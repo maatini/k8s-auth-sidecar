@@ -1,0 +1,263 @@
+# RR-Sidecar Configuration
+# ========================
+
+quarkus:
+  application:
+    name: rr-sidecar
+    version: 1.0.0
+
+  # HTTP Server Configuration
+  http:
+    port: 8080
+    cors:
+      ~: true
+      origins: "*"
+      methods: GET,POST,PUT,DELETE,PATCH,OPTIONS
+      headers: "*"
+      access-control-max-age: 24H
+
+  # OIDC Configuration for JWT Validation
+  oidc:
+    # Default tenant (Keycloak)
+    auth-server-url: ${OIDC_AUTH_SERVER_URL:https://keycloak.example.com/realms/myrealm}
+    client-id: ${OIDC_CLIENT_ID:rr-sidecar}
+    credentials:
+      secret: ${OIDC_CLIENT_SECRET:}
+    tls:
+      verification: ${OIDC_TLS_VERIFICATION:required}
+    
+    # Token validation settings
+    token:
+      issuer: ${OIDC_TOKEN_ISSUER:}
+      audience: ${OIDC_TOKEN_AUDIENCE:}
+      principal-claim: ${OIDC_PRINCIPAL_CLAIM:sub}
+      
+    # JWKS cache configuration
+    jwks:
+      resolve-early: true
+      cache-size: 10
+      cache-time-to-live: 10m
+    
+    # Multi-tenancy configuration
+    tenant-enabled: ${OIDC_TENANT_ENABLED:false}
+    
+    # Microsoft Entra ID Tenant
+    entra:
+      auth-server-url: ${ENTRA_AUTH_SERVER_URL:https://login.microsoftonline.com/common/v2.0}
+      client-id: ${ENTRA_CLIENT_ID:}
+      token:
+        issuer: ${ENTRA_TOKEN_ISSUER:}
+        audience: ${ENTRA_TOKEN_AUDIENCE:}
+
+  # REST Client Configuration
+  rest-client:
+    "space.maatini.sidecar.client.RolesServiceClient":
+      url: ${ROLES_SERVICE_URL:http://localhost:8082}
+      scope: jakarta.enterprise.context.ApplicationScoped
+      connect-timeout: 5000
+      read-timeout: 10000
+
+  # Caching Configuration
+  cache:
+    caffeine:
+      "roles-cache":
+        initial-capacity: 100
+        maximum-size: 1000
+        expire-after-write: 5m
+      "permissions-cache":
+        initial-capacity: 100
+        maximum-size: 1000
+        expire-after-write: 5m
+      "policy-decision-cache":
+        initial-capacity: 500
+        maximum-size: 5000
+        expire-after-write: 1m
+
+  # Health and Metrics
+  smallrye-health:
+    ui:
+      enable: true
+  
+  micrometer:
+    export:
+      prometheus:
+        enabled: true
+    binder:
+      http-server:
+        enabled: true
+      jvm: true
+      system: true
+
+  # Logging Configuration
+  log:
+    level: ${QUARKUS_LOG_LEVEL:INFO}
+    category:
+      "space.maatini.sidecar":
+        level: ${SIDECAR_LOG_LEVEL:DEBUG}
+      "io.quarkus.oidc":
+        level: DEBUG
+    console:
+      json: ${QUARKUS_LOG_JSON:true}
+      format: "%d{yyyy-MM-dd HH:mm:ss,SSS} %-5p [%c{3.}] (%t) %s%e%n"
+    
+  # OpenTelemetry
+  otel:
+    enabled: ${OTEL_ENABLED:false}
+    exporter:
+      otlp:
+        endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4317}
+    service:
+      name: rr-sidecar
+
+  # Native Image Configuration
+  native:
+    additional-build-args: -H:+ReportExceptionStackTraces
+
+# ===================
+# Sidecar Configuration
+# ===================
+
+sidecar:
+  # Proxy Configuration
+  proxy:
+    target:
+      host: ${PROXY_TARGET_HOST:localhost}
+      port: ${PROXY_TARGET_PORT:8081}
+      scheme: ${PROXY_TARGET_SCHEME:http}
+    timeout:
+      connect: 5000
+      read: 30000
+    
+    # Headers to propagate to backend
+    propagate-headers:
+      - X-Request-ID
+      - X-Correlation-ID
+      - X-Forwarded-For
+      - X-Forwarded-Proto
+    
+    # Headers added programmatically by ProxyService
+    # Available placeholders: ${user.id}, ${user.email}, ${user.roles}, ${user.tenant}
+    # These are resolved at runtime, not by Quarkus config
+    add-headers: {}
+
+  # Authentication Configuration
+  auth:
+    enabled: ${AUTH_ENABLED:true}
+    
+    # Paths that don't require authentication
+    public-paths:
+      - /health
+      - /health/live
+      - /health/ready
+      - /metrics
+      - /q/health
+      - /q/metrics
+      - /q/openapi
+      - /q/swagger-ui
+      - /api/public/**
+    
+    # Token extraction
+    token:
+      header-name: Authorization
+      header-prefix: Bearer
+      cookie-name: ${AUTH_TOKEN_COOKIE:access_token}
+      query-param: ${AUTH_TOKEN_QUERY_PARAM:token}
+
+  # Authorization Configuration
+  authz:
+    enabled: ${AUTHZ_ENABLED:true}
+    
+    # Roles Service Client
+    roles-service:
+      enabled: ${ROLES_SERVICE_ENABLED:true}
+      path: /api/v1/users/{userId}/roles
+      cache-enabled: true
+      cache-ttl: 300
+    
+    # Permissions Service Client
+    permissions-service:
+      enabled: ${PERMISSIONS_SERVICE_ENABLED:true}
+      path: /api/v1/users/{userId}/permissions
+      cache-enabled: true
+      cache-ttl: 300
+
+  # OPA (Open Policy Agent) Configuration
+  opa:
+    enabled: ${OPA_ENABLED:true}
+    mode: ${OPA_MODE:embedded}  # embedded, external
+    
+    # External OPA server (when mode=external)
+    external:
+      url: ${OPA_URL:http://localhost:8181}
+      decision-path: ${OPA_DECISION_PATH:/v1/data/authz/allow}
+      timeout: 5000
+    
+    # Embedded OPA (when mode=embedded)
+    embedded:
+      policy-directory: ${OPA_POLICY_DIR:/policies}
+      bundle-path: ${OPA_BUNDLE_PATH:}
+      watch-policies: true
+      
+    # Default policy package
+    default-package: authz
+    default-rule: allow
+
+  # Rate Limiting
+  rate-limit:
+    enabled: ${RATE_LIMIT_ENABLED:false}
+    requests-per-second: ${RATE_LIMIT_RPS:100}
+    burst-size: ${RATE_LIMIT_BURST:200}
+
+  # Audit Logging
+  audit:
+    enabled: ${AUDIT_ENABLED:true}
+    log-request-body: false
+    log-response-body: false
+    sensitive-headers:
+      - Authorization
+      - Cookie
+      - X-Api-Key
+
+# ===================
+# Profile-specific Configuration
+# ===================
+
+"%dev":
+  quarkus:
+    log:
+      console:
+        json: false
+      level: DEBUG
+    oidc:
+      auth-server-url: http://localhost:8180/realms/development
+      tls:
+        verification: none
+  sidecar:
+    auth:
+      enabled: true
+    authz:
+      enabled: true
+    opa:
+      enabled: true
+      mode: embedded
+
+"%test":
+  quarkus:
+    log:
+      level: WARN
+    oidc:
+      auth-server-url: http://localhost:8180/realms/test
+  sidecar:
+    auth:
+      enabled: true
+    authz:
+      enabled: false
+    opa:
+      enabled: false
+
+"%prod":
+  quarkus:
+    log:
+      console:
+        json: true
+      level: INFO

@@ -1,0 +1,30 @@
+{
+  "packages": [
+    "jdk@21",
+    "maven@latest",
+    "open-policy-agent@latest",
+    "kubectl@latest",
+    "kustomize@latest",
+    "quarkus@latest"
+  ],
+  "env": {
+    "JAVA_HOME": "$DEVBOX_PACKAGES_DIR/jdk"
+  },
+  "shell": {
+    "init_hook": [
+      "echo '🚀 RR-Sidecar Devbox Environment'",
+      "echo '☕ Java Version:' $(java -version 2>&1 | head -n 1)",
+      "echo '📦 Maven Version:' $(mvn -v | head -n 1)",
+      "echo '🛡️ OPA Version:' $(opa version | head -n 1)"
+    ],
+    "scripts": {
+      "build": "mvn package",
+      "dev": "mvn quarkus:dev",
+      "test": "mvn test",
+      "test:coverage": "mvn test -Dquarkus.jacoco.report=true",
+      "test:policies": "opa test src/main/resources/policies -v",
+      "image:build": "docker build -t space.maatini/rr-sidecar:1.0.0 .",
+      "deploy:dev": "kubectl apply -k k8s/overlays/development"
+    }
+  }
+}

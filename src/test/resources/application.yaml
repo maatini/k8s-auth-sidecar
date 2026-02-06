@@ -1,0 +1,53 @@
+# Test configuration
+quarkus:
+  log:
+    level: WARN
+    console:
+      json: false
+  
+  oidc:
+    # Use Quarkus test OIDC server
+    auth-server-url: ${keycloak.url:http://localhost:8180}/realms/quarkus
+    client-id: test-client
+    credentials:
+      secret: test-secret
+    tls:
+      verification: none
+
+  rest-client:
+    "space.maatini.sidecar.client.RolesServiceClient":
+      url: http://localhost:8082
+
+  # Disable tracing for tests
+  otel:
+    enabled: false
+
+sidecar:
+  auth:
+    enabled: true
+    public-paths:
+      - /health
+      - /q/health
+      - /q/metrics
+      - /api/public/**
+  
+  authz:
+    enabled: true
+    roles-service:
+      enabled: false  # Disabled for unit tests
+  
+  opa:
+    enabled: true
+    mode: embedded
+    embedded:
+      policy-directory: src/main/resources/policies
+  
+  proxy:
+    target:
+      host: localhost
+      port: 8081
+    # Simplified headers without placeholders for tests
+    add-headers: {}
+  
+  audit:
+    enabled: false

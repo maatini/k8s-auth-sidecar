@@ -1,0 +1,47 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: rr-sidecar-prod
+
+resources:
+  - ../../base
+
+namePrefix: prod-
+
+commonLabels:
+  environment: production
+
+# Production-specific patches
+patches:
+  - patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 3
+    target:
+      kind: Deployment
+      name: my-application
+
+  - patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/memory
+        value: "256Mi"
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/memory
+        value: "1Gi"
+    target:
+      kind: Deployment
+      name: my-application
+
+configMapGenerator:
+  - name: rr-sidecar-config
+    behavior: merge
+    literals:
+      - QUARKUS_LOG_LEVEL=WARN
+      - SIDECAR_LOG_LEVEL=INFO
+      - QUARKUS_LOG_JSON=true
+      - OTEL_ENABLED=true
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+
+images:
+  - name: space.maatini/rr-sidecar
+    newTag: "1.0.0"

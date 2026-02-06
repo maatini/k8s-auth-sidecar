@@ -1,0 +1,226 @@
+# Example Deployment with RR-Sidecar as Sidecar Container
+# This deployment shows how to add the sidecar to your application
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-application
+  namespace: rr-sidecar-demo
+  labels:
+    app: my-application
+    app.kubernetes.io/name: my-application
+    app.kubernetes.io/part-of: rr-sidecar-demo
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: my-application
+  template:
+    metadata:
+      labels:
+        app: my-application
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/q/metrics"
+    spec:
+      serviceAccountName: my-application
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      
+      containers:
+        # ==========================================
+        # SIDECAR CONTAINER (rr-sidecar)
+        # Handles AuthN/AuthZ before forwarding to main app
+        # ==========================================
+        - name: rr-sidecar
+          image: space.maatini/rr-sidecar:1.0.0
+          imagePullPolicy: IfNotPresent
+          
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          
+          envFrom:
+            - configMapRef:
+                name: rr-sidecar-config
+            - secretRef:
+                name: rr-sidecar-secrets
+          
+          env:
+            # Proxy target is the main application container
+            - name: PROXY_TARGET_HOST
+              value: "localhost"
+            - name: PROXY_TARGET_PORT
+              value: "8081"
+            - name: PROXY_TARGET_SCHEME
+              value: "http"
+          
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          
+          livenessProbe:
+            httpGet:
+              path: /q/health/live
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 30
+            timeoutSeconds: 3
+            failureThreshold: 3
+          
+          readinessProbe:
+            httpGet:
+              path: /q/health/ready
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          
+          volumeMounts:
+            - name: policies
+              mountPath: /policies
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+
+        # ==========================================
+        # MAIN APPLICATION CONTAINER
+        # Your actual application that receives authorized requests
+        # ==========================================
+        - name: application
+          image: my-application:latest
+          imagePullPolicy: IfNotPresent
+          
+          # Note: Only exposed internally, not to the service
+          ports:
+            - name: http-internal
+              containerPort: 8081
+              protocol: TCP
+          
+          env:
+            - name: SERVER_PORT
+              value: "8081"
+            # The app doesn't need auth - sidecar handles it
+            - name: SECURITY_ENABLED
+              value: "false"
+          
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "200m"
+            limits:
+              memory: "1Gi"
+              cpu: "1000m"
+          
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8081
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8081
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            capabilities:
+              drop:
+                - ALL
+      
+      volumes:
+        - name: policies
+          configMap:
+            name: rr-sidecar-policies
+        - name: tmp
+          emptyDir: {}
+      
+      # Pod anti-affinity for high availability
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app: my-application
+                topologyKey: kubernetes.io/hostname
+
+---
+# Service pointing to the SIDECAR port (8080)
+# All external traffic goes through the sidecar first
+apiVersion: v1
+kind: Service
+metadata:
+  name: my-application
+  namespace: rr-sidecar-demo
+  labels:
+    app: my-application
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080  # Points to sidecar, NOT the main app
+      protocol: TCP
+  selector:
+    app: my-application
+
+---
+# ServiceAccount
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: my-application
+  namespace: rr-sidecar-demo
+  labels:
+    app: my-application
+
+---
+# Ingress (optional)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-application
+  namespace: rr-sidecar-demo
+  labels:
+    app: my-application
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+spec:
+  tls:
+    - hosts:
+        - my-application.example.com
+      secretName: my-application-tls
+  rules:
+    - host: my-application.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: my-application
+                port:
+                  number: 80

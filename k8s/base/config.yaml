@@ -1,0 +1,111 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: rr-sidecar-demo
+  labels:
+    name: rr-sidecar-demo
+    app.kubernetes.io/part-of: rr-sidecar
+---
+# ConfigMap for Sidecar Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rr-sidecar-config
+  namespace: rr-sidecar-demo
+  labels:
+    app: rr-sidecar
+data:
+  # OIDC Configuration
+  OIDC_AUTH_SERVER_URL: "https://keycloak.example.com/realms/myrealm"
+  OIDC_CLIENT_ID: "rr-sidecar"
+  OIDC_TENANT_ENABLED: "true"
+  
+  # Microsoft Entra ID (optional)
+  ENTRA_AUTH_SERVER_URL: "https://login.microsoftonline.com/YOUR_TENANT_ID/v2.0"
+  ENTRA_CLIENT_ID: ""
+  
+  # Roles Service
+  ROLES_SERVICE_URL: "http://roles-service:8080"
+  
+  # OPA Configuration
+  OPA_ENABLED: "true"
+  OPA_MODE: "embedded"
+  OPA_POLICY_DIR: "/policies"
+  
+  # Logging
+  QUARKUS_LOG_LEVEL: "INFO"
+  SIDECAR_LOG_LEVEL: "DEBUG"
+  QUARKUS_LOG_JSON: "true"
+  
+  # Metrics
+  OTEL_ENABLED: "false"
+---
+# ConfigMap for OPA Policies
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rr-sidecar-policies
+  namespace: rr-sidecar-demo
+  labels:
+    app: rr-sidecar
+data:
+  authz.rego: |
+    package authz
+
+    import future.keywords.if
+    import future.keywords.in
+
+    default allow := false
+
+    # Allow superadmin
+    allow if {
+        "superadmin" in input.user.roles
+    }
+
+    # Allow admin paths for admin users
+    allow if {
+        startswith(input.request.path, "/api/admin")
+        "admin" in input.user.roles
+    }
+
+    # Allow read access for authenticated users
+    allow if {
+        input.request.method == "GET"
+        startswith(input.request.path, "/api/")
+        role_match({"admin", "user", "viewer"})
+    }
+
+    # Allow write access for users and admins
+    allow if {
+        input.request.method in ["POST", "PUT", "DELETE", "PATCH"]
+        startswith(input.request.path, "/api/")
+        role_match({"admin", "user"})
+    }
+
+    # Public endpoints
+    allow if {
+        input.request.path in ["/health", "/metrics", "/ready", "/live"]
+    }
+
+    allow if {
+        startswith(input.request.path, "/api/public/")
+    }
+
+    # Helper function
+    role_match(required_roles) if {
+        some role in input.user.roles
+        role in required_roles
+    }
+---
+# Secret for sensitive configuration
+apiVersion: v1
+kind: Secret
+metadata:
+  name: rr-sidecar-secrets
+  namespace: rr-sidecar-demo
+  labels:
+    app: rr-sidecar
+type: Opaque
+stringData:
+  OIDC_CLIENT_SECRET: "your-client-secret-here"
+  ENTRA_CLIENT_SECRET: ""

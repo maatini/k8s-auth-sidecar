@@ -1,0 +1,35 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: rr-sidecar-dev
+
+resources:
+  - ../../base
+
+namePrefix: dev-
+
+commonLabels:
+  environment: development
+
+patches:
+  - patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 1
+    target:
+      kind: Deployment
+      name: my-application
+
+configMapGenerator:
+  - name: rr-sidecar-config
+    behavior: merge
+    literals:
+      - QUARKUS_LOG_LEVEL=DEBUG
+      - SIDECAR_LOG_LEVEL=DEBUG
+      - QUARKUS_LOG_JSON=false
+      - OTEL_ENABLED=false
+      - OIDC_TLS_VERIFICATION=none
+
+images:
+  - name: space.maatini/rr-sidecar
+    newTag: "latest"
