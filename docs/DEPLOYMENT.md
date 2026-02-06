@@ -1,6 +1,6 @@
 # Deployment-Anleitung
 
-Diese Anleitung beschreibt Schritt für Schritt, wie der RR-Sidecar in Kubernetes deployt wird.
+Diese Anleitung beschreibt Schritt für Schritt, wie der K8s-Auth-Sidecar in Kubernetes deployt wird.
 
 ## Voraussetzungen
 
@@ -14,10 +14,10 @@ Diese Anleitung beschreibt Schritt für Schritt, wie der RR-Sidecar in Kubernete
 
 ```bash
 # 1. Image bauen
-docker build -t your-registry.io/rr-sidecar:1.0.0 .
+docker build -t your-registry.io/k8s-auth-sidecar:1.0.0 .
 
 # 2. In Registry pushen
-docker push your-registry.io/rr-sidecar:1.0.0
+docker push your-registry.io/k8s-auth-sidecar:1.0.0
 ```
 
 ## Schritt 2: Konfiguration anpassen
@@ -42,10 +42,10 @@ ROLES_SERVICE_URL: "http://roles-service.namespace.svc.cluster.local:8080"
 ### 2.2 Secrets erstellen
 
 ```bash
-kubectl create secret generic rr-sidecar-secrets \
+kubectl create secret generic k8s-auth-sidecar-secrets \
   --from-literal=OIDC_CLIENT_SECRET='your-secret' \
   --from-literal=ENTRA_CLIENT_SECRET='your-azure-secret' \
-  -n rr-sidecar-demo
+  -n k8s-auth-sidecar-demo
 ```
 
 ### 2.3 Image-Tag anpassen
@@ -54,8 +54,8 @@ Bearbeite `k8s/overlays/production/kustomization.yaml`:
 
 ```yaml
 images:
-  - name: space.maatini/rr-sidecar
-    newName: your-registry.io/rr-sidecar
+  - name: space.maatini/k8s-auth-sidecar
+    newName: your-registry.io/k8s-auth-sidecar
     newTag: "1.0.0"
 ```
 
@@ -67,7 +67,7 @@ Bearbeite die Policy-ConfigMap in `k8s/base/config.yaml`:
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: rr-sidecar-policies
+  name: k8s-auth-sidecar-policies
 data:
   authz.rego: |
     package authz
@@ -89,13 +89,13 @@ kubectl apply -k k8s/overlays/production
 
 ```bash
 # Pods prüfen
-kubectl get pods -n rr-sidecar-demo
+kubectl get pods -n k8s-auth-sidecar-demo
 
 # Logs anzeigen
-kubectl logs -n rr-sidecar-demo -l app=my-application -c rr-sidecar
+kubectl logs -n k8s-auth-sidecar-demo -l app=my-application -c k8s-auth-sidecar
 
 # Health Check
-kubectl exec -n rr-sidecar-demo deploy/my-application -c rr-sidecar -- \
+kubectl exec -n k8s-auth-sidecar-demo deploy/my-application -c k8s-auth-sidecar -- \
   wget -qO- http://localhost:8080/q/health
 ```
 
@@ -117,8 +117,8 @@ spec:
   template:
     spec:
       containers:
-        - name: rr-sidecar
-          image: your-registry.io/rr-sidecar:1.0.0
+        - name: k8s-auth-sidecar
+          image: your-registry.io/k8s-auth-sidecar:1.0.0
           ports:
             - containerPort: 8080
           env:
@@ -128,16 +128,16 @@ spec:
               value: "8080"  # Port deiner App
           envFrom:
             - configMapRef:
-                name: rr-sidecar-config
+                name: k8s-auth-sidecar-config
             - secretRef:
-                name: rr-sidecar-secrets
+                name: k8s-auth-sidecar-secrets
           volumeMounts:
             - name: policies
               mountPath: /policies
       volumes:
         - name: policies
           configMap:
-            name: rr-sidecar-policies
+            name: k8s-auth-sidecar-policies
 ```
 
 ### 6.2 Service anpassen
@@ -161,7 +161,7 @@ spec:
 
 1. OIDC-Konfiguration prüfen:
    ```bash
-   kubectl logs -c rr-sidecar ... | grep -i oidc
+   kubectl logs -c k8s-auth-sidecar ... | grep -i oidc
    ```
 
 2. JWKS-Endpoint erreichbar?
@@ -173,7 +173,7 @@ spec:
 
 1. Policy-Evaluation prüfen:
    ```bash
-   kubectl logs -c rr-sidecar ... | grep -i policy
+   kubectl logs -c k8s-auth-sidecar ... | grep -i policy
    ```
 
 2. Roles-Service erreichbar?
@@ -185,7 +185,7 @@ spec:
 
 1. Backend erreichbar?
    ```bash
-   kubectl exec -c rr-sidecar ... -- wget -qO- http://localhost:$PROXY_TARGET_PORT/health
+   kubectl exec -c k8s-auth-sidecar ... -- wget -qO- http://localhost:$PROXY_TARGET_PORT/health
    ```
 
 2. Backend-Port korrekt?
@@ -198,7 +198,7 @@ spec:
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
-  name: rr-sidecar
+  name: k8s-auth-sidecar
 spec:
   selector:
     matchLabels:
@@ -228,6 +228,6 @@ kubectl apply -k k8s/overlays/production
 Bei `OPA_MODE=embedded` und `watch-policies=true` werden Policies automatisch neu geladen:
 
 ```bash
-kubectl patch configmap rr-sidecar-policies -n rr-sidecar-demo \
+kubectl patch configmap k8s-auth-sidecar-policies -n k8s-auth-sidecar-demo \
   --patch '{"data":{"authz.rego":"...neue policy..."}}'
 ```

@@ -1,9 +1,9 @@
-# RR-Sidecar Configuration
+# K8s-Auth-Sidecar Configuration
 # ========================
 
 quarkus:
   application:
-    name: rr-sidecar
+    name: k8s-auth-sidecar
     version: 1.0.0
 
   # HTTP Server Configuration
@@ -20,7 +20,7 @@ quarkus:
   oidc:
     # Default tenant (Keycloak)
     auth-server-url: ${OIDC_AUTH_SERVER_URL:https://keycloak.example.com/realms/myrealm}
-    client-id: ${OIDC_CLIENT_ID:rr-sidecar}
+    client-id: ${OIDC_CLIENT_ID:k8s-auth-sidecar}
     credentials:
       secret: ${OIDC_CLIENT_SECRET:}
     tls:
@@ -107,7 +107,7 @@ quarkus:
       otlp:
         endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4317}
     service:
-      name: rr-sidecar
+      name: k8s-auth-sidecar
 
   # Native Image Configuration
   native:

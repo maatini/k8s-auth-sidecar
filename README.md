@@ -1,14 +1,14 @@
 <div align="center">
-  <img src="docs/images/banner.png" alt="RR-Sidecar Banner" width="100%">
+  <img src="docs/images/banner.png" alt="K8s-Auth-Sidecar Banner" width="100%">
 </div>
 
-# RR-Sidecar - AuthN/AuthZ Sidecar für Kubernetes
+# K8s-Auth-Sidecar - AuthN/AuthZ Sidecar für Kubernetes
 
 [![Quarkus](https://img.shields.io/badge/Quarkus-3.17-blue.svg)](https://quarkus.io)
 [![Java](https://img.shields.io/badge/Java-21-orange.svg)](https://openjdk.org)
 [![License](https://img.shields.io/badge/License-Apache%202.0-green.svg)](LICENSE)
 
-**RR-Sidecar** (Request Router Sidecar) ist ein Quarkus-basierter Microservice, der als Sidecar in Kubernetes-Pods läuft und Authentifizierung (AuthN) sowie Autorisierung (AuthZ) für den Haupt-Container übernimmt – ähnlich wie Cerbos oder OPA.
+**K8s-Auth-Sidecar** (Request Router Sidecar) ist ein Quarkus-basierter Microservice, der als Sidecar in Kubernetes-Pods läuft und Authentifizierung (AuthN) sowie Autorisierung (AuthZ) für den Haupt-Container übernimmt – ähnlich wie Cerbos oder OPA.
 
 ## 🏗️ Architektur
 
@@ -49,7 +49,7 @@ Jeder Request durchläuft diese Pipeline:
 Du musst den Sidecar **nicht neu starten**, um Regeln zu ändern!
 
 *   **Embedded Mode (Standard):**
-    1.  Regeln liegen in einer Kubernetes **ConfigMap** (`rr-sidecar-policies`).
+    1.  Regeln liegen in einer Kubernetes **ConfigMap** (`k8s-auth-sidecar-policies`).
     2.  Du änderst die Regel in der ConfigMap (`kubectl edit` oder GitOps).
     3.  Kubernetes aktualisiert die Datei im Pod.
     4.  Der Sidecar bemerkt die Änderung und lädt die neuen Regeln **automatisch (Hot Reload)**.
@@ -78,8 +78,8 @@ Du musst den Sidecar **nicht neu starten**, um Regeln zu ändern!
 
 ```bash
 # Projekt klonen
-git clone https://github.com/maatini/rr-sidecar.git
-cd rr-sidecar
+git clone https://github.com/maatini/k8s-auth-sidecar.git
+cd k8s-auth-sidecar
 
 # Dependencies herunterladen und kompilieren
 mvn compile
@@ -95,10 +95,10 @@ mvn test
 
 ```bash
 # JVM-Image bauen
-docker build -t space.maatini/rr-sidecar:1.0.0 .
+docker build -t space.maatini/k8s-auth-sidecar:1.0.0 .
 
 # Native Image bauen (dauert länger)
-docker build -f Dockerfile.native -t space.maatini/rr-sidecar:1.0.0-native .
+docker build -f Dockerfile.native -t space.maatini/k8s-auth-sidecar:1.0.0-native .
 ```
 
 ## ⚙️ Konfiguration
@@ -108,7 +108,7 @@ docker build -f Dockerfile.native -t space.maatini/rr-sidecar:1.0.0-native .
 | Variable | Beschreibung | Standard |
 |----------|--------------|----------|
 | `OIDC_AUTH_SERVER_URL` | Keycloak Auth-Server URL | `https://keycloak.example.com/realms/myrealm` |
-| `OIDC_CLIENT_ID` | OIDC Client ID | `rr-sidecar` |
+| `OIDC_CLIENT_ID` | OIDC Client ID | `k8s-auth-sidecar` |
 | `OIDC_CLIENT_SECRET` | OIDC Client Secret | - |
 | `OIDC_TENANT_ENABLED` | Multi-Tenant aktivieren | `false` |
 | `ENTRA_AUTH_SERVER_URL` | Entra ID Auth-Server URL | - |
@@ -219,9 +219,9 @@ spec:
       ports:
         - containerPort: 8081  # Interne Port
 
-    # RR-Sidecar hinzufügen
-    - name: rr-sidecar
-      image: space.maatini/rr-sidecar:1.0.0
+    # K8s-Auth-Sidecar hinzufügen
+    - name: k8s-auth-sidecar
+      image: space.maatini/k8s-auth-sidecar:1.0.0
       ports:
         - containerPort: 8080  # Externe Port
       env:
@@ -362,7 +362,7 @@ Beispiel `input.json`:
 ## 📁 Projektstruktur
 
 ```
-rr-sidecar/
+k8s-auth-sidecar/
 ├── docs/
 │   └── ARCHITECTURE.md       # Architektur-Dokumentation
 ├── k8s/

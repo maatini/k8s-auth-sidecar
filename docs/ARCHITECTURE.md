@@ -2,7 +2,7 @@
 
 ## Übersicht
 
-Der **rr-sidecar** (Request Router Sidecar) ist ein Quarkus-basierter Microservice, der als Sidecar in einem Kubernetes-Pod läuft und Authentifizierung (AuthN) sowie Autorisierung (AuthZ) für den Haupt-Container übernimmt.
+Der **k8s-auth-sidecar** (Request Router Sidecar) ist ein Quarkus-basierter Microservice, der als Sidecar in einem Kubernetes-Pod läuft und Authentifizierung (AuthN) sowie Autorisierung (AuthZ) für den Haupt-Container übernimmt.
 
 ## Architekturdiagramm (ASCII)
 
@@ -130,8 +130,8 @@ spec:
         - containerPort: 8081
     
     # Sidecar Container (AuthN/AuthZ)
-    - name: rr-sidecar
-      image: space.maatini/rr-sidecar:latest
+    - name: k8s-auth-sidecar
+      image: space.maatini/k8s-auth-sidecar:latest
       ports:
         - containerPort: 8080
       env:

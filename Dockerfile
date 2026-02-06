@@ -1,5 +1,5 @@
 # =====================================================
-# RR-Sidecar Multi-Stage Dockerfile
+# K8s-Auth-Sidecar Multi-Stage Dockerfile
 # =====================================================
 # Stage 1: Build with Maven
 # Stage 2: Native Image Build (optional)
@@ -12,7 +12,7 @@
 FROM eclipse-temurin:21-jdk-alpine AS build
 
 LABEL maintainer="space.maatini"
-LABEL description="RR-Sidecar AuthN/AuthZ Microservice Build Stage"
+LABEL description="K8s-Auth-Sidecar AuthN/AuthZ Microservice Build Stage"
 
 # Install Maven
 RUN apk add --no-cache maven
@@ -47,7 +47,7 @@ RUN mvn package -DskipTests -Dquarkus.package.type=uber-jar
 #     -H:+ReportExceptionStackTraces \
 #     --no-fallback \
 #     --static \
-#     -o /app/rr-sidecar
+#     -o /app/k8s-auth-sidecar
 
 # =====================================================
 # Stage 3: Runtime (JVM Mode)
@@ -55,7 +55,7 @@ RUN mvn package -DskipTests -Dquarkus.package.type=uber-jar
 FROM eclipse-temurin:21-jre-alpine AS runtime
 
 LABEL maintainer="space.maatini"
-LABEL description="RR-Sidecar AuthN/AuthZ Microservice"
+LABEL description="K8s-Auth-Sidecar AuthN/AuthZ Microservice"
 LABEL version="1.0.0"
 
 # Create non-root user for security
@@ -64,7 +64,7 @@ RUN addgroup -S sidecar && adduser -S sidecar -G sidecar
 WORKDIR /app
 
 # Copy the uber-jar from build stage
-COPY --from=build /app/target/*-runner.jar /app/rr-sidecar.jar
+COPY --from=build /app/target/*-runner.jar /app/k8s-auth-sidecar.jar
 
 # Copy policies
 COPY --from=build /app/src/main/resources/policies /policies
@@ -103,16 +103,16 @@ ENV QUARKUS_HTTP_PORT=8080 \
     OPA_POLICY_DIR=/policies
 
 # Run the application
-ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar /app/rr-sidecar.jar"]
+ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar /app/k8s-auth-sidecar.jar"]
 
 # =====================================================
 # Stage 3 Alternative: Native Runtime
 # =====================================================
 # FROM gcr.io/distroless/static-debian12 AS native-runtime
 # 
-# COPY --from=native-build /app/rr-sidecar /app/rr-sidecar
+# COPY --from=native-build /app/k8s-auth-sidecar /app/k8s-auth-sidecar
 # COPY --from=build /app/src/main/resources/policies /policies
 # 
 # EXPOSE 8080
 # 
-# ENTRYPOINT ["/app/rr-sidecar"]
+# ENTRYPOINT ["/app/k8s-auth-sidecar"]

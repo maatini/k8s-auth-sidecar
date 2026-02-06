@@ -1,14 +1,14 @@
-# Example Deployment with RR-Sidecar as Sidecar Container
+# Example Deployment with K8s-Auth-Sidecar as Sidecar Container
 # This deployment shows how to add the sidecar to your application
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: my-application
-  namespace: rr-sidecar-demo
+  namespace: k8s-auth-sidecar-demo
   labels:
     app: my-application
     app.kubernetes.io/name: my-application
-    app.kubernetes.io/part-of: rr-sidecar-demo
+    app.kubernetes.io/part-of: k8s-auth-sidecar-demo
 spec:
   replicas: 2
   selector:
@@ -31,11 +31,11 @@ spec:
       
       containers:
         # ==========================================
-        # SIDECAR CONTAINER (rr-sidecar)
+        # SIDECAR CONTAINER (k8s-auth-sidecar)
         # Handles AuthN/AuthZ before forwarding to main app
         # ==========================================
-        - name: rr-sidecar
-          image: space.maatini/rr-sidecar:1.0.0
+        - name: k8s-auth-sidecar
+          image: space.maatini/k8s-auth-sidecar:1.0.0
           imagePullPolicy: IfNotPresent
           
           ports:
@@ -45,9 +45,9 @@ spec:
           
           envFrom:
             - configMapRef:
-                name: rr-sidecar-config
+                name: k8s-auth-sidecar-config
             - secretRef:
-                name: rr-sidecar-secrets
+                name: k8s-auth-sidecar-secrets
           
           env:
             # Proxy target is the main application container
@@ -151,7 +151,7 @@ spec:
       volumes:
         - name: policies
           configMap:
-            name: rr-sidecar-policies
+            name: k8s-auth-sidecar-policies
         - name: tmp
           emptyDir: {}
       
@@ -173,7 +173,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: my-application
-  namespace: rr-sidecar-demo
+  namespace: k8s-auth-sidecar-demo
   labels:
     app: my-application
 spec:
@@ -192,7 +192,7 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: my-application
-  namespace: rr-sidecar-demo
+  namespace: k8s-auth-sidecar-demo
   labels:
     app: my-application
 
@@ -202,7 +202,7 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: my-application
-  namespace: rr-sidecar-demo
+  namespace: k8s-auth-sidecar-demo
   labels:
     app: my-application
   annotations:

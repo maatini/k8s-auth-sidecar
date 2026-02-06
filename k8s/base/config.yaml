@@ -1,23 +1,23 @@
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: rr-sidecar-demo
+  name: k8s-auth-sidecar-demo
   labels:
-    name: rr-sidecar-demo
-    app.kubernetes.io/part-of: rr-sidecar
+    name: k8s-auth-sidecar-demo
+    app.kubernetes.io/part-of: k8s-auth-sidecar
 ---
 # ConfigMap for Sidecar Configuration
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: rr-sidecar-config
-  namespace: rr-sidecar-demo
+  name: k8s-auth-sidecar-config
+  namespace: k8s-auth-sidecar-demo
   labels:
-    app: rr-sidecar
+    app: k8s-auth-sidecar
 data:
   # OIDC Configuration
   OIDC_AUTH_SERVER_URL: "https://keycloak.example.com/realms/myrealm"
-  OIDC_CLIENT_ID: "rr-sidecar"
+  OIDC_CLIENT_ID: "k8s-auth-sidecar"
   OIDC_TENANT_ENABLED: "true"
   
   # Microsoft Entra ID (optional)
@@ -44,10 +44,10 @@ data:
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: rr-sidecar-policies
-  namespace: rr-sidecar-demo
+  name: k8s-auth-sidecar-policies
+  namespace: k8s-auth-sidecar-demo
   labels:
-    app: rr-sidecar
+    app: k8s-auth-sidecar
 data:
   authz.rego: |
     package authz
@@ -101,10 +101,10 @@ data:
 apiVersion: v1
 kind: Secret
 metadata:
-  name: rr-sidecar-secrets
-  namespace: rr-sidecar-demo
+  name: k8s-auth-sidecar-secrets
+  namespace: k8s-auth-sidecar-demo
   labels:
-    app: rr-sidecar
+    app: k8s-auth-sidecar
 type: Opaque
 stringData:
   OIDC_CLIENT_SECRET: "your-client-secret-here"

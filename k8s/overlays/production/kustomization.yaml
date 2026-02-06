@@ -1,7 +1,7 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-namespace: rr-sidecar-prod
+namespace: k8s-auth-sidecar-prod
 
 resources:
   - ../../base
@@ -33,7 +33,7 @@ patches:
       name: my-application
 
 configMapGenerator:
-  - name: rr-sidecar-config
+  - name: k8s-auth-sidecar-config
     behavior: merge
     literals:
       - QUARKUS_LOG_LEVEL=WARN
@@ -43,5 +43,5 @@ configMapGenerator:
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
 
 images:
-  - name: space.maatini/rr-sidecar
+  - name: space.maatini/k8s-auth-sidecar
     newTag: "1.0.0"
