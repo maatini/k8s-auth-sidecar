@@ -10,12 +10,14 @@ import io.vertx.mutiny.core.buffer.Buffer;
 import io.vertx.mutiny.ext.web.client.HttpResponse;
 import io.vertx.mutiny.ext.web.client.WebClient;
 import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.jboss.logging.Logger;
 import space.maatini.sidecar.config.SidecarConfig;
 import space.maatini.sidecar.model.AuthContext;
 import space.maatini.sidecar.model.PolicyDecision;
+import space.maatini.sidecar.util.PathMatcher;
 import space.maatini.sidecar.model.PolicyInput;
 
 import java.io.IOException;
@@ -48,7 +50,7 @@ public class PolicyService {
     @PostConstruct
     void init() {
         this.webClient = WebClient.create(vertx);
-        
+
         if (config.opa().enabled() && "embedded".equals(config.opa().mode())) {
             loadEmbeddedPolicies();
             if (config.opa().embedded().watchPolicies()) {
@@ -57,13 +59,28 @@ public class PolicyService {
         }
     }
 
+    @PreDestroy
+    void shutdown() {
+        if (watchService != null) {
+            try {
+                watchService.close();
+                LOG.info("Policy watcher stopped");
+            } catch (IOException e) {
+                LOG.warnf("Failed to close policy watcher: %s", e.getMessage());
+            }
+        }
+        if (webClient != null) {
+            webClient.close();
+        }
+    }
+
     /**
      * Evaluates an authorization policy for the given context and request.
      *
      * @param authContext The authentication context
-     * @param method The HTTP method
-     * @param path The request path
-     * @param headers The request headers
+     * @param method      The HTTP method
+     * @param path        The request path
+     * @param headers     The request headers
      * @param queryParams The query parameters
      * @return A Uni containing the policy decision
      */
@@ -101,19 +118,18 @@ public class PolicyService {
             requestBody.set("input", objectMapper.valueToTree(input));
 
             return webClient.postAbs(opaUrl + decisionPath)
-                .timeout(timeout)
-                .sendJson(requestBody)
-                .onItem().transform(this::parseOpaResponse)
-                .onFailure().recoverWithItem(error -> {
-                    LOG.errorf("OPA evaluation failed: %s", error.getMessage());
-                    // Fail closed: deny on error
-                    return PolicyDecision.deny("Policy evaluation failed: " + error.getMessage());
-                });
+                    .timeout(timeout)
+                    .sendJson(requestBody)
+                    .onItem().transform(this::parseOpaResponse)
+                    .onFailure().recoverWithItem(error -> {
+                        LOG.errorf("OPA evaluation failed: %s", error.getMessage());
+                        // Fail closed: deny on error
+                        return PolicyDecision.deny("Policy evaluation failed: " + error.getMessage());
+                    });
         } catch (Exception e) {
             LOG.errorf(e, "Failed to build OPA request");
             return Uni.createFrom().item(
-                PolicyDecision.deny("Policy evaluation error: " + e.getMessage())
-            );
+                    PolicyDecision.deny("Policy evaluation error: " + e.getMessage()));
         }
     }
 
@@ -159,17 +175,18 @@ public class PolicyService {
             if (hasRequiredRole(input.user().roles(), "admin")) {
                 return PolicyDecision.allow();
             }
-            return PolicyDecision.deny("Admin role required", 
-                List.of("Missing required role: admin"));
+            return PolicyDecision.deny("Admin role required",
+                    List.of("Missing required role: admin"));
         }
 
         // User management requires user-manager or admin role
-        if (path.startsWith("/api/users") && ("POST".equals(method) || "PUT".equals(method) || "DELETE".equals(method))) {
+        if (path.startsWith("/api/users")
+                && ("POST".equals(method) || "PUT".equals(method) || "DELETE".equals(method))) {
             if (hasRequiredRole(input.user().roles(), "admin", "user-manager")) {
                 return PolicyDecision.allow();
             }
             return PolicyDecision.deny("User management role required",
-                List.of("Missing required role: admin or user-manager"));
+                    List.of("Missing required role: admin or user-manager"));
         }
 
         // Read-only access for authenticated users
@@ -191,7 +208,7 @@ public class PolicyService {
 
         // Default deny
         return PolicyDecision.deny("Access denied by default policy",
-            List.of("No matching policy found for path: " + path));
+                List.of("No matching policy found for path: " + path));
     }
 
     /**
@@ -213,30 +230,7 @@ public class PolicyService {
      * Checks if a path is public (no authentication required).
      */
     private boolean isPublicPath(String path) {
-        List<String> publicPaths = config.auth().publicPaths();
-        if (publicPaths == null) {
-            return false;
-        }
-        for (String publicPath : publicPaths) {
-            if (matchesPath(path, publicPath)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /**
-     * Simple path matching with wildcard support.
-     */
-    private boolean matchesPath(String path, String pattern) {
-        if (pattern.endsWith("/**")) {
-            String prefix = pattern.substring(0, pattern.length() - 3);
-            return path.startsWith(prefix);
-        } else if (pattern.endsWith("/*")) {
-            String prefix = pattern.substring(0, pattern.length() - 2);
-            return path.startsWith(prefix) && !path.substring(prefix.length() + 1).contains("/");
-        }
-        return path.equals(pattern);
+        return PathMatcher.matchesAny(path, config.auth().publicPaths());
     }
 
     /**
@@ -257,16 +251,16 @@ public class PolicyService {
 
             // Handle boolean result
             if (result.isBoolean()) {
-                return result.asBoolean() 
-                    ? PolicyDecision.allow() 
-                    : PolicyDecision.deny("Access denied by policy");
+                return result.asBoolean()
+                        ? PolicyDecision.allow()
+                        : PolicyDecision.deny("Access denied by policy");
             }
 
             // Handle object result with 'allow' field
             if (result.isObject() && result.has("allow")) {
                 boolean allowed = result.get("allow").asBoolean(false);
                 String reason = result.has("reason") ? result.get("reason").asText() : null;
-                
+
                 if (allowed) {
                     return PolicyDecision.allow();
                 } else {
@@ -302,9 +296,9 @@ public class PolicyService {
             }
 
             Files.walk(path)
-                .filter(Files::isRegularFile)
-                .filter(p -> p.toString().endsWith(".rego"))
-                .forEach(this::loadPolicy);
+                    .filter(Files::isRegularFile)
+                    .filter(p -> p.toString().endsWith(".rego"))
+                    .forEach(this::loadPolicy);
 
             LOG.infof("Loaded %d policies", policies.size());
         } catch (IOException e) {
@@ -355,10 +349,10 @@ public class PolicyService {
             }
 
             watchService = FileSystems.getDefault().newWatchService();
-            path.register(watchService, 
-                StandardWatchEventKinds.ENTRY_CREATE,
-                StandardWatchEventKinds.ENTRY_MODIFY,
-                StandardWatchEventKinds.ENTRY_DELETE);
+            path.register(watchService,
+                    StandardWatchEventKinds.ENTRY_CREATE,
+                    StandardWatchEventKinds.ENTRY_MODIFY,
+                    StandardWatchEventKinds.ENTRY_DELETE);
 
             // Start watcher thread
             Thread watchThread = new Thread(this::watchPolicies, "policy-watcher");

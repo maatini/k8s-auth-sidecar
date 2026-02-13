@@ -1,5 +1,6 @@
 package space.maatini.sidecar.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
@@ -12,6 +13,7 @@ import io.vertx.mutiny.ext.web.client.HttpRequest;
 import io.vertx.mutiny.ext.web.client.HttpResponse;
 import io.vertx.mutiny.ext.web.client.WebClient;
 import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.jboss.logging.Logger;
@@ -40,6 +42,9 @@ public class ProxyService {
     @Inject
     MeterRegistry meterRegistry;
 
+    @Inject
+    ObjectMapper objectMapper;
+
     private WebClient webClient;
     private Counter requestCounter;
     private Counter errorCounter;
@@ -48,29 +53,36 @@ public class ProxyService {
     @PostConstruct
     void init() {
         this.webClient = WebClient.create(vertx);
-        
+
         // Initialize metrics
         this.requestCounter = Counter.builder("sidecar.proxy.requests")
-            .description("Total number of proxied requests")
-            .register(meterRegistry);
-        
+                .description("Total number of proxied requests")
+                .register(meterRegistry);
+
         this.errorCounter = Counter.builder("sidecar.proxy.errors")
-            .description("Total number of proxy errors")
-            .register(meterRegistry);
-        
+                .description("Total number of proxy errors")
+                .register(meterRegistry);
+
         this.requestTimer = Timer.builder("sidecar.proxy.duration")
-            .description("Proxy request duration")
-            .register(meterRegistry);
+                .description("Proxy request duration")
+                .register(meterRegistry);
+    }
+
+    @PreDestroy
+    void shutdown() {
+        if (webClient != null) {
+            webClient.close();
+        }
     }
 
     /**
      * Proxies a request to the backend service.
      *
-     * @param method The HTTP method
-     * @param path The request path
-     * @param headers The request headers
+     * @param method      The HTTP method
+     * @param path        The request path
+     * @param headers     The request headers
      * @param queryParams The query parameters
-     * @param body The request body (may be null)
+     * @param body        The request body (may be null)
      * @param authContext The authentication context
      * @return A Uni containing the proxy response
      */
@@ -94,8 +106,8 @@ public class ProxyService {
 
         HttpMethod httpMethod = HttpMethod.valueOf(method.toUpperCase());
         HttpRequest<Buffer> request = webClient
-            .request(httpMethod, targetPort, targetHost, path)
-            .timeout(config.proxy().timeout().read());
+                .request(httpMethod, targetPort, targetHost, path)
+                .timeout(config.proxy().timeout().read());
 
         // Add query parameters
         if (queryParams != null && !queryParams.isEmpty()) {
@@ -119,22 +131,20 @@ public class ProxyService {
         }
 
         return responseUni
-            .onItem().transform(response -> {
-                long duration = System.nanoTime() - startTime;
-                requestTimer.record(duration, TimeUnit.NANOSECONDS);
-                
-                LOG.debugf("Proxy response: status=%d, duration=%dms", 
-                    response.statusCode(), TimeUnit.NANOSECONDS.toMillis(duration));
-                
-                return toProxyResponse(response);
-            })
-            .onFailure().invoke(error -> {
-                errorCounter.increment();
-                LOG.errorf("Proxy request failed: %s", error.getMessage());
-            })
-            .onFailure().recoverWithItem(error -> 
-                ProxyResponse.error(502, "Bad Gateway: " + error.getMessage())
-            );
+                .onItem().transform(response -> {
+                    long duration = System.nanoTime() - startTime;
+                    requestTimer.record(duration, TimeUnit.NANOSECONDS);
+
+                    LOG.debugf("Proxy response: status=%d, duration=%dms",
+                            response.statusCode(), TimeUnit.NANOSECONDS.toMillis(duration));
+
+                    return toProxyResponse(response);
+                })
+                .onFailure().invoke(error -> {
+                    errorCounter.increment();
+                    LOG.errorf("Proxy request failed: %s", error.getMessage());
+                })
+                .onFailure().recoverWithItem(error -> ProxyResponse.error(502, "Bad Gateway: " + error.getMessage()));
     }
 
     /**
@@ -151,10 +161,10 @@ public class ProxyService {
             if (value == null) {
                 // Try case-insensitive lookup
                 value = headers.entrySet().stream()
-                    .filter(e -> e.getKey().equalsIgnoreCase(headerName))
-                    .map(Map.Entry::getValue)
-                    .findFirst()
-                    .orElse(null);
+                        .filter(e -> e.getKey().equalsIgnoreCase(headerName))
+                        .map(Map.Entry::getValue)
+                        .findFirst()
+                        .orElse(null);
             }
             if (value != null) {
                 request.putHeader(headerName, value);
@@ -226,7 +236,8 @@ public class ProxyService {
         String result = template;
         result = result.replace("${user.id}", authContext.userId() != null ? authContext.userId() : "");
         result = result.replace("${user.email}", authContext.email() != null ? authContext.email() : "");
-        result = result.replace("${user.roles}", authContext.roles() != null ? String.join(",", authContext.roles()) : "");
+        result = result.replace("${user.roles}",
+                authContext.roles() != null ? String.join(",", authContext.roles()) : "");
         result = result.replace("${user.tenant}", authContext.tenant() != null ? authContext.tenant() : "");
         result = result.replace("${user.name}", authContext.name() != null ? authContext.name() : "");
 
@@ -245,32 +256,35 @@ public class ProxyService {
 
         Buffer body = response.body();
         return new ProxyResponse(
-            response.statusCode(),
-            response.statusMessage(),
-            responseHeaders,
-            body != null ? body : Buffer.buffer()
-        );
+                response.statusCode(),
+                response.statusMessage(),
+                responseHeaders,
+                body != null ? body : Buffer.buffer());
     }
 
     /**
      * Response from the proxy operation.
      */
     public record ProxyResponse(
-        int statusCode,
-        String statusMessage,
-        Map<String, String> headers,
-        Buffer body
-    ) {
+            int statusCode,
+            String statusMessage,
+            Map<String, String> headers,
+            Buffer body) {
         /**
          * Creates an error response.
          */
         public static ProxyResponse error(int statusCode, String message) {
+            String safeJson;
+            try {
+                safeJson = new ObjectMapper().writeValueAsString(java.util.Map.of("error", message));
+            } catch (Exception e) {
+                safeJson = "{\"error\":\"Internal error\"}";
+            }
             return new ProxyResponse(
-                statusCode,
-                message,
-                Map.of("Content-Type", "application/json"),
-                Buffer.buffer("{\"error\":\"" + message + "\"}")
-            );
+                    statusCode,
+                    message,
+                    Map.of("Content-Type", "application/json"),
+                    Buffer.buffer(safeJson));
         }
 
         /**

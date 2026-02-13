@@ -6,7 +6,6 @@ import io.micrometer.core.instrument.Timer;
 import io.quarkus.security.identity.SecurityIdentity;
 import io.smallrye.mutiny.Uni;
 import io.vertx.core.http.HttpServerRequest;
-import io.vertx.mutiny.core.buffer.Buffer;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -19,7 +18,6 @@ import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.core.UriInfo;
 import jakarta.ws.rs.ext.Provider;
 import org.jboss.logging.Logger;
-import org.jboss.resteasy.reactive.server.ServerRequestFilter;
 import space.maatini.sidecar.config.SidecarConfig;
 import space.maatini.sidecar.model.AuthContext;
 import space.maatini.sidecar.model.PolicyDecision;
@@ -27,6 +25,7 @@ import space.maatini.sidecar.service.AuthenticationService;
 import space.maatini.sidecar.service.PolicyService;
 import space.maatini.sidecar.service.ProxyService;
 import space.maatini.sidecar.service.RolesService;
+import space.maatini.sidecar.util.PathMatcher;
 
 import java.io.IOException;
 import java.util.HashMap;
@@ -86,24 +85,24 @@ public class AuthProxyFilter implements ContainerRequestFilter {
     @PostConstruct
     void init() {
         authSuccessCounter = Counter.builder("sidecar.auth.success")
-            .description("Successful authentications")
-            .register(meterRegistry);
-        
+                .description("Successful authentications")
+                .register(meterRegistry);
+
         authFailureCounter = Counter.builder("sidecar.auth.failure")
-            .description("Failed authentications")
-            .register(meterRegistry);
-        
+                .description("Failed authentications")
+                .register(meterRegistry);
+
         authzAllowCounter = Counter.builder("sidecar.authz.allow")
-            .description("Allowed authorization decisions")
-            .register(meterRegistry);
-        
+                .description("Allowed authorization decisions")
+                .register(meterRegistry);
+
         authzDenyCounter = Counter.builder("sidecar.authz.deny")
-            .description("Denied authorization decisions")
-            .register(meterRegistry);
-        
+                .description("Denied authorization decisions")
+                .register(meterRegistry);
+
         authTimer = Timer.builder("sidecar.auth.duration")
-            .description("Authentication duration")
-            .register(meterRegistry);
+                .description("Authentication duration")
+                .register(meterRegistry);
     }
 
     @Override
@@ -111,7 +110,7 @@ public class AuthProxyFilter implements ContainerRequestFilter {
         long startTime = System.nanoTime();
         String path = requestContext.getUriInfo().getPath();
         String method = requestContext.getMethod();
-        
+
         // Ensure request has an ID for tracing
         ensureRequestId(requestContext);
 
@@ -150,41 +149,56 @@ public class AuthProxyFilter implements ContainerRequestFilter {
             // Store auth context for later use
             requestContext.setProperty(AUTH_CONTEXT_PROPERTY, authContext);
 
-            // Enrich with roles from external service (blocking for filter)
+            // Enrich with roles and evaluate policy reactively, then block once
+            Map<String, String> headers = extractHeaders(requestContext);
+            Map<String, String> queryParams = extractQueryParams(requestContext);
+
             AuthContext enrichedContext = rolesService.enrichWithRoles(authContext)
-                .await().atMost(java.time.Duration.ofSeconds(5));
+                    .flatMap(enriched -> {
+                        if (!config.authz().enabled()) {
+                            return Uni.createFrom().item(enriched);
+                        }
+                        return policyService.evaluate(enriched, method, path, headers, queryParams)
+                                .map(decision -> {
+                                    if (!decision.allowed()) {
+                                        throw new AuthorizationDeniedException(decision);
+                                    }
+                                    return enriched;
+                                });
+                    })
+                    .await().atMost(java.time.Duration.ofSeconds(10));
 
-            // Perform authorization check
-            if (config.authz().enabled()) {
-                Map<String, String> headers = extractHeaders(requestContext);
-                Map<String, String> queryParams = extractQueryParams(requestContext);
-
-                PolicyDecision decision = policyService.evaluate(
-                    enrichedContext, method, path, headers, queryParams
-                ).await().atMost(java.time.Duration.ofSeconds(5));
-
-                if (!decision.allowed()) {
-                    LOG.warnf("Authorization denied for user %s on %s %s: %s",
-                        enrichedContext.userId(), method, path, decision.reason());
-                    authzDenyCounter.increment();
-                    abortWithForbidden(requestContext, decision);
-                    return;
-                }
-
-                authzAllowCounter.increment();
-                LOG.debugf("Authorization allowed for user %s on %s %s",
+            authzAllowCounter.increment();
+            LOG.debugf("Authorization allowed for user %s on %s %s",
                     enrichedContext.userId(), method, path);
-            }
 
             // Update stored context with enriched version
             requestContext.setProperty(AUTH_CONTEXT_PROPERTY, enrichedContext);
 
+        } catch (AuthorizationDeniedException e) {
+            LOG.warnf("Authorization denied for user on %s %s: %s",
+                    method, path, e.decision.reason());
+            authzDenyCounter.increment();
+            abortWithForbidden(requestContext, e.decision);
         } catch (Exception e) {
             LOG.errorf(e, "Error during authentication/authorization");
             abortWithError(requestContext, "Internal authentication error");
         } finally {
             long duration = System.nanoTime() - startTime;
             authTimer.record(duration, TimeUnit.NANOSECONDS);
+        }
+    }
+
+    /**
+     * Exception used to short-circuit the reactive pipeline on authorization
+     * denial.
+     */
+    private static class AuthorizationDeniedException extends RuntimeException {
+        final PolicyDecision decision;
+
+        AuthorizationDeniedException(PolicyDecision decision) {
+            super(decision.reason());
+            this.decision = decision;
         }
     }
 
@@ -204,42 +218,18 @@ public class AuthProxyFilter implements ContainerRequestFilter {
      * Checks if a path is public and doesn't require authentication.
      */
     private boolean isPublicPath(String path) {
-        List<String> publicPaths = config.auth().publicPaths();
-        if (publicPaths == null) {
-            return false;
-        }
-
-        for (String publicPath : publicPaths) {
-            if (matchesPath(path, publicPath)) {
-                return true;
-            }
-        }
-        return false;
+        return PathMatcher.matchesAny(path, config.auth().publicPaths());
     }
 
     /**
      * Checks if a path is an internal Quarkus path.
      */
     private boolean isInternalPath(String path) {
-        return path.startsWith("/q/") || 
-               path.equals("/health") ||
-               path.equals("/metrics") ||
-               path.equals("/ready") ||
-               path.equals("/live");
-    }
-
-    /**
-     * Simple path matching with wildcard support.
-     */
-    private boolean matchesPath(String path, String pattern) {
-        if (pattern.endsWith("/**")) {
-            String prefix = pattern.substring(0, pattern.length() - 3);
-            return path.startsWith(prefix) || path.equals(prefix.substring(0, prefix.length() > 0 ? prefix.length() - 1 : 0));
-        } else if (pattern.endsWith("/*")) {
-            String prefix = pattern.substring(0, pattern.length() - 2);
-            return path.startsWith(prefix);
-        }
-        return path.equals(pattern);
+        return path.startsWith("/q/") ||
+                path.equals("/health") ||
+                path.equals("/metrics") ||
+                path.equals("/ready") ||
+                path.equals("/live");
     }
 
     /**
@@ -271,10 +261,10 @@ public class AuthProxyFilter implements ContainerRequestFilter {
      */
     private void abortWithUnauthorized(ContainerRequestContext requestContext, String message) {
         requestContext.abortWith(Response
-            .status(Response.Status.UNAUTHORIZED)
-            .entity(new ErrorResponse("unauthorized", message))
-            .header("WWW-Authenticate", "Bearer")
-            .build());
+                .status(Response.Status.UNAUTHORIZED)
+                .entity(new ErrorResponse("unauthorized", message))
+                .header("WWW-Authenticate", "Bearer")
+                .build());
     }
 
     /**
@@ -282,13 +272,12 @@ public class AuthProxyFilter implements ContainerRequestFilter {
      */
     private void abortWithForbidden(ContainerRequestContext requestContext, PolicyDecision decision) {
         requestContext.abortWith(Response
-            .status(Response.Status.FORBIDDEN)
-            .entity(new ErrorResponse(
-                "forbidden",
-                decision.reason() != null ? decision.reason() : "Access denied",
-                decision.violations()
-            ))
-            .build());
+                .status(Response.Status.FORBIDDEN)
+                .entity(new ErrorResponse(
+                        "forbidden",
+                        decision.reason() != null ? decision.reason() : "Access denied",
+                        decision.violations()))
+                .build());
     }
 
     /**
@@ -296,19 +285,18 @@ public class AuthProxyFilter implements ContainerRequestFilter {
      */
     private void abortWithError(ContainerRequestContext requestContext, String message) {
         requestContext.abortWith(Response
-            .status(Response.Status.INTERNAL_SERVER_ERROR)
-            .entity(new ErrorResponse("error", message))
-            .build());
+                .status(Response.Status.INTERNAL_SERVER_ERROR)
+                .entity(new ErrorResponse("error", message))
+                .build());
     }
 
     /**
      * Error response structure.
      */
     public record ErrorResponse(
-        String code,
-        String message,
-        List<String> details
-    ) {
+            String code,
+            String message,
+            List<String> details) {
         public ErrorResponse(String code, String message) {
             this(code, message, null);
         }

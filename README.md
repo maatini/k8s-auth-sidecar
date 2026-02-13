@@ -60,8 +60,11 @@ Du musst den Sidecar **nicht neu starten**, um Regeln zu ändern!
 - **Multi-Tenant OIDC-Support**: Keycloak und Microsoft Entra ID (Azure AD)
 - **Flexible Policy-Engine**: Eingebettete OPA-Regeln oder externer OPA-Server
 - **Rollen-Enrichment**: Integration mit externem Roles/Permissions-Service
+- **Reaktive Pipeline**: Non-blocking AuthN → Enrichment → AuthZ Verarbeitung
 - **Zero-Trust**: Jede Anfrage wird validiert
+- **Zentrales Path-Matching**: Ant-Style Patterns (`/**`, `/*`) über `PathMatcher`-Utility
 - **Observability**: Prometheus Metrics, JSON Logging, OpenTelemetry
+- **Sicherer Lifecycle**: Ordnungsgemäße Ressourcen-Freigabe (`@PreDestroy`) aller Clients
 - **Native Image**: Support für GraalVM Native Image
 - **Kubernetes-Ready**: Kustomize-basierte Deployment-Manifeste
 
@@ -119,6 +122,7 @@ docker build -f Dockerfile.native -t space.maatini/k8s-auth-sidecar:1.0.0-native
 | `OPA_ENABLED` | OPA-Policy-Evaluation aktivieren | `true` |
 | `OPA_MODE` | `embedded` oder `external` | `embedded` |
 | `OPA_URL` | Externer OPA-Server URL | `http://localhost:8181` |
+| `QUARKUS_HTTP_CORS_ORIGINS` | Erlaubte CORS Origins | `*` (nur Dev!) |
 
 ### Vollständige Konfiguration
 
@@ -305,6 +309,7 @@ Der Sidecar validiert JWTs gegen den konfigurierten Identity Provider:
 - ✅ Audit-Logging aktivieren
 - ✅ Rate-Limiting konfigurieren
 - ✅ Non-Root Container ausführen
+- ✅ CORS-Origins in Produktion einschränken (`QUARKUS_HTTP_CORS_ORIGINS`)
 
 ## 🧪 Testing
 
@@ -377,7 +382,8 @@ k8s-auth-sidecar/
 │   │   │   ├── filter/       # HTTP-Filter
 │   │   │   ├── resource/     # REST-Endpoints
 │   │   │   ├── client/       # REST-Clients
-│   │   │   └── health/       # Health-Checks
+│   │   │   ├── health/       # Health-Checks
+│   │   │   └── util/         # Utilities (PathMatcher)
 │   │   └── resources/
 │   │       ├── application.yaml
 │   │       └── policies/     # OPA-Policies

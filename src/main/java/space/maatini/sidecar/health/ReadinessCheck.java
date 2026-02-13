@@ -5,6 +5,7 @@ import io.vertx.mutiny.core.Vertx;
 import io.vertx.mutiny.core.buffer.Buffer;
 import io.vertx.mutiny.ext.web.client.WebClient;
 import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.health.HealthCheck;
@@ -18,7 +19,8 @@ import java.time.Duration;
 
 /**
  * Readiness health check for the sidecar.
- * Verifies that all required dependencies (backend, roles service, OPA) are reachable.
+ * Verifies that all required dependencies (backend, roles service, OPA) are
+ * reachable.
  */
 @Readiness
 @ApplicationScoped
@@ -37,6 +39,13 @@ public class ReadinessCheck implements HealthCheck {
     @PostConstruct
     void init() {
         this.webClient = WebClient.create(vertx);
+    }
+
+    @PreDestroy
+    void shutdown() {
+        if (webClient != null) {
+            webClient.close();
+        }
     }
 
     @Override
@@ -91,9 +100,9 @@ public class ReadinessCheck implements HealthCheck {
 
         try {
             var response = webClient.get(port, host, "/health")
-                .timeout(2000)
-                .send()
-                .await().atMost(Duration.ofSeconds(3));
+                    .timeout(2000)
+                    .send()
+                    .await().atMost(Duration.ofSeconds(3));
 
             return response.statusCode() >= 200 && response.statusCode() < 500;
         } catch (Exception e) {
@@ -101,8 +110,8 @@ public class ReadinessCheck implements HealthCheck {
             // Try a simple TCP connection check
             try {
                 var socket = vertx.createNetClient()
-                    .connect(port, host)
-                    .await().atMost(Duration.ofSeconds(2));
+                        .connect(port, host)
+                        .await().atMost(Duration.ofSeconds(2));
                 socket.close();
                 return true;
             } catch (Exception ex) {
@@ -119,9 +128,9 @@ public class ReadinessCheck implements HealthCheck {
 
         try {
             var response = webClient.getAbs(opaUrl + "/health")
-                .timeout(2000)
-                .send()
-                .await().atMost(Duration.ofSeconds(3));
+                    .timeout(2000)
+                    .send()
+                    .await().atMost(Duration.ofSeconds(3));
 
             return response.statusCode() == 200;
         } catch (Exception e) {

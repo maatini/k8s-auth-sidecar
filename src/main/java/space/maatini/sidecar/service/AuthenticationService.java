@@ -1,9 +1,6 @@
 package space.maatini.sidecar.service;
 
-import io.quarkus.oidc.TokenIntrospection;
-import io.quarkus.oidc.UserInfo;
 import io.quarkus.security.identity.SecurityIdentity;
-import io.smallrye.jwt.auth.principal.JWTParser;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.jwt.Claims;
@@ -17,7 +14,8 @@ import java.util.stream.Collectors;
 
 /**
  * Service for extracting authentication context from JWT tokens.
- * Handles claim extraction and normalization for both Keycloak and Entra ID tokens.
+ * Handles claim extraction and normalization for both Keycloak and Entra ID
+ * tokens.
  */
 @ApplicationScoped
 public class AuthenticationService {
@@ -38,7 +36,7 @@ public class AuthenticationService {
     // Keycloak-specific claims
     private static final String CLAIM_REALM_ACCESS = "realm_access";
     private static final String CLAIM_RESOURCE_ACCESS = "resource_access";
-    
+
     // Entra ID-specific claims
     private static final String CLAIM_ROLES = "roles";
     private static final String CLAIM_GROUPS = "groups";
@@ -62,9 +60,9 @@ public class AuthenticationService {
         }
 
         try {
-            JsonWebToken jwt = identity.getPrincipal() instanceof JsonWebToken 
-                ? (JsonWebToken) identity.getPrincipal() 
-                : null;
+            JsonWebToken jwt = identity.getPrincipal() instanceof JsonWebToken
+                    ? (JsonWebToken) identity.getPrincipal()
+                    : null;
 
             if (jwt == null) {
                 LOG.warn("Principal is not a JWT token");
@@ -96,37 +94,37 @@ public class AuthenticationService {
         String email = extractClaim(jwt, CLAIM_EMAIL, String.class);
         String name = extractClaim(jwt, CLAIM_NAME, String.class);
         String preferredUsername = extractPreferredUsername(jwt, isEntraToken);
-        
+
         Set<String> tokenRoles = extractRoles(jwt, isEntraToken);
         List<String> audience = extractAudience(jwt);
-        
+
         long issuedAt = extractLongClaim(jwt, CLAIM_IAT);
         long expiresAt = extractLongClaim(jwt, CLAIM_EXP);
         String tokenId = extractClaim(jwt, CLAIM_JTI, String.class);
-        String tenant = isEntraToken 
-            ? extractClaim(jwt, CLAIM_TID, String.class) 
-            : extractTenantFromIssuer(issuer);
+        String tenant = isEntraToken
+                ? extractClaim(jwt, CLAIM_TID, String.class)
+                : extractTenantFromIssuer(issuer);
 
         Map<String, Object> claims = extractAllClaims(jwt);
 
         AuthContext context = AuthContext.builder()
-            .userId(userId)
-            .email(email)
-            .name(name)
-            .preferredUsername(preferredUsername)
-            .issuer(issuer)
-            .audience(audience)
-            .roles(tokenRoles)
-            .permissions(Collections.emptySet()) // Filled later by authorization service
-            .claims(claims)
-            .issuedAt(issuedAt)
-            .expiresAt(expiresAt)
-            .tokenId(tokenId)
-            .tenant(tenant)
-            .build();
+                .userId(userId)
+                .email(email)
+                .name(name)
+                .preferredUsername(preferredUsername)
+                .issuer(issuer)
+                .audience(audience)
+                .roles(tokenRoles)
+                .permissions(Collections.emptySet()) // Filled later by authorization service
+                .claims(claims)
+                .issuedAt(issuedAt)
+                .expiresAt(expiresAt)
+                .tokenId(tokenId)
+                .tenant(tenant)
+                .build();
 
-        LOG.debugf("Extracted auth context for user: %s, roles: %s, tenant: %s", 
-            userId, tokenRoles, tenant);
+        LOG.debugf("Extracted auth context for user: %s, roles: %s, tenant: %s",
+                userId, tokenRoles, tenant);
 
         return context;
     }
@@ -171,7 +169,8 @@ public class AuthenticationService {
             // Also check 'groups' claim
             roles.addAll(extractClaimAsStringSet(jwt, CLAIM_GROUPS));
         } else {
-            // Keycloak: roles are in 'realm_access.roles' and 'resource_access.{client}.roles'
+            // Keycloak: roles are in 'realm_access.roles' and
+            // 'resource_access.{client}.roles'
             roles.addAll(extractKeycloakRealmRoles(jwt));
             roles.addAll(extractKeycloakResourceRoles(jwt));
         }
@@ -190,9 +189,9 @@ public class AuthenticationService {
                 Object rolesObj = realmAccess.get("roles");
                 if (rolesObj instanceof Collection) {
                     return ((Collection<?>) rolesObj).stream()
-                        .filter(String.class::isInstance)
-                        .map(String.class::cast)
-                        .collect(Collectors.toSet());
+                            .filter(String.class::isInstance)
+                            .map(String.class::cast)
+                            .collect(Collectors.toSet());
                 }
             }
         } catch (Exception e) {
@@ -218,10 +217,10 @@ public class AuthenticationService {
                             Object rolesObj = clientAccess.get("roles");
                             if (rolesObj instanceof Collection) {
                                 ((Collection<?>) rolesObj).stream()
-                                    .filter(String.class::isInstance)
-                                    .map(String.class::cast)
-                                    .map(role -> clientId + ":" + role)
-                                    .forEach(roles::add);
+                                        .filter(String.class::isInstance)
+                                        .map(String.class::cast)
+                                        .map(role -> clientId + ":" + role)
+                                        .forEach(roles::add);
                             }
                         }
                     }
@@ -303,9 +302,9 @@ public class AuthenticationService {
             Object value = jwt.getClaim(claimName);
             if (value instanceof Collection) {
                 return ((Collection<?>) value).stream()
-                    .filter(String.class::isInstance)
-                    .map(String.class::cast)
-                    .collect(Collectors.toSet());
+                        .filter(String.class::isInstance)
+                        .map(String.class::cast)
+                        .collect(Collectors.toSet());
             } else if (value instanceof String) {
                 return Set.of((String) value);
             }
@@ -331,10 +330,8 @@ public class AuthenticationService {
      * Checks if the issuer is a Microsoft Entra ID issuer.
      */
     private boolean isEntraIssuer(String issuer) {
-        return issuer != null && (
-            issuer.contains("login.microsoftonline.com") ||
-            issuer.contains("sts.windows.net") ||
-            issuer.contains("login.microsoft.com")
-        );
+        return issuer != null && (issuer.contains("login.microsoftonline.com") ||
+                issuer.contains("sts.windows.net") ||
+                issuer.contains("login.microsoft.com"));
     }
 }
