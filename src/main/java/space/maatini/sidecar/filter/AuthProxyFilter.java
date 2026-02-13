@@ -175,14 +175,28 @@ public class AuthProxyFilter implements ContainerRequestFilter {
             // Update stored context with enriched version
             requestContext.setProperty(AUTH_CONTEXT_PROPERTY, enrichedContext);
 
-        } catch (AuthorizationDeniedException e) {
-            LOG.warnf("Authorization denied for user on %s %s: %s",
-                    method, path, e.decision.reason());
-            authzDenyCounter.increment();
-            abortWithForbidden(requestContext, e.decision);
         } catch (Exception e) {
-            LOG.errorf(e, "Error during authentication/authorization");
-            abortWithError(requestContext, "Internal authentication error");
+            AuthorizationDeniedException authzEx = null;
+            Throwable current = e;
+            while (current != null) {
+                if (current instanceof AuthorizationDeniedException) {
+                    authzEx = (AuthorizationDeniedException) current;
+                    break;
+                }
+                if (current.getCause() == current)
+                    break;
+                current = current.getCause();
+            }
+
+            if (authzEx != null) {
+                LOG.warnf("Authorization denied for user on %s %s: %s",
+                        method, path, authzEx.decision.reason());
+                authzDenyCounter.increment();
+                abortWithForbidden(requestContext, authzEx.decision);
+            } else {
+                LOG.errorf(e, "Error during authentication/authorization: %s", e.getClass().getName());
+                abortWithError(requestContext, "Internal authentication error");
+            }
         } finally {
             long duration = System.nanoTime() - startTime;
             authTimer.record(duration, TimeUnit.NANOSECONDS);
