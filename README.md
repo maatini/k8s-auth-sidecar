@@ -284,6 +284,13 @@ spec:
   - ✅ TLS für externe Verbindungen (Roles Service, IdP).
   - ✅ Audit-Logging am Sidecar aktivieren.
 
+## 🚀 CI/CD & Releases
+
+Das Projekt nutzt GitHub Actions für Continuous Integration und schnelles Deployment:
+- **CI Pipeline (`ci.yml`)**: Führt bei jedem PR und Push auf `main` Tests aus, testet GraalVM Native Images, baut Multi-Arch Docker-Images (`linux/amd64`, `linux/arm64`), generiert CycloneDX SBOMs und scant das Image mit Trivy nach Schwachstellen.
+- **Release Pipeline (`release.yml`)**: Wird automatisch beim Pushen von Tags (z.B. `v0.1.0`) getriggert. Baut Release-Images (JVM und Native), befüllt OCI-Labels dynamisch und pusht sie nach `ghcr.io/maatini/k8s-auth-sidecar`. Zudem wird ein automatisches GitHub Release mit Changelog erstellt.
+- **Dependency Automation**: Dependabot & Renovate sorgen in Kombination für regelmäßige Security-Updates von Maven-Abhängigkeiten, Docker-Images und GitHub Actions (inkl. Auto-Merge für Minor/Patch-Updates).
+
 ## 🧪 Testing & Docker Build
 
 ### Unit & Integration Tests

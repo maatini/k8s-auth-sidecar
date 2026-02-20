@@ -1,0 +1,104 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  release:
+    name: Build, Push & Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Package Native Image
+        uses: graalvm/setup-graalvm@v1
+        with:
+          java-version: '21'
+          distribution: 'graalvm-community'
+          cache: 'maven'
+      
+      - name: Compile Native Runner
+        run: ./mvnw package -Pnative -Dquarkus.native.container-build=true -DskipTests -B --no-transfer-progress
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Docker Meta (JVM)
+        id: meta-jvm
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/maatini/k8s-auth-sidecar
+          tags: |
+            type=ref,event=tag
+            type=raw,value=latest,enable=${{ !contains(github.ref, '-rc') && !contains(github.ref, '-alpha') }}
+            type=sha,format=short
+
+      - name: Docker Meta (Native)
+        id: meta-native
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/maatini/k8s-auth-sidecar
+          tags: |
+            type=match,pattern=v(.*),group=1,suffix=-native
+            type=raw,value=latest-native,enable=${{ !contains(github.ref, '-rc') && !contains(github.ref, '-alpha') }}
+            type=sha,format=short,suffix=-native
+
+      - name: Build & Push JVM Image (Multi-Arch)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta-jvm.outputs.tags }}
+          labels: ${{ steps.meta-jvm.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            VERSION=${{ github.ref_name }}
+
+      - name: Build & Push Native Image (Multi-Arch)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: Dockerfile.native
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta-native.outputs.tags }}
+          labels: ${{ steps.meta-native.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            VERSION=${{ github.ref_name }}
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          draft: false
+          prerelease: ${{ contains(github.ref, '-rc') || contains(github.ref, '-alpha') }}

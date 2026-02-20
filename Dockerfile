@@ -54,9 +54,15 @@ RUN mvn package -DskipTests -Dquarkus.package.type=uber-jar
 # =====================================================
 FROM eclipse-temurin:21-jre-alpine AS runtime
 
-LABEL maintainer="space.maatini"
-LABEL description="K8s-Auth-Sidecar AuthN/AuthZ Microservice"
-LABEL version="1.0.0"
+# Build Arguments
+ARG VERSION=1.0.0
+
+# OCI standard labels
+LABEL org.opencontainers.image.title="K8s-Auth-Sidecar"
+LABEL org.opencontainers.image.description="AuthN/AuthZ Microservice"
+LABEL org.opencontainers.image.authors="space.maatini"
+LABEL org.opencontainers.image.version="${VERSION}"
+LABEL org.opencontainers.image.source="https://github.com/maatini/k8s-auth-sidecar"
 
 # Create non-root user for security
 RUN addgroup -S sidecar && adduser -S sidecar -G sidecar

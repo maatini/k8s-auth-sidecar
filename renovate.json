@@ -1,0 +1,33 @@
+{
+    "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+    "extends": [
+        "config:best-practices"
+    ],
+    "packageRules": [
+        {
+            "matchUpdateTypes": [
+                "minor",
+                "patch"
+            ],
+            "automerge": true,
+            "automergeType": "pr"
+        },
+        {
+            "matchManagers": [
+                "maven"
+            ],
+            "matchPackageNames": [
+                "io.quarkus:*",
+                "io.quarkus.platform:quarkus-bom"
+            ],
+            "groupName": "Quarkus framework"
+        }
+    ],
+    "schedule": [
+        "* 0-4 * * *"
+    ],
+    "timezone": "Europe/Berlin",
+    "labels": [
+        "dependencies"
+    ]
+}
