@@ -9,7 +9,7 @@
 # =====================================================
 # Stage 1: Build
 # =====================================================
-FROM --platform=$BUILDPLATFORM eclipse-temurin:21-jdk-alpine AS build
+FROM --platform=$BUILDPLATFORM eclipse-temurin:25-jdk-alpine AS build
 
 LABEL maintainer="space.maatini"
 LABEL description="K8s-Auth-Sidecar AuthN/AuthZ Microservice Build Stage"
@@ -52,7 +52,7 @@ RUN --mount=type=cache,target=/root/.m2 mvn package -DskipTests -Dquarkus.packag
 # =====================================================
 # Stage 3: Runtime (JVM Mode)
 # =====================================================
-FROM eclipse-temurin:21-jre-alpine AS runtime
+FROM eclipse-temurin:25-jre-alpine AS runtime
 
 # Build Arguments
 ARG VERSION=0.3.0
