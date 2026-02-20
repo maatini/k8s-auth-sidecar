@@ -45,6 +45,13 @@ Der **k8s-auth-sidecar** (Request Router Sidecar) ist ein Quarkus-basierter Micr
 - Fügt Security-Headers hinzu
 - Propagiert relevante Claims
 
+## Architektur für lokale Entwicklung (Dev-Profil & Mocking)
+
+Für eine erstklassige Developer Experience ohne externe Abhängigkeiten nutzt der Sidecar im Quarkus `%dev` Profil ein dediziertes Setup:
+- **WireMock-Integration**: Zwei vorkonfigurierte WireMock-Instanzen (`docker-compose.dev.yml`) simulieren den Identity Provider (OIDC Discovery, JWKS, Token-Generierung) und den externen Roles-Service (dynamische Response-Templates).
+- **In-Memory Alternative**: Für reine Code-Tests ohne Container kann ein `@IfBuildProfile("dev")`-getaggter Client (`InMemoryRolesService`) als Fallback einkompiliert werden.
+- **Auto-Config**: Im `%dev`-Modus werden Caches für Roles und Policies deaktiviert, um sofortige Testrückmeldungen (Live-Reloading) zu ermöglichen.
+
 ## Technologie-Stack
 
 | Komponente | Technologie |

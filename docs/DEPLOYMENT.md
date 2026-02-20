@@ -2,6 +2,8 @@
 
 Diese Anleitung beschreibt Schritt für Schritt, wie der K8s-Auth-Sidecar in Kubernetes deployt wird.
 
+> **💡 Lokale Entwicklung**: Wenn du den Sidecar lokal auf deinem Rechner testen möchtest (vollständig entkoppelt von Kubernetes), schau dir das `README.md` oder den `JUNIOR_GUIDE.md` an. Dort ist das "60-Sekunden-Dev-Setup" mit `docker-compose.dev.yml` (WireMock) und `mvn quarkus:dev` beschrieben.
+
 ## Voraussetzungen
 
 - Kubernetes Cluster (1.24+)
