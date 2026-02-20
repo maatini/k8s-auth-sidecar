@@ -249,6 +249,10 @@ sidecar:
     opa:
       enabled: true
       mode: embedded
+    rate-limit:
+      enabled: true
+      requests-per-second: 100
+      burst-size: 200
 
 "%test":
   quarkus:

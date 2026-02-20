@@ -12,11 +12,15 @@ import io.vertx.mutiny.core.buffer.Buffer;
 import io.vertx.mutiny.ext.web.client.HttpRequest;
 import io.vertx.mutiny.ext.web.client.HttpResponse;
 import io.vertx.mutiny.ext.web.client.WebClient;
+import io.vertx.ext.web.client.WebClientOptions;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.jboss.logging.Logger;
+import org.eclipse.microprofile.faulttolerance.CircuitBreaker;
+import org.eclipse.microprofile.faulttolerance.Fallback;
+import org.eclipse.microprofile.faulttolerance.Retry;
 import space.maatini.sidecar.config.SidecarConfig;
 import space.maatini.sidecar.model.AuthContext;
 
@@ -86,6 +90,9 @@ public class ProxyService {
      * @param authContext The authentication context
      * @return A Uni containing the proxy response
      */
+    @Retry(maxRetries = 2, delay = 200, retryOn = Exception.class)
+    @CircuitBreaker(requestVolumeThreshold = 20, failureRatio = 0.5, delay = 5000)
+    @Fallback(fallbackMethod = "fallbackProxy")
     public Uni<ProxyResponse> proxy(
             String method,
             String path,
@@ -143,8 +150,14 @@ public class ProxyService {
                 .onFailure().invoke(error -> {
                     errorCounter.increment();
                     LOG.errorf("Proxy request failed: %s", error.getMessage());
-                })
-                .onFailure().recoverWithItem(error -> ProxyResponse.error(502, "Bad Gateway: " + error.getMessage()));
+                });
+    }
+
+    public Uni<ProxyResponse> fallbackProxy(String method, String path, Map<String, String> headers,
+            Map<String, String> queryParams, Buffer body, AuthContext authContext, Throwable t) {
+        LOG.errorf("Fallback triggered for proxy on %s %s: %s", method, path, t.getMessage());
+        return Uni.createFrom()
+                .item(ProxyResponse.error(503, "Service Unavailable: Backend system cannot be reached."));
     }
 
     /**

@@ -27,16 +27,18 @@ allow if {
     role_match({"admin", "user-manager"})
 }
 
-# Allow read access to users for authenticated users
+# Allow read access to users for admin/user-manager/viewer
 allow if {
     startswith(input.request.path, "/api/users")
     input.request.method == "GET"
-    role_match({"admin", "user-manager", "user", "viewer"})
+    role_match({"admin", "user-manager", "viewer"})
 }
 
 # Allow read access to resources for users with viewer or higher role
 allow if {
     startswith(input.request.path, "/api/")
+    not startswith(input.request.path, "/api/admin")
+    not startswith(input.request.path, "/api/users")
     input.request.method == "GET"
     role_match({"admin", "user", "viewer"})
 }
@@ -44,6 +46,8 @@ allow if {
 # Allow write access to resources for users with user or higher role
 allow if {
     startswith(input.request.path, "/api/")
+    not startswith(input.request.path, "/api/admin")
+    not startswith(input.request.path, "/api/users")
     input.request.method in ["POST", "PUT", "DELETE", "PATCH"]
     role_match({"admin", "user"})
 }

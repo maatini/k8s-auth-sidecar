@@ -96,10 +96,11 @@ class ProxyServiceTest {
 
         AuthContext authContext = AuthContext.builder().userId("user1").build();
 
-        ProxyService.ProxyResponse response = proxyService.proxy(
-                "GET", "/api/test", Map.of(), Map.of(), null, authContext).await().indefinitely();
+        RuntimeException exception = assertThrows(RuntimeException.class, () -> {
+            proxyService.proxy("GET", "/api/test", Map.of(), Map.of(), null, authContext)
+                    .await().indefinitely();
+        });
 
-        assertEquals(502, response.statusCode());
-        assertTrue(response.bodyAsString().contains("Network error"));
+        assertEquals("Network error", exception.getMessage());
     }
 }

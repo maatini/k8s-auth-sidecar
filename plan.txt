@@ -1,0 +1,9 @@
+**Plan für Resilience & E2E Tests:**
+1. **pom.xml**: Hinzufügen von `quarkus-smallrye-fault-tolerance` und `com.bucket4j:bucket4j-core` für Resilience und Rate Limiting. OPA Client ist bereits vorhanden, wird gezielt integriert.
+2. **src/main/resources/application.yaml**: Erweitern um Rate-Limiting-Konfiguration und Fault-Tolerance-Defaults.
+3. **src/main/java/space/maatini/sidecar/filter/RateLimitFilter.java**: Neuer Filter (Priority vor/nach Auth) zur Begrenzung von Requests via Token-Bucket (Bucket4j), basierend auf IP & User-ID.
+4. **src/main/java/space/maatini/sidecar/service/PolicyService.java**: Refactoring der `evaluateEmbedded` Methode. Statt Java-If-Else wird nun echte lokale OPA/Rego-Auswertung angesteuert (z.B. via `opa eval` Process execution oder falls gewünscht OPA-Wasm, um volle Authentizität zu haben). `evaluateExternal` erhält `@Retry`, `@CircuitBreaker`.
+5. **src/main/java/space/maatini/sidecar/service/RolesService.java** & **ProxyService.java**: Integration von `@Retry`, `@Timeout` und `@Fallback` Annotationen.
+6. **src/test/java/space/maatini/sidecar/service/PolicyServiceRegoTest.java**: Neue Testklasse, die konkrete `.rego`-Dateien inkl. RBAC verarbeitet und lokal testet.
+7. **src/test/java/space/maatini/sidecar/AuthSidecarE2EIT.java**: Neuer Integration-Test mit Testcontainers (OPA, Keycloak/Wiremock) zur E2E-Validierung des Happy-Paths und von Fehlerfällen (401, 403, 429).
+8. **README.md**: Doku-Erweiterung für Resilience & Rate Limiting.

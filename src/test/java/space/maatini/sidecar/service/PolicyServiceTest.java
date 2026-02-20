@@ -25,13 +25,12 @@ class PolicyServiceTest {
     @Test
     void testEvaluate_SuperadminAllowed() {
         AuthContext authContext = AuthContext.builder()
-            .userId("superadmin-user")
-            .roles(Set.of("superadmin"))
-            .build();
+                .userId("superadmin-user")
+                .roles(Set.of("superadmin"))
+                .build();
 
         PolicyDecision decision = policyService.evaluate(
-            authContext, "GET", "/api/admin/settings", Map.of(), Map.of()
-        ).await().atMost(Duration.ofSeconds(5));
+                authContext, "GET", "/api/admin/settings", Map.of(), Map.of()).await().atMost(Duration.ofSeconds(5));
 
         assertTrue(decision.allowed());
     }
@@ -39,13 +38,12 @@ class PolicyServiceTest {
     @Test
     void testEvaluate_AdminAccessToAdminPath() {
         AuthContext authContext = AuthContext.builder()
-            .userId("admin-user")
-            .roles(Set.of("admin"))
-            .build();
+                .userId("admin-user")
+                .roles(Set.of("admin"))
+                .build();
 
         PolicyDecision decision = policyService.evaluate(
-            authContext, "GET", "/api/admin/settings", Map.of(), Map.of()
-        ).await().atMost(Duration.ofSeconds(5));
+                authContext, "GET", "/api/admin/settings", Map.of(), Map.of()).await().atMost(Duration.ofSeconds(5));
 
         assertTrue(decision.allowed());
     }
@@ -53,28 +51,26 @@ class PolicyServiceTest {
     @Test
     void testEvaluate_UserDeniedAdminPath() {
         AuthContext authContext = AuthContext.builder()
-            .userId("regular-user")
-            .roles(Set.of("user"))
-            .build();
+                .userId("regular-user")
+                .roles(Set.of("user"))
+                .build();
 
         PolicyDecision decision = policyService.evaluate(
-            authContext, "GET", "/api/admin/settings", Map.of(), Map.of()
-        ).await().atMost(Duration.ofSeconds(5));
+                authContext, "GET", "/api/admin/settings", Map.of(), Map.of()).await().atMost(Duration.ofSeconds(5));
 
         assertFalse(decision.allowed());
         assertNotNull(decision.reason());
     }
 
     @Test
-    void testEvaluate_UserCanReadApi() {
+    void testEvaluate_UserManagerCanReadUsers() {
         AuthContext authContext = AuthContext.builder()
-            .userId("regular-user")
-            .roles(Set.of("user"))
-            .build();
+                .userId("manager-user")
+                .roles(Set.of("user-manager"))
+                .build();
 
         PolicyDecision decision = policyService.evaluate(
-            authContext, "GET", "/api/users", Map.of(), Map.of()
-        ).await().atMost(Duration.ofSeconds(5));
+                authContext, "GET", "/api/users", Map.of(), Map.of()).await().atMost(Duration.ofSeconds(5));
 
         assertTrue(decision.allowed());
     }
@@ -82,13 +78,12 @@ class PolicyServiceTest {
     @Test
     void testEvaluate_ViewerCannotWrite() {
         AuthContext authContext = AuthContext.builder()
-            .userId("viewer-user")
-            .roles(Set.of("viewer"))
-            .build();
+                .userId("viewer-user")
+                .roles(Set.of("viewer"))
+                .build();
 
         PolicyDecision decision = policyService.evaluate(
-            authContext, "POST", "/api/users", Map.of(), Map.of()
-        ).await().atMost(Duration.ofSeconds(5));
+                authContext, "POST", "/api/users", Map.of(), Map.of()).await().atMost(Duration.ofSeconds(5));
 
         assertFalse(decision.allowed());
     }
@@ -98,8 +93,7 @@ class PolicyServiceTest {
         AuthContext authContext = AuthContext.anonymous();
 
         PolicyDecision decision = policyService.evaluate(
-            authContext, "GET", "/api/users", Map.of(), Map.of()
-        ).await().atMost(Duration.ofSeconds(5));
+                authContext, "GET", "/api/users", Map.of(), Map.of()).await().atMost(Duration.ofSeconds(5));
 
         assertFalse(decision.allowed());
         assertNotNull(decision.reason());
@@ -108,7 +102,7 @@ class PolicyServiceTest {
     @Test
     void testPolicyDecision_Allow() {
         PolicyDecision decision = PolicyDecision.allow();
-        
+
         assertTrue(decision.allowed());
         assertNull(decision.reason());
         assertTrue(decision.violations().isEmpty());
@@ -117,7 +111,7 @@ class PolicyServiceTest {
     @Test
     void testPolicyDecision_DenyWithReason() {
         PolicyDecision decision = PolicyDecision.deny("Access denied");
-        
+
         assertFalse(decision.allowed());
         assertEquals("Access denied", decision.reason());
         assertTrue(decision.violations().isEmpty());
@@ -126,10 +120,9 @@ class PolicyServiceTest {
     @Test
     void testPolicyDecision_DenyWithViolations() {
         PolicyDecision decision = PolicyDecision.deny(
-            "Multiple violations",
-            List.of("Missing role: admin", "Expired token")
-        );
-        
+                "Multiple violations",
+                List.of("Missing role: admin", "Expired token"));
+
         assertFalse(decision.allowed());
         assertEquals(2, decision.violations().size());
         assertTrue(decision.firstViolation().isPresent());
