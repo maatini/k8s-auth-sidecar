@@ -86,7 +86,7 @@ jobs:
           severity: 'CRITICAL,HIGH'
 
       - name: Build local Image for Scanning (amd64)
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
           platforms: linux/amd64
@@ -105,7 +105,7 @@ jobs:
           scanners: 'vuln,secret,misconfig'
 
       - name: Test Multi-Arch Build (No Push)
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
           platforms: linux/amd64,linux/arm64

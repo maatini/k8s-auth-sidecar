@@ -70,7 +70,7 @@ jobs:
             type=sha,format=short,suffix=-native
 
       - name: Build & Push JVM Image (Multi-Arch)
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
           platforms: linux/amd64,linux/arm64
@@ -83,7 +83,7 @@ jobs:
             VERSION=${{ github.ref_name }}
 
       - name: Build & Push Native Image (Multi-Arch)
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
           file: Dockerfile.native
