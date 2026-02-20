@@ -26,15 +26,7 @@ jobs:
           distribution: 'temurin'
           cache: 'maven'
 
-      - name: Package Native Image
-        uses: graalvm/setup-graalvm@v1
-        with:
-          java-version: '21'
-          distribution: 'graalvm-community'
-          cache: 'maven'
-      
-      - name: Compile Native Runner
-        run: ./mvnw package -Pnative -Dquarkus.native.container-build=true -DskipTests -B --no-transfer-progress
+
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -82,12 +74,12 @@ jobs:
           build-args: |
             VERSION=${{ github.ref_name }}
 
-      - name: Build & Push Native Image (Multi-Arch)
+      - name: Build & Push Native Image (amd64)
         uses: docker/build-push-action@v6
         with:
           context: .
           file: Dockerfile.native
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64
           push: true
           tags: ${{ steps.meta-native.outputs.tags }}
           labels: ${{ steps.meta-native.outputs.labels }}
