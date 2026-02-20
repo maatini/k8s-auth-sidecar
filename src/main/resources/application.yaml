@@ -4,7 +4,7 @@
 quarkus:
   application:
     name: k8s-auth-sidecar
-    version: 0.1.0
+    version: 0.2.0
 
   # HTTP Server Configuration
   http:

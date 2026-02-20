@@ -6,7 +6,7 @@
 
     <groupId>space.maatini</groupId>
     <artifactId>k8s-auth-sidecar</artifactId>
-    <version>0.1.0</version>
+    <version>0.2.0</version>
     <packaging>jar</packaging>
 
     <name>K8s-Auth-Sidecar - AuthN/AuthZ Sidecar</name>

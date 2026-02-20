@@ -30,7 +30,7 @@ RUN --mount=type=cache,target=/root/.m2 mvn package -Pnative -DskipTests \
 FROM quay.io/quarkus/quarkus-micro-image:2.0
 
 # Build Arguments
-ARG VERSION=0.1.0
+ARG VERSION=0.2.0
 
 # OCI Labels
 LABEL org.opencontainers.image.title="K8s-Auth-Sidecar (Native)"

@@ -55,7 +55,7 @@ RUN --mount=type=cache,target=/root/.m2 mvn package -DskipTests -Dquarkus.packag
 FROM eclipse-temurin:21-jre-alpine AS runtime
 
 # Build Arguments
-ARG VERSION=0.1.0
+ARG VERSION=0.2.0
 
 # OCI standard labels
 LABEL org.opencontainers.image.title="K8s-Auth-Sidecar"
