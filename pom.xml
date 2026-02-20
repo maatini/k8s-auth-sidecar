@@ -272,36 +272,26 @@
                 <version>3.5.0</version>
                 <executions>
                     <execution>
-                        <id>create-opa-wasm-dir</id>
-                        <phase>generate-resources</phase>
-                        <goals>
-                            <goal>exec</goal>
-                        </goals>
-                        <configuration>
-                            <executable>mkdir</executable>
-                            <arguments>
-                                <argument>-p</argument>
-                                <argument>${project.build.directory}/classes/policies</argument>
-                            </arguments>
-                        </configuration>
-                    </execution>
-                    <execution>
                         <id>compile-opa-wasm</id>
                         <phase>generate-resources</phase>
                         <goals>
                             <goal>exec</goal>
                         </goals>
                         <configuration>
-                            <executable>opa</executable>
+                            <executable>sh</executable>
                             <arguments>
-                                <argument>build</argument>
-                                <argument>-t</argument>
-                                <argument>wasm</argument>
-                                <argument>-e</argument>
-                                <argument>authz/allow</argument>
-                                <argument>-o</argument>
-                                <argument>${project.build.directory}/classes/policies/authz.wasm</argument>
-                                <argument>${project.basedir}/src/main/resources/policies/</argument>
+                                <argument>-c</argument>
+                                <argument>
+                                    if command -v opa >/dev/null 2>&amp;1; then
+                                        mkdir -p ${project.build.directory}/classes/policies &amp;&amp;
+                                        opa build -t wasm -e authz/allow \
+                                            -o ${project.build.directory}/classes/policies/authz.wasm \
+                                            ${project.basedir}/src/main/resources/policies/ &amp;&amp;
+                                        echo "[OPA] WASM compiled successfully"
+                                    else
+                                        echo "[OPA] opa CLI not found – using pre-compiled WASM from src/main/resources/policies/authz.wasm"
+                                    fi
+                                </argument>
                             </arguments>
                         </configuration>
                     </execution>
