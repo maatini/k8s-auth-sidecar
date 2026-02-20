@@ -286,10 +286,11 @@ spec:
 
 ## 🚀 CI/CD & Releases
 
-Das Projekt nutzt GitHub Actions für Continuous Integration und schnelles Deployment:
-- **CI Pipeline (`ci.yml`)**: Führt bei jedem PR und Push auf `main` Tests aus, testet GraalVM Native Images, baut Multi-Arch Docker-Images (`linux/amd64`, `linux/arm64`), generiert CycloneDX SBOMs und scant das Image mit Trivy nach Schwachstellen.
-- **Release Pipeline (`release.yml`)**: Wird automatisch beim Pushen von Tags (z.B. `v0.1.0`) getriggert. Baut Release-Images (JVM und Native), befüllt OCI-Labels dynamisch und pusht sie nach `ghcr.io/maatini/k8s-auth-sidecar`. Zudem wird ein automatisches GitHub Release mit Changelog erstellt.
+Das Projekt nutzt GitHub Actions für Continuous Integration und schnelles Deployment nach den höchsten Security-Standards:
+- **CI Pipeline (`ci.yml`)**: Führt bei jedem PR und Push auf `main` Tests aus, testet GraalVM Native Images, baut Multi-Arch Docker-Images (`linux/amd64`, `linux/arm64`), generiert CycloneDX SBOMs und scant das Image mit Trivy nach Schwachstellen. Arbeitet streng nach dem Least-Privilege-Prinzip.
+- **Release Pipeline (`release.yml`)**: Wird automatisch beim Pushen von Tags (z.B. `v0.1.0`) getriggert. Baut Release-Images (JVM und Native), befüllt OCI-Labels dynamisch und fügt **Signed Provenance & SBOMs (SLSA Level 3)** hinzu. Veröffentlicht sicher in `ghcr.io/maatini/k8s-auth-sidecar` und generiert ein Automatisches GitHub Release.
 - **Dependency Automation**: Dependabot & Renovate sorgen in Kombination für regelmäßige Security-Updates von Maven-Abhängigkeiten, Docker-Images und GitHub Actions (inkl. Auto-Merge für Minor/Patch-Updates).
+- **Docker-Sicherheit**: Alle Images nutzen standardmäßig nicht-privilegierte User (`sidecar` bzw. UID `1001`), um **niemals als Root** zu laufen, und integrieren automatisch standardisierte OCI-Labels zur vollen Traceability.
 
 ## 🧪 Testing & Docker Build
 

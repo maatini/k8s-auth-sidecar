@@ -12,6 +12,7 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
+# Security: Least privilege strategy
 permissions:
   contents: read
 
@@ -23,6 +24,7 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v6
 
+      # Setup Java 21 distribution with Maven caching for faster builds
       - name: Set up JDK 21
         uses: actions/setup-java@v5
         with:
@@ -30,13 +32,16 @@ jobs:
           distribution: 'temurin'
           cache: 'maven'
 
+      # Standard Maven verify phase: runs unit & integration tests
       - name: Verify (Tests, Static Analysis)
         run: ./mvnw clean verify -B --no-transfer-progress
 
+      # Generate an SBOM for the JVM dependencies (Security Best Practice)
       - name: Generate CycloneDX SBOM (Maven)
         run: ./mvnw cyclonedx:makeAggregateBom -B --no-transfer-progress
         continue-on-error: true
 
+      # Upload the generated SBOM as a workflow artifact
       - name: Upload SBOM
         uses: actions/upload-artifact@v6
         with:
@@ -52,6 +57,7 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v6
 
+      # Setup GraalVM for native compilation
       - name: Set up GraalVM
         uses: graalvm/setup-graalvm@v1
         with:
@@ -59,6 +65,7 @@ jobs:
           distribution: 'graalvm-community'
           cache: 'maven'
 
+      # Build the native image (without tests, as they ran in the JVM phase)
       - name: Package Native Image
         run: ./mvnw package -Pnative -Dquarkus.native.container-build=true -DskipTests -B --no-transfer-progress
 
@@ -70,12 +77,15 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v6
 
+      # QEMU allows building for ARM64 on AMD64 runners
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
+      # Buildx is required for multi-arch builds and advanced caching
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      # Security: Scan the local Git repository for vulnerabilities
       - name: Trivy FS Scan
         uses: aquasecurity/trivy-action@master
         with:
@@ -85,6 +95,7 @@ jobs:
           exit-code: '1'
           severity: 'CRITICAL,HIGH'
 
+      # Build an AMD64 image locally specifically for the vulnerability scanner
       - name: Build local Image for Scanning (amd64)
         uses: docker/build-push-action@v6
         with:
@@ -95,6 +106,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      # Security: Scan the built Docker image for vulnerabilities in OS packages and dependencies
       - name: Trivy Image Scan (Syft/Trivy)
         uses: aquasecurity/trivy-action@master
         with:
@@ -104,6 +116,7 @@ jobs:
           severity: 'CRITICAL,HIGH'
           scanners: 'vuln,secret,misconfig'
 
+      # Perform a dry-run multi-arch build to ensure arm64 and amd64 both compile successfully
       - name: Test Multi-Arch Build (No Push)
         uses: docker/build-push-action@v6
         with:
