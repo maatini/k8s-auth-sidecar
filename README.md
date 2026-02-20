@@ -246,7 +246,7 @@ spec:
 
     # 2. Den K8s-Auth-Sidecar hinzufügen
     - name: k8s-auth-sidecar
-      image: ghcr.io/maatini/k8s-auth-sidecar:0.2.0
+      image: ghcr.io/maatini/k8s-auth-sidecar:0.3.0
       ports:
         - containerPort: 8080  # Externer Port (auf den der Service zeigt!)
       env:
@@ -316,10 +316,10 @@ opa build -t wasm -e authz/allow -o src/main/resources/policies/authz.wasm src/m
 ### Docker und Native Image Build
 ```bash
 # Standard JVM-Image
-docker build -t ghcr.io/maatini/k8s-auth-sidecar:0.2.0 .
+docker build -t ghcr.io/maatini/k8s-auth-sidecar:0.3.0 .
 
 # Leichtgewichtiges Native Image (GraalVM, dauert länger)
-docker build -f Dockerfile.native -t ghcr.io/maatini/k8s-auth-sidecar:0.2.0-native .
+docker build -f Dockerfile.native -t ghcr.io/maatini/k8s-auth-sidecar:0.3.0-native .
 ```
 
 ## 📁 Projektstruktur
