@@ -85,7 +85,7 @@ public record PolicyDecision(
     public static class Builder {
         private boolean allowed = false;
         private String reason;
-        private List<String> violations = Collections.emptyList();
+        private List<String> violations = new java.util.ArrayList<>();
         private Map<String, Object> metadata = Collections.emptyMap();
 
         public Builder allowed(boolean allowed) {
@@ -99,17 +99,12 @@ public record PolicyDecision(
         }
 
         public Builder violations(List<String> violations) {
-            this.violations = violations != null ? List.copyOf(violations) : Collections.emptyList();
+            this.violations = violations != null ? new java.util.ArrayList<>(violations) : new java.util.ArrayList<>();
             return this;
         }
 
         public Builder addViolation(String violation) {
-            if (this.violations.isEmpty()) {
-                this.violations = new java.util.ArrayList<>();
-            }
-            if (this.violations instanceof java.util.ArrayList) {
-                this.violations.add(violation);
-            }
+            this.violations.add(violation);
             return this;
         }
 

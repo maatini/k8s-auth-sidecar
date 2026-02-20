@@ -1,6 +1,5 @@
 package space.maatini.sidecar.health;
 
-import io.smallrye.health.api.Wellness;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.health.HealthCheck;
@@ -23,9 +22,9 @@ public class LivenessCheck implements HealthCheck {
     @Override
     public HealthCheckResponse call() {
         HealthCheckResponseBuilder builder = HealthCheckResponse.named("sidecar-liveness")
-            .withData("auth.enabled", config.auth().enabled())
-            .withData("authz.enabled", config.authz().enabled())
-            .withData("opa.enabled", config.opa().enabled());
+                .withData("auth.enabled", config.auth().enabled())
+                .withData("authz.enabled", config.authz().enabled())
+                .withData("opa.enabled", config.opa().enabled());
 
         return builder.up().build();
     }

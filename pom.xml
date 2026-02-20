@@ -85,13 +85,7 @@
             <artifactId>vertx-web-client</artifactId>
         </dependency>
         
-        <!-- OPA Client for policy evaluation -->
-        <dependency>
-            <groupId>com.styra</groupId>
-            <artifactId>opa</artifactId>
-            <version>2.1.1</version>
-        </dependency>
-        
+
         <!-- Caching -->
         <dependency>
             <groupId>io.quarkus</groupId>
@@ -141,16 +135,11 @@
             <artifactId>quarkus-config-yaml</artifactId>
         </dependency>
         
-        <!-- Scheduler for periodic tasks -->
-        <dependency>
-            <groupId>io.quarkus</groupId>
-            <artifactId>quarkus-scheduler</artifactId>
-        </dependency>
-        
+
         <!-- Test dependencies -->
         <dependency>
             <groupId>io.quarkus</groupId>
-            <artifactId>quarkus-junit5</artifactId>
+            <artifactId>quarkus-junit</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>
@@ -160,7 +149,7 @@
         </dependency>
         <dependency>
             <groupId>io.quarkus</groupId>
-            <artifactId>quarkus-junit5-mockito</artifactId>
+            <artifactId>quarkus-junit-mockito</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>

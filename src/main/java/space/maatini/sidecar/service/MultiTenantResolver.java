@@ -12,8 +12,10 @@ import org.jboss.logging.Logger;
 import java.util.Optional;
 
 /**
- * Multi-tenant resolver for OIDC that supports both Keycloak and Microsoft Entra ID.
- * The tenant is determined from the JWT token's issuer claim or from request headers.
+ * Multi-tenant resolver for OIDC that supports both Keycloak and Microsoft
+ * Entra ID.
+ * The tenant is determined from the JWT token's issuer claim or from request
+ * headers.
  */
 @ApplicationScoped
 public class MultiTenantResolver implements TenantResolver {
@@ -54,7 +56,7 @@ public class MultiTenantResolver implements TenantResolver {
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
             String token = authHeader.substring(7);
             Optional<String> issuer = extractIssuerFromToken(token);
-            
+
             if (issuer.isPresent()) {
                 String iss = issuer.get();
                 if (isEntraIssuer(iss)) {
@@ -85,19 +87,14 @@ public class MultiTenantResolver implements TenantResolver {
             }
 
             String payload = new String(java.util.Base64.getUrlDecoder().decode(parts[1]));
-            
-            // Simple JSON parsing for issuer
-            int issIndex = payload.indexOf("\"iss\"");
-            if (issIndex == -1) {
-                return Optional.empty();
-            }
 
-            int colonIndex = payload.indexOf(":", issIndex);
-            int quoteStart = payload.indexOf("\"", colonIndex);
-            int quoteEnd = payload.indexOf("\"", quoteStart + 1);
-            
-            if (quoteStart != -1 && quoteEnd != -1) {
-                return Optional.of(payload.substring(quoteStart + 1, quoteEnd));
+            // Use Jackson for robust JSON parsing instead of fragile string manipulation
+            com.fasterxml.jackson.databind.JsonNode node = new com.fasterxml.jackson.databind.ObjectMapper()
+                    .readTree(payload);
+            com.fasterxml.jackson.databind.JsonNode issNode = node.get("iss");
+
+            if (issNode != null && issNode.isTextual()) {
+                return Optional.of(issNode.asText());
             }
         } catch (Exception e) {
             LOG.debugf("Failed to extract issuer from token: %s", e.getMessage());
@@ -109,20 +106,16 @@ public class MultiTenantResolver implements TenantResolver {
      * Checks if the issuer is a Microsoft Entra ID (Azure AD) issuer.
      */
     private boolean isEntraIssuer(String issuer) {
-        return issuer != null && (
-            issuer.contains("login.microsoftonline.com") ||
-            issuer.contains("sts.windows.net") ||
-            issuer.contains("login.microsoft.com")
-        );
+        return issuer != null && (issuer.contains("login.microsoftonline.com") ||
+                issuer.contains("sts.windows.net") ||
+                issuer.contains("login.microsoft.com"));
     }
 
     /**
      * Checks if the issuer is a Keycloak issuer.
      */
     private boolean isKeycloakIssuer(String issuer) {
-        return issuer != null && (
-            issuer.contains("/realms/") ||
-            issuer.contains("keycloak")
-        );
+        return issuer != null && (issuer.contains("/realms/") ||
+                issuer.contains("keycloak"));
     }
 }

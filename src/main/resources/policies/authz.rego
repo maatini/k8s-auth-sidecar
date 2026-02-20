@@ -86,12 +86,11 @@ public_path(path) if {
     startswith(path, "/q/")
 }
 
-# Resource-based access control example
-# Deny access to sensitive resources unless explicitly allowed
-deny[msg] if {
+# Guard: Deny access to sensitive resources unless user has explicit permission.
+# This is evaluated as part of the allow rules (not a separate deny query).
+allow if {
     startswith(input.request.path, "/api/sensitive")
-    not "sensitive-data-access" in input.user.permissions
-    msg := "Access to sensitive data requires explicit permission"
+    "sensitive-data-access" in input.user.permissions
 }
 
 # Rate limiting information (for documentation, actual enforcement elsewhere)
