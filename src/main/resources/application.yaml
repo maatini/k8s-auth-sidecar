@@ -226,14 +226,21 @@ sidecar:
 
 "%dev":
   quarkus:
+    http:
+      port: 8080
     log:
       console:
         json: false
       level: DEBUG
     oidc:
-      auth-server-url: http://localhost:8180/realms/development
+      auth-server-url: http://localhost:8090/realms/master
       tls:
         verification: none
+    rest-client:
+      "space.maatini.sidecar.client.RolesServiceClient":
+        url: http://localhost:8089
+    cache:
+      enabled: false
   sidecar:
     auth:
       enabled: true

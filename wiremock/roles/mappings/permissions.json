@@ -1,0 +1,24 @@
+{
+    "request": {
+        "method": "GET",
+        "urlPattern": "/api/v1/users/([^/]+)/permissions"
+    },
+    "response": {
+        "status": 200,
+        "headers": {
+            "Content-Type": "application/json"
+        },
+        "jsonBody": {
+            "userId": "{{request.requestLine.pathSegments.[3]}}",
+            "roles": [
+                "developer",
+                "admin"
+            ],
+            "permissions": [
+                "read:all",
+                "write:all"
+            ],
+            "tenant": "tenant-A"
+        }
+    }
+}

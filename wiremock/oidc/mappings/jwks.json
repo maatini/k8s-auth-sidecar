@@ -1,0 +1,24 @@
+{
+  "request": {
+    "method": "GET",
+    "url": "/realms/master/protocol/openid-connect/certs"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "jsonBody": {
+      "keys": [
+        {
+          "kty": "RSA",
+          "kid": "wiremock-key",
+          "use": "sig",
+          "alg": "RS256",
+          "n": "jskQJU7Af-Bjhi_553vHkaoyo85yIW5wZalbieqy5HalccMSDdeNVBp0Wirogtqbe7Pp9YuHJExQmIouZQqqJ7yzE-cJ4hr97HclXyCEASzYN2_WWnvkC1tYixZpPEcYlPzDt8Ft0AoFUJdt7gbuStMgnpjGdd75kwbZaMRKJ7qXhQ8ZmcfJlmDrLUT9pDKsd6iShLRJcoEMh5tgXdmmfjwdiwRmFmXkiZbzMPWzEB2jIMxvHwCS2G7XwLM7nwu1CCEdKvmrh0GU8CWnrcU1VhjC6aanOHxP2gZt4H7csU8xU-Cvn4NaaEMU4dqZeVinp-5p7XL4gIdbCKZF15xoTw",
+          "e": "AQAB"
+        }
+      ]
+    }
+  }
+}

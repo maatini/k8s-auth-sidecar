@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  wiremock-oidc:
+    image: wiremock/wiremock:3.3.1
+    container_name: k8s-auth-wiremock-oidc
+    ports:
+      - "8090:8080"
+    volumes:
+      - ./wiremock/oidc:/home/wiremock
+    command:
+      - "--global-response-templating"
+
+  wiremock-roles:
+    image: wiremock/wiremock:3.3.1
+    container_name: k8s-auth-wiremock-roles
+    ports:
+      - "8089:8080"
+    volumes:
+      - ./wiremock/roles:/home/wiremock
+    command:
+      - "--global-response-templating"
