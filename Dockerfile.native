@@ -4,7 +4,7 @@
 # =====================================================
 # Stage 1: Build Native Image
 # =====================================================
-FROM ghcr.io/graalvm/native-image-community:21 AS build
+FROM ghcr.io/graalvm/native-image-community:25 AS build
 
 WORKDIR /app
 
