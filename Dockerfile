@@ -9,7 +9,7 @@
 # =====================================================
 # Stage 1: Build
 # =====================================================
-FROM eclipse-temurin:25-jdk-alpine AS build
+FROM --platform=$BUILDPLATFORM eclipse-temurin:25-jdk-alpine AS build
 
 LABEL maintainer="space.maatini"
 LABEL description="K8s-Auth-Sidecar AuthN/AuthZ Microservice Build Stage"
@@ -22,14 +22,14 @@ WORKDIR /app
 # Copy pom.xml first for better layer caching
 COPY pom.xml .
 
-# Download dependencies (cached if pom.xml unchanged)
-RUN mvn dependency:go-offline -B
+# Download dependencies (use BuildKit cache mount for speed)
+RUN --mount=type=cache,target=/root/.m2 mvn dependency:go-offline -B
 
 # Copy source code
 COPY src ./src
 
-# Build the application
-RUN mvn package -DskipTests -Dquarkus.package.type=uber-jar
+# Build the application (use BuildKit cache mount for speed)
+RUN --mount=type=cache,target=/root/.m2 mvn package -DskipTests -Dquarkus.package.type=uber-jar
 
 # =====================================================
 # Stage 2: Native Image Build (Optional)
