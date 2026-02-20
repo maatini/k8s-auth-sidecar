@@ -104,9 +104,7 @@ ENV QUARKUS_HTTP_PORT=8080 \
     PROXY_TARGET_PORT=8081 \
     AUTH_ENABLED=true \
     AUTHZ_ENABLED=true \
-    OPA_ENABLED=true \
-    OPA_MODE=embedded \
-    OPA_POLICY_DIR=/policies
+    OPA_ENABLED=true
 
 # Run the application
 ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar /app/k8s-auth-sidecar.jar"]

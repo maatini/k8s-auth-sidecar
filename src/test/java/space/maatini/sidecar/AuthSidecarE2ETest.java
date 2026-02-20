@@ -3,7 +3,6 @@ package space.maatini.sidecar;
 import com.github.tomakehurst.wiremock.WireMockServer;
 import com.github.tomakehurst.wiremock.client.WireMock;
 
-import io.quarkus.test.common.QuarkusTestResource;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.QuarkusTestProfile;
 import io.quarkus.test.junit.TestProfile;
@@ -13,7 +12,6 @@ import io.quarkus.test.security.jwt.JwtSecurity;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import space.maatini.sidecar.test.OpaTestResource;
 
 import java.util.Map;
 
@@ -25,7 +23,7 @@ import static org.hamcrest.CoreMatchers.*;
  * End-to-End integration test for the sidecar proxy pipeline.
  */
 @QuarkusTest
-@QuarkusTestResource(OpaTestResource.class)
+// testing profile only
 @TestProfile(AuthSidecarE2ETest.E2EProfile.class)
 public class AuthSidecarE2ETest {
 

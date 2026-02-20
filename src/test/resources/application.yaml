@@ -40,7 +40,7 @@ sidecar:
     enabled: true
     mode: embedded
     embedded:
-      policy-directory: src/main/resources/policies
+      wasm-path: classpath:policies/authz.wasm
   
   proxy:
     target:

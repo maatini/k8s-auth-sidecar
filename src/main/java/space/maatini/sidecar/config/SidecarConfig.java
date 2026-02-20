@@ -6,7 +6,6 @@ import io.smallrye.config.WithName;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 /**
  * Configuration mapping for the RR-Sidecar.
@@ -66,7 +65,8 @@ public interface SidecarConfig {
         List<String> propagateHeaders();
 
         /**
-         * Headers to add to backend request. Values can contain placeholders like ${user.id}.
+         * Headers to add to backend request. Values can contain placeholders like
+         * ${user.id}.
          */
         Map<String, String> addHeaders();
 
@@ -227,16 +227,9 @@ public interface SidecarConfig {
         }
 
         interface EmbeddedOpaConfig {
-            @WithName("policy-directory")
-            @WithDefault("/policies")
-            String policyDirectory();
-
-            @WithName("bundle-path")
-            Optional<String> bundlePath();
-
-            @WithName("watch-policies")
-            @WithDefault("true")
-            boolean watchPolicies();
+            @WithName("wasm-path")
+            @WithDefault("classpath:policies/authz.wasm")
+            String wasmPath();
         }
     }
 

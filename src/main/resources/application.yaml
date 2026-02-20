@@ -194,11 +194,9 @@ sidecar:
       decision-path: ${OPA_DECISION_PATH:/v1/data/authz/allow}
       timeout: 5000
     
-    # Embedded OPA (when mode=embedded)
+    # Embedded OPA WASM (when mode=embedded)
     embedded:
-      policy-directory: ${OPA_POLICY_DIR:/policies}
-      bundle-path: ${OPA_BUNDLE_PATH:}
-      watch-policies: true
+      wasm-path: ${OPA_WASM_PATH:classpath:policies/authz.wasm}
       
     # Default policy package
     default-package: authz

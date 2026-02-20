@@ -57,8 +57,8 @@ Der Sidecar ist wie ein **Sicherheits-Checkpoint** auf einem Flughafen:
 - **Sidecar-Pattern**: Zwei Container im selben Pod teilen sich Netzwerk und Storage. Der eine hilft dem anderen.
 - **Zero-Trust**: Niemandem wird automatisch vertraut – jeder Request wird geprüft.
 - **JWT (JSON Web Token)**: Ein verschlüsseltes „Ausweis-Kärtchen“ mit User-Infos.
-- **OPA + Rego**: Die „Gesetzbücher“ deiner App. Du schreibst Regeln wie in einer Tabelle, OPA entscheidet automatisch.
-- **Hot-Reload**: Du änderst eine Rego-Datei in einer ConfigMap → der Sidecar merkt es und lädt sie neu, ohne Neustart!
+- **OPA + Rego**: Die „Gesetzbücher“ deiner App. Du schreibst Regeln in Rego, kompilierst sie zu WASM und der Sidecar entscheidet in Millisekunden In-Memory.
+- **Hot-Reload**: Du änderst eine `.wasm` oder `.rego`-Datei in einer ConfigMap → der Sidecar merkt es und lädt sie neu, ohne Neustart!
 - **Quarkus**: Ein super-schnelles Java-Framework, das auch als winziges **Native-Image** (keine JVM nötig) laufen kann.
 
 ---
@@ -66,7 +66,7 @@ Der Sidecar ist wie ein **Sicherheits-Checkpoint** auf einem Flughafen:
 ## ✨ Alle Features im Überblick
 
 - Unterstützt **Keycloak** und **Entra ID** (auch Multi-Tenant)
-- **Embedded OPA** (schnell) oder externer OPA-Server
+- **Embedded OPA WASM** (In-Memory, enorm schnell) oder externer OPA-Server
 - Rollen-Enrichment aus eigenem Service
 - Ant-Style Path-Matching (`/**`, `/api/*/users`)
 - Prometheus-Metriken + OpenTelemetry + JSON-Logging

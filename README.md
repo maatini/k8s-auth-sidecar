@@ -14,7 +14,7 @@
 
 - ⚡ **Blitzschnelle lokale Entwicklung**: Out-of-the-Box Mocking für Identity Provider (Keycloak/Entra) und Roles Service via WireMock.
 - 🏢 **Multi-Tenant OIDC-Support**: Standardisiert für Keycloak und Microsoft Entra ID (Azure AD).
-- 🧠 **Flexible Policy-Engine**: Eingebettete OPA-Regeln (Hot-Reload) oder externer OPA-Server.
+- 🧠 **Flexible Policy-Engine**: Eingebettete OPA-WASM-Engine (Chicory, In-Memory) mit Hot-Reload oder externer OPA-Server.
 - ➕ **Rollen-Enrichment**: Nahtlose Integration mit externem Roles/Permissions-Service.
 - ⚡ **Reaktive Pipeline**: Non-blocking AuthN → Enrichment → AuthZ Verarbeitung.
 - 🛡️ **Zero-Trust**: Jede Anfrage wird validiert.
@@ -140,9 +140,9 @@ Jeder Request durchläuft diese Pipeline:
 
 ### 3. Wie werden Regeln aktualisiert?
 Du musst den Sidecar **nicht neu starten**, um OPA-Regeln zu ändern (bei `OPA_MODE=embedded`):
-1. Regeln liegen z.B. in einer Kubernetes **ConfigMap**.
+1. Regeln (.rego oder .wasm) liegen z.B. in einer Kubernetes **ConfigMap**.
 2. Kubernetes aktualisiert die Datei im Pod bei Änderungen.
-3. Der Sidecar lädt die neuen Regeln **automatisch (Hot Reload)** in wenigen Sekunden.
+3. Der Sidecar lädt das neue WASM-Modul **automatisch (Hot Reload)** via In-Memory WatchService in wenigen Sekunden.
 
 ## ⚙️ Konfiguration
 
@@ -160,8 +160,9 @@ Du musst den Sidecar **nicht neu starten**, um OPA-Regeln zu ändern (bei `OPA_M
 | `PROXY_TARGET_HOST` | Backend-Host (App Container) | `localhost` |
 | `PROXY_TARGET_PORT` | Backend-Port (App Container) | `8081` |
 | `OPA_ENABLED` | OPA-Policy-Evaluation aktivieren | `true` |
-| `OPA_MODE` | `embedded` (intern) oder `external` | `embedded` |
-| `OPA_URL` | Externer OPA-Server URL | `http://localhost:8181` |
+| `OPA_MODE` | `embedded` (internes WASM) oder `external` | `embedded` |
+| `OPA_WASM_PATH` | Pfad zur OPA-WASM-Datei (nur `embedded`) | `classpath:policies/authz.wasm` |
+| `OPA_URL` | Externer OPA-Server URL (nur `external`) | `http://localhost:8181` |
 | `QUARKUS_HTTP_CORS_ORIGINS` | Erlaubte CORS Origins | `*` (nur Dev!) |
 
 *Siehe `src/main/resources/application.yaml` für alle Konfigurationsmöglichkeiten inkl. des neuen `%dev` Profils.*
@@ -303,10 +304,13 @@ mvn verify
 mvn test -Dquarkus.jacoco.report=true
 ```
 
-### OPA Policy Tests (Lokal)
+### OPA Policy Tests (Lokal - optional)
+*(Hinweis: Der Sidecar benötigt die OPA-CLI zur Laufzeit nicht mehr, da er In-Memory WASM nutzt! Zum manuellen Testen von Policies ist die CLI jedoch hilfreich)*
 ```bash
 brew install opa
 opa eval -i input.json -d src/main/resources/policies/ 'data.authz.allow'
+# Oder WASM kompilieren:
+opa build -t wasm -e authz/allow -o src/main/resources/policies/authz.wasm src/main/resources/policies/
 ```
 
 ### Docker und Native Image Build
@@ -325,13 +329,14 @@ k8s-auth-sidecar/
 ├── docs/                     # Architektur-Bilder & Docs
 ├── k8s/                      # Kubernetes Base & Overlays
 ├── src/main/java/space/maatini/sidecar/
-│   ├── config/               # Quarkus Konfiguration
+│   ├── config/               # Quarkus Konfiguration (SidecarConfig)
 │   ├── client/               # REST-Clients (z.B. Roles Service)
 │   ├── filter/               # HTTP-Filter & Pipeline
+│   ├── service/              # PolicyService (OPA WASM), ProxyService
 │   └── util/                 # Utilities (PathMatcher)
 ├── src/main/resources/       
 │   ├── application.yaml      # Config inkl. %dev Profil
-│   └── policies/             # OPA-Regeln (.rego)
+│   └── policies/             # OPA-Regeln (.rego → .wasm via Maven Build)
 ├── wiremock/                 # JSON Mock Mappings für Dev-Modus
 ├── docker-compose.dev.yml    # Wiremock Dev-Infrastruktur
 ├── Dockerfile                # JVM-Image

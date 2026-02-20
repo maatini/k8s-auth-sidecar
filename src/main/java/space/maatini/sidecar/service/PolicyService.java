@@ -22,11 +22,14 @@ import space.maatini.sidecar.config.SidecarConfig;
 import space.maatini.sidecar.model.AuthContext;
 import space.maatini.sidecar.model.PolicyDecision;
 import space.maatini.sidecar.model.PolicyInput;
-import space.maatini.sidecar.util.PathMatcher;
 
+import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.*;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicReference;
+import com.styra.opa.wasm.OpaPolicy;
 
 /**
  * Service for evaluating authorization policies using OPA (Open Policy Agent).
@@ -51,26 +54,33 @@ public class PolicyService {
     PolicyService self; // Self-injection for interceptors to work on evaluations
 
     private WebClient webClient;
-    private Process embeddedOpaProcess;
+
+    // Thread-safe reference to the current WASM policy instance
+    private final AtomicReference<OpaPolicy> wasmPolicyRef = new AtomicReference<>();
+    private Thread watcherThread;
+    private volatile boolean watching = true;
 
     @PostConstruct
     void init() {
         this.webClient = WebClient.create(vertx);
 
         if (config.opa().enabled() && "embedded".equals(config.opa().mode())) {
-            startEmbeddedOpaDaemon();
+            loadWasmModule();
+            startHotReloadWatcher();
         }
     }
 
     @PreDestroy
     void shutdown() {
-        if (embeddedOpaProcess != null && embeddedOpaProcess.isAlive()) {
-            LOG.info("Shutting down embedded OPA process");
-            embeddedOpaProcess.destroy();
+        watching = false;
+        if (watcherThread != null) {
+            watcherThread.interrupt();
         }
         if (webClient != null) {
             webClient.close();
         }
+        // policy.close() - not needed if it doesn't hold native resources directly
+        // (managed by JVM)
     }
 
     /**
@@ -102,14 +112,12 @@ public class PolicyService {
     @CircuitBreaker(requestVolumeThreshold = 10, failureRatio = 0.5, delay = 5000)
     @Fallback(fallbackMethod = "fallbackEvaluateExternal")
     public Uni<PolicyDecision> evaluateExternal(PolicyInput input) {
+        if ("embedded".equals(config.opa().mode())) {
+            return evaluateEmbeddedWasm(input);
+        }
+
         String opaUrl = config.opa().external().url();
         String decisionPath = config.opa().external().decisionPath();
-
-        // If in embedded mode, we override the URL to point to our locally spawned OPA
-        // daemon
-        if ("embedded".equals(config.opa().mode())) {
-            opaUrl = "http://localhost:8181";
-        }
 
         try {
             ObjectNode requestBody = objectMapper.createObjectNode();
@@ -170,25 +178,161 @@ public class PolicyService {
         }
     }
 
-    /**
-     * Starts an authentic OPA process locally for real Rego evaluation instead of
-     * Java simulation.
-     */
-    private void startEmbeddedOpaDaemon() {
-        String policyDir = config.opa().embedded().policyDirectory();
-        LOG.infof("Starting embedded OPA daemon on port 8181 monitoring policies in %s", policyDir);
+    private Uni<PolicyDecision> evaluateEmbeddedWasm(PolicyInput input) {
+        OpaPolicy policy = wasmPolicyRef.get();
+        if (policy == null) {
+            LOG.warn("WASM policy module is not loaded. Defaulting to deny.");
+            return Uni.createFrom().item(PolicyDecision.deny("WASM module not initialized"));
+        }
 
+        return Uni.createFrom().item(() -> {
+            try {
+                String inputJson = objectMapper.writeValueAsString(input);
+                String resultJson = policy.evaluate(inputJson);
+
+                JsonNode resultNode = objectMapper.readTree(resultJson);
+                if (resultNode.isArray() && resultNode.size() > 0) {
+                    JsonNode resultObj = resultNode.get(0).get("result");
+                    if (resultObj != null) {
+                        if (resultObj.isBoolean()) {
+                            return resultObj.asBoolean() ? PolicyDecision.allow()
+                                    : PolicyDecision.deny("Access denied by policy");
+                        }
+                        if (resultObj.isObject() && resultObj.has("allow")) {
+                            boolean allowed = resultObj.get("allow").asBoolean(false);
+                            if (allowed) {
+                                return PolicyDecision.allow();
+                            }
+                            return PolicyDecision.deny(resultObj.has("reason") ? resultObj.get("reason").asText()
+                                    : "Access denied by policy");
+                        }
+                    }
+                }
+
+                if (resultNode.isBoolean()) {
+                    return resultNode.asBoolean() ? PolicyDecision.allow()
+                            : PolicyDecision.deny("Access denied by policy");
+                }
+
+                return PolicyDecision.deny("Unexpected WASM evaluation result");
+            } catch (Exception e) {
+                LOG.errorf(e, "WASM evaluation failed");
+                throw new RuntimeException("WASM evaluation failed", e);
+            }
+        });
+    }
+
+    /**
+     * Loads the WASM module from the configured path into memory using chicory.
+     */
+    private void loadWasmModule() {
+        String wasmPath = config.opa().embedded().wasmPath();
         try {
+            byte[] wasmBytes;
+            if (wasmPath.startsWith("classpath:")) {
+                String cpPath = wasmPath.substring("classpath:".length());
+                if (cpPath.startsWith("/")) {
+                    cpPath = cpPath.substring(1);
+                }
+                try (InputStream is = Thread.currentThread().getContextClassLoader().getResourceAsStream(cpPath)) {
+                    if (is == null) {
+                        throw new IOException("Resource not found in classpath: " + cpPath);
+                    }
+                    wasmBytes = is.readAllBytes();
+                }
+            } else {
+                wasmBytes = Files.readAllBytes(Paths.get(wasmPath));
+            }
+
+            OpaPolicy newPolicy = OpaPolicy.builder().withPolicy(wasmBytes).build();
+            wasmPolicyRef.set(newPolicy);
+            LOG.infof("Successfully loaded OPA WASM module from %s", wasmPath);
+        } catch (Exception e) {
+            LOG.errorf(e, "Failed to load OPA WASM module from %s. Requests will be denied.", wasmPath);
+        }
+    }
+
+    /**
+     * Starts a WatchService to monitor policy directories for changes.
+     */
+    private void startHotReloadWatcher() {
+        Path devPolicies = Paths.get("src/main/resources/policies");
+        Path prodPolicies = Paths.get("/policies");
+
+        final Path watchDir;
+        if (Files.exists(devPolicies)) {
+            watchDir = devPolicies;
+        } else if (Files.exists(prodPolicies)) {
+            watchDir = prodPolicies;
+        } else {
+            LOG.info("No policy directory found to watch for hot-reloading.");
+            return;
+        }
+
+        watcherThread = new Thread(() -> {
+            try (WatchService watchService = FileSystems.getDefault().newWatchService()) {
+                watchDir.register(watchService, StandardWatchEventKinds.ENTRY_MODIFY,
+                        StandardWatchEventKinds.ENTRY_CREATE);
+                LOG.infof("Hot-reload watcher started on directory %s", watchDir.toAbsolutePath());
+
+                while (watching) {
+                    WatchKey key = watchService.take();
+                    boolean changed = false;
+                    for (WatchEvent<?> event : key.pollEvents()) {
+                        String file = event.context().toString();
+                        if (file.endsWith(".rego") || file.endsWith(".wasm")) {
+                            changed = true;
+                            break;
+                        }
+                    }
+                    if (changed) {
+                        LOG.info("Detected changes in policies directory. Recompiling and reloading...");
+                        Thread.sleep(500);
+                        recompileWasm(watchDir);
+                        loadWasmModule();
+                    }
+                    key.reset();
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                LOG.info("Policy hot-reload watcher interrupted");
+            } catch (Exception e) {
+                LOG.errorf(e, "Error inside hot-reload watcher");
+            }
+        });
+        watcherThread.setDaemon(true);
+        watcherThread.start();
+    }
+
+    private void recompileWasm(Path policyDir) {
+        try {
+            ProcessBuilder checkPb = new ProcessBuilder("opa", "version");
+            if (checkPb.start().waitFor() != 0) {
+                return;
+            }
+
+            String outPath = config.opa().embedded().wasmPath();
+            if (outPath.startsWith("classpath:")) {
+                outPath = "target/classes/policies/authz.wasm";
+            }
+
+            File outFile = new File(outPath);
+            outFile.getParentFile().mkdirs();
+
             ProcessBuilder pb = new ProcessBuilder(
-                    "opa", "run", "--server", "--addr", "localhost:8181", policyDir);
-            // Ignore output or redirect to sidecar output
+                    "opa", "build", "-t", "wasm", "-e",
+                    config.opa().defaultPackage() + "/" + config.opa().defaultRule(),
+                    "-o", outPath, policyDir.toAbsolutePath().toString());
             pb.redirectErrorStream(true);
-            embeddedOpaProcess = pb.start();
-            LOG.info("Embedded OPA daemon started successfully.");
-        } catch (IOException e) {
-            LOG.errorf("Failed to start embedded OPA daemon. Ensure 'opa' CLI is installed and on the PATH: %s",
-                    e.getMessage());
-            // We don't crash the sidecar here, as requests will just Fallback to Deny.
+            Process p = pb.start();
+            int exitCode = p.waitFor();
+            if (exitCode == 0) {
+                LOG.info("Successfully recompiled OPA policies to WASM");
+            } else {
+                LOG.errorf("Failed to compile OPA policies. Opa cli exit code: %d", exitCode);
+            }
+        } catch (Exception e) {
+            LOG.debugf("Skipping recompilation. (opa cli might be missing): %s", e.getMessage());
         }
     }
 }

@@ -35,10 +35,10 @@ Der **k8s-auth-sidecar** (Request Router Sidecar) ist ein Quarkus-basierter Micr
 - Ruft Rollen/Rechte vom externen Microservice ab
 - Evaluiert Policies mit eingebetteter OPA-Engine
 
-### 4. Policy Engine (OPA Integration)
-- Eingebettete OPA-Engine für Policy-Evaluation
-- Rego-Policies für flexible Zugriffskontrolle
-- Hot-Reload von Policies
+### 4. Policy Engine (OPA WASM Integration)
+- Eingebettete OPA-Engine (WASM via Chicory) für blitzschnelle In-Memory Policy-Evaluation
+- Rego-Policies kompiliert zu WASM für flexible Zugriffskontrolle
+- Hot-Reload von Policies (In-Memory Neuladen bei Datei-Änderung)
 
 ### 5. Proxy Service (`ProxyService`)
 - Leitet autorisierte Anfragen an den Main-Container weiter
@@ -60,7 +60,7 @@ Für eine erstklassige Developer Experience ohne externe Abhängigkeiten nutzt d
 | Language | Java 21 |
 | OIDC | quarkus-oidc |
 | HTTP Client | quarkus-rest-client-reactive |
-| Policy Engine | OPA (via REST oder embedded) |
+| Policy Engine | OPA WASM (Chicory) oder REST (external) |
 | Metrics | Micrometer + Prometheus |
 | Logging | quarkus-logging-json |
 | Container | GraalVM Native Image |
@@ -89,7 +89,8 @@ PROXY_TARGET_HOST=localhost
 PROXY_TARGET_PORT=8081
 
 # OPA
-OPA_POLICY_PATH=/policies
+OPA_MODE=embedded
+OPA_WASM_PATH=/policies/authz.wasm
 OPA_DECISION_ENDPOINT=/v1/data/authz/allow
 
 # Metrics & Logging

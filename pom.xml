@@ -136,6 +136,13 @@
         </dependency>
         
 
+        <!-- OPA WASM (Chicory) -->
+        <dependency>
+            <groupId>com.styra.opa</groupId>
+            <artifactId>opa-java-wasm</artifactId>
+            <version>1.0.2</version>
+        </dependency>
+
         <!-- Test dependencies -->
         <dependency>
             <groupId>io.quarkus</groupId>
@@ -257,6 +264,48 @@
                     <outputFormat>json</outputFormat>
                     <outputName>bom</outputName>
                 </configuration>
+            </plugin>
+            
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.5.0</version>
+                <executions>
+                    <execution>
+                        <id>create-opa-wasm-dir</id>
+                        <phase>generate-resources</phase>
+                        <goals>
+                            <goal>exec</goal>
+                        </goals>
+                        <configuration>
+                            <executable>mkdir</executable>
+                            <arguments>
+                                <argument>-p</argument>
+                                <argument>${project.build.directory}/classes/policies</argument>
+                            </arguments>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>compile-opa-wasm</id>
+                        <phase>generate-resources</phase>
+                        <goals>
+                            <goal>exec</goal>
+                        </goals>
+                        <configuration>
+                            <executable>opa</executable>
+                            <arguments>
+                                <argument>build</argument>
+                                <argument>-t</argument>
+                                <argument>wasm</argument>
+                                <argument>-e</argument>
+                                <argument>authz/allow</argument>
+                                <argument>-o</argument>
+                                <argument>${project.build.directory}/classes/policies/authz.wasm</argument>
+                                <argument>${project.basedir}/src/main/resources/policies/</argument>
+                            </arguments>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>
