@@ -22,7 +22,7 @@
         <quarkus.platform.version>3.17.5</quarkus.platform.version>
         
         <compiler-plugin.version>3.13.0</compiler-plugin.version>
-        <surefire-plugin.version>3.5.2</surefire-plugin.version>
+        <surefire-plugin.version>3.5.4</surefire-plugin.version>
         <failsafe-plugin.version>3.5.2</failsafe-plugin.version>
     </properties>
 
