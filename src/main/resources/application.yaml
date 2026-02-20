@@ -10,7 +10,7 @@ quarkus:
   http:
     port: 8080
     cors:
-      ~: true
+      enabled: true
       # WARNING: Wildcard origins are for development only.
       # In production, override via env: QUARKUS_HTTP_CORS_ORIGINS=https://your-app.example.com
       origins: ${QUARKUS_HTTP_CORS_ORIGINS:*}
@@ -25,8 +25,7 @@ quarkus:
     client-id: ${OIDC_CLIENT_ID:k8s-auth-sidecar}
     credentials:
       secret: ${OIDC_CLIENT_SECRET:}
-    tls:
-      verification: ${OIDC_TLS_VERIFICATION:required}
+
     
     # Token validation settings
     token:
@@ -78,7 +77,7 @@ quarkus:
   # Health and Metrics
   smallrye-health:
     ui:
-      enable: true
+      enabled: true
   
   micrometer:
     export:
@@ -99,7 +98,8 @@ quarkus:
       "io.quarkus.oidc":
         level: DEBUG
     console:
-      json: ${QUARKUS_LOG_JSON:true}
+      json:
+        enabled: ${QUARKUS_LOG_JSON:true}
       format: "%d{yyyy-MM-dd HH:mm:ss,SSS} %-5p [%c{3.}] (%t) %s%e%n"
     
   # OpenTelemetry
@@ -234,8 +234,7 @@ sidecar:
       level: DEBUG
     oidc:
       auth-server-url: http://localhost:8090/realms/master
-      tls:
-        verification: none
+
     rest-client:
       "space.maatini.sidecar.client.RolesServiceClient":
         url: http://localhost:8089
@@ -272,6 +271,7 @@ sidecar:
   quarkus:
     http:
       cors:
+        enabled: true
         origins: ${QUARKUS_HTTP_CORS_ORIGINS:}
     log:
       console:
