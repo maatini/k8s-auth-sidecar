@@ -71,7 +71,7 @@ RUN addgroup -S sidecar && adduser -S sidecar -G sidecar
 RUN apk upgrade --no-cache
 
 # HOT-RELOAD FIX – P0.5: Install OPA CLI for in-container policy recompilation
-ARG OPA_VERSION=1.4.2
+ARG OPA_VERSION=1.13.2
 ARG TARGETARCH
 RUN wget -q -O /usr/local/bin/opa \
     "https://github.com/open-policy-agent/opa/releases/download/v${OPA_VERSION}/opa_linux_${TARGETARCH:-amd64}_static" && \
