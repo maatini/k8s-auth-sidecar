@@ -104,7 +104,7 @@ public class ProxyService {
             String path,
             Map<String, String> headers,
             Map<String, String> queryParams,
-            Buffer body,
+            io.vertx.core.http.HttpServerRequest clientRequest,
             AuthContext authContext) {
 
         long startTime = System.nanoTime();
@@ -137,8 +137,12 @@ public class ProxyService {
 
         // Send request with or without body
         Uni<HttpResponse<Buffer>> responseUni;
-        if (body != null && body.length() > 0) {
-            responseUni = request.sendBuffer(body);
+        // STREAMING FIX – Gemini 3 Flash P0.1
+        if (clientRequest != null && (method.equalsIgnoreCase("POST") || method.equalsIgnoreCase("PUT")
+                || method.equalsIgnoreCase("PATCH"))) {
+            io.vertx.mutiny.core.http.HttpServerRequest mutinyReq = io.vertx.mutiny.core.http.HttpServerRequest
+                    .newInstance(clientRequest);
+            responseUni = request.sendStream(mutinyReq);
         } else {
             responseUni = request.send();
         }
@@ -160,7 +164,8 @@ public class ProxyService {
     }
 
     public Uni<ProxyResponse> fallbackProxy(String method, String path, Map<String, String> headers,
-            Map<String, String> queryParams, Buffer body, AuthContext authContext, Throwable t) {
+            Map<String, String> queryParams, io.vertx.core.http.HttpServerRequest clientRequest,
+            AuthContext authContext, Throwable t) {
         LOG.errorf("Fallback triggered for proxy on %s %s: %s", method, path, t.getMessage());
         return Uni.createFrom()
                 .item(ProxyResponse.error(503, "Service Unavailable: Backend system cannot be reached."));

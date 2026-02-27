@@ -207,6 +207,13 @@ sidecar:
     enabled: ${RATE_LIMIT_ENABLED:false}
     requests-per-second: ${RATE_LIMIT_RPS:100}
     burst-size: ${RATE_LIMIT_BURST:200}
+    # Trusted proxy IPs: Only requests from these IPs will honour X-Forwarded-For / X-Real-IP.
+    # All other clients are rate-limited by their real TCP remote address (IP spoofing protection).
+    # Typical values:
+    #   - Kubernetes Ingress NGINX:  10.0.0.0/8 range or the specific pod CIDR
+    #   - Cloud Load Balancers:     see your provider's documentation
+    #   - Local development:        127.0.0.1, ::1
+    trusted-proxies: ${RATE_LIMIT_TRUSTED_PROXIES:127.0.0.1,::1}
 
   # Audit Logging
   audit:

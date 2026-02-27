@@ -5,20 +5,17 @@ import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import io.quarkus.security.identity.SecurityIdentity;
 import io.smallrye.mutiny.Uni;
-import io.smallrye.common.annotation.Blocking;
 import io.vertx.core.http.HttpServerRequest;
 import jakarta.annotation.PostConstruct;
-import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.Priorities;
 import jakarta.ws.rs.container.ContainerRequestContext;
-import jakarta.ws.rs.container.ContainerRequestFilter;
 import jakarta.ws.rs.core.Context;
 import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.core.UriInfo;
-import jakarta.ws.rs.ext.Provider;
 import org.jboss.logging.Logger;
+import org.jboss.resteasy.reactive.server.ServerRequestFilter;
 import space.maatini.sidecar.config.SidecarConfig;
 import space.maatini.sidecar.model.AuthContext;
 import space.maatini.sidecar.model.PolicyDecision;
@@ -29,7 +26,6 @@ import space.maatini.sidecar.service.RolesService;
 import space.maatini.sidecar.util.PathMatcher;
 import space.maatini.sidecar.util.RequestUtils;
 
-import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -41,11 +37,8 @@ import java.util.concurrent.TimeUnit;
  * 2. Authorization (via OPA policies)
  * 3. Proxying to the backend container
  */
-@Provider
-@Priority(Priorities.AUTHENTICATION)
 @ApplicationScoped
-@Blocking
-public class AuthProxyFilter implements ContainerRequestFilter {
+public class AuthProxyFilter {
 
     private static final Logger LOG = Logger.getLogger(AuthProxyFilter.class);
     private static final String REQUEST_ID_HEADER = "X-Request-ID";
@@ -107,8 +100,8 @@ public class AuthProxyFilter implements ContainerRequestFilter {
                 .register(meterRegistry);
     }
 
-    @Override
-    public void filter(ContainerRequestContext requestContext) throws IOException {
+    @ServerRequestFilter(priority = Priorities.AUTHENTICATION)
+    public Uni<Response> filter(ContainerRequestContext requestContext) {
         long startTime = System.nanoTime();
         String path = requestContext.getUriInfo().getPath();
         String method = requestContext.getMethod();
@@ -119,30 +112,33 @@ public class AuthProxyFilter implements ContainerRequestFilter {
         // Skip auth for public paths
         if (isPublicPath(path)) {
             LOG.debugf("Skipping auth for public path: %s", path);
-            return;
+            return Uni.createFrom().nullItem();
         }
 
         // Skip auth for internal Quarkus paths
         if (PathMatcher.isInternalPath(path)) {
             LOG.debugf("Skipping auth for internal path: %s", path);
-            return;
+            return Uni.createFrom().nullItem();
         }
 
         // Check if auth is enabled
         if (!config.auth().enabled()) {
             LOG.debug("Authentication is disabled");
-            return;
+            return Uni.createFrom().nullItem();
         }
 
-        try {
-            // Extract authentication context
-            AuthContext authContext = authenticationService.extractAuthContext(securityIdentity);
-
+        return Uni.createFrom().item(() -> {
+            try {
+                return authenticationService.extractAuthContext(securityIdentity);
+            } catch (Exception e) {
+                LOG.errorf(e, "Error during authentication extraction: %s", e.getClass().getName());
+                throw new InternalAuthException(e);
+            }
+        }).flatMap(authContext -> {
             if (!authContext.isAuthenticated()) {
                 LOG.warnf("Authentication failed for request: %s %s", method, path);
                 authFailureCounter.increment();
-                abortWithUnauthorized(requestContext, "Authentication required");
-                return;
+                return Uni.createFrom().item(createUnauthorizedResponse("Authentication required"));
             }
 
             authSuccessCounter.increment();
@@ -151,11 +147,12 @@ public class AuthProxyFilter implements ContainerRequestFilter {
             // Store auth context for later use
             requestContext.setProperty(AUTH_CONTEXT_PROPERTY, authContext);
 
-            // Enrich with roles and evaluate policy reactively, then block once
+            // Enrich with roles and evaluate policy reactively
             Map<String, String> headers = RequestUtils.extractHeaders(requestContext);
             Map<String, String> queryParams = RequestUtils.extractQueryParams(requestContext.getUriInfo());
 
-            AuthContext enrichedContext = rolesService.enrichWithRoles(authContext)
+            // REACTIVE FIX – Gemini 3 Flash P0.2
+            return rolesService.enrichWithRoles(authContext)
                     .flatMap(enriched -> {
                         if (!config.authz().enabled()) {
                             return Uni.createFrom().item(enriched);
@@ -168,31 +165,33 @@ public class AuthProxyFilter implements ContainerRequestFilter {
                                     return enriched;
                                 });
                     })
-                    .await().atMost(java.time.Duration.ofSeconds(10));
-
-            authzAllowCounter.increment();
-            LOG.debugf("Authorization allowed for user %s on %s %s",
-                    enrichedContext.userId(), method, path);
-
-            // Update stored context with enriched version
-            requestContext.setProperty(AUTH_CONTEXT_PROPERTY, enrichedContext);
-
-        } catch (Exception e) {
-            AuthorizationDeniedException authzEx = findCause(e, AuthorizationDeniedException.class);
-
+                    .onItem().invoke(enrichedContext -> {
+                        authzAllowCounter.increment();
+                        LOG.debugf("Authorization allowed for user %s on %s %s",
+                                enrichedContext.userId(), method, path);
+                        // Update stored context with enriched version
+                        requestContext.setProperty(AUTH_CONTEXT_PROPERTY, enrichedContext);
+                    })
+                    .map(ignored -> (Response) null); // Continuing the filter chain
+        }).onFailure().recoverWithItem(error -> {
+            AuthorizationDeniedException authzEx = findCause(error, AuthorizationDeniedException.class);
             if (authzEx != null) {
                 LOG.warnf("Authorization denied for user on %s %s: %s",
                         method, path, authzEx.decision.reason());
                 authzDenyCounter.increment();
-                abortWithForbidden(requestContext, authzEx.decision);
-            } else {
-                LOG.errorf(e, "Error during authentication/authorization: %s", e.getClass().getName());
-                abortWithError(requestContext, "Internal authentication error");
+                return createForbiddenResponse(authzEx.decision);
             }
-        } finally {
+            InternalAuthException intAuthEx = findCause(error, InternalAuthException.class);
+            if (intAuthEx != null) {
+                return createErrorResponse("Internal authentication error");
+            }
+
+            LOG.errorf(error, "Unexpected error during authentication/authorization: %s", error.getClass().getName());
+            return createErrorResponse("Internal server error");
+        }).onItemOrFailure().invoke((response, throwable) -> {
             long duration = System.nanoTime() - startTime;
             authTimer.record(duration, TimeUnit.NANOSECONDS);
-        }
+        });
     }
 
     /**
@@ -205,6 +204,12 @@ public class AuthProxyFilter implements ContainerRequestFilter {
         AuthorizationDeniedException(PolicyDecision decision) {
             super(decision.reason());
             this.decision = decision;
+        }
+    }
+
+    private static class InternalAuthException extends RuntimeException {
+        InternalAuthException(Throwable cause) {
+            super(cause);
         }
     }
 
@@ -227,38 +232,29 @@ public class AuthProxyFilter implements ContainerRequestFilter {
         return PathMatcher.matchesAny(path, config.auth().publicPaths());
     }
 
-    /**
-     * Aborts the request with a 401 Unauthorized response.
-     */
-    private void abortWithUnauthorized(ContainerRequestContext requestContext, String message) {
-        requestContext.abortWith(Response
+    private Response createUnauthorizedResponse(String message) {
+        return Response
                 .status(Response.Status.UNAUTHORIZED)
                 .entity(new ErrorResponse("unauthorized", message))
                 .header("WWW-Authenticate", "Bearer")
-                .build());
+                .build();
     }
 
-    /**
-     * Aborts the request with a 403 Forbidden response.
-     */
-    private void abortWithForbidden(ContainerRequestContext requestContext, PolicyDecision decision) {
-        requestContext.abortWith(Response
+    private Response createForbiddenResponse(PolicyDecision decision) {
+        return Response
                 .status(Response.Status.FORBIDDEN)
                 .entity(new ErrorResponse(
                         "forbidden",
                         decision.reason() != null ? decision.reason() : "Access denied",
                         decision.violations()))
-                .build());
+                .build();
     }
 
-    /**
-     * Aborts the request with a 500 Internal Server Error response.
-     */
-    private void abortWithError(ContainerRequestContext requestContext, String message) {
-        requestContext.abortWith(Response
+    private Response createErrorResponse(String message) {
+        return Response
                 .status(Response.Status.INTERNAL_SERVER_ERROR)
                 .entity(new ErrorResponse("error", message))
-                .build());
+                .build();
     }
 
     /**

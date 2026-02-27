@@ -44,6 +44,13 @@ WORKDIR /app
 # Switch to root to change ownership
 USER root
 
+# HOT-RELOAD FIX – P0.5: Install OPA CLI for in-container policy recompilation
+ARG OPA_VERSION=0.71.0
+ARG TARGETARCH
+RUN curl -L -o /usr/local/bin/opa \
+    "https://openpolicyagent.org/downloads/v${OPA_VERSION}/opa_linux_${TARGETARCH:-amd64}_static" && \
+    chmod +x /usr/local/bin/opa
+
 # Copy the native executable with proper ownership
 COPY --chown=1001:1001 --from=build /app/target/*-runner /app/k8s-auth-sidecar
 

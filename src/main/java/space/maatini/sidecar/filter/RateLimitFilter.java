@@ -20,12 +20,11 @@ import org.jboss.logging.Logger;
 import space.maatini.sidecar.config.SidecarConfig;
 import space.maatini.sidecar.model.AuthContext;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import java.io.IOException;
 import java.time.Duration;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -52,13 +51,10 @@ public class RateLimitFilter implements ContainerRequestFilter {
     @Context
     HttpServerRequest httpRequest;
 
-    // Eviction: periodically prune expired buckets to prevent unbounded growth.
-    // In high-scale production, replace with Caffeine LoadingCache or Bucket4j
-    // ProxyManager.
-    private final Map<String, Bucket> buckets = new ConcurrentHashMap<>();
+    // RATE-LIMIT SECURITY FIX – Gemini 3 Flash P0.3
+    private Cache<String, Bucket> buckets;
 
     private Counter rateLimitExceededCounter;
-    private ScheduledExecutorService evictionScheduler;
 
     @PostConstruct
     void init() {
@@ -66,13 +62,12 @@ public class RateLimitFilter implements ContainerRequestFilter {
                 .description("Number of requests rejected due to rate limiting")
                 .register(meterRegistry);
 
-        // Evict all buckets every 5 minutes to prevent unbounded memory growth
-        evictionScheduler = Executors.newSingleThreadScheduledExecutor(r -> {
-            Thread t = new Thread(r, "rate-limit-evictor");
-            t.setDaemon(true);
-            return t;
-        });
-        evictionScheduler.scheduleAtFixedRate(this::evictBuckets, 5, 5, TimeUnit.MINUTES);
+        // RATE-LIMIT SECURITY FIX – Gemini 3 Flash P0.3
+        // Caffeine cache to prevent memory leaks with bounded size and expiration
+        buckets = Caffeine.newBuilder()
+                .maximumSize(MAX_BUCKETS)
+                .expireAfterAccess(15, TimeUnit.MINUTES) // Free memory after periods of inactivity
+                .build();
     }
 
     @Override
@@ -100,14 +95,8 @@ public class RateLimitFilter implements ContainerRequestFilter {
         }
 
         // Protect against memory exhaustion from too many unique keys
-        if (buckets.size() >= MAX_BUCKETS && !buckets.containsKey(key)) {
-            LOG.warnf("Rate limit bucket map at capacity (%d), rejecting new key: %s", MAX_BUCKETS, key);
-            rateLimitExceededCounter.increment();
-            abortWithTooManyRequests(requestContext, 1);
-            return;
-        }
-
-        Bucket bucket = buckets.computeIfAbsent(key, this::createNewBucket);
+        // using Caffeine size bounds
+        Bucket bucket = buckets.get(key, this::createNewBucket);
         ConsumptionProbe probe = bucket.tryConsumeAndReturnRemaining(1);
 
         if (!probe.isConsumed()) {
@@ -142,32 +131,32 @@ public class RateLimitFilter implements ContainerRequestFilter {
     }
 
     private String resolveClientIp(ContainerRequestContext context) {
-        // 1. Check X-Forwarded-For header (reverse proxy scenario)
-        String xForwardedFor = context.getHeaderString("X-Forwarded-For");
-        if (xForwardedFor != null && !xForwardedFor.isEmpty()) {
-            return xForwardedFor.split(",")[0].trim();
-        }
-
-        // 2. Check X-Real-IP header
-        String xRealIp = context.getHeaderString("X-Real-IP");
-        if (xRealIp != null && !xRealIp.isEmpty()) {
-            return xRealIp;
-        }
-
-        // 3. Use Vert.x HttpServerRequest for the actual remote address
+        String remoteAddress = "unknown";
         if (httpRequest != null && httpRequest.remoteAddress() != null) {
-            return httpRequest.remoteAddress().host();
+            remoteAddress = httpRequest.remoteAddress().host();
         }
 
-        return "unknown";
-    }
+        List<String> trustedProxies = config.rateLimit().trustedProxies();
+        boolean isTrustedProxy = trustedProxies != null && trustedProxies.contains(remoteAddress);
 
-    private void evictBuckets() {
-        int size = buckets.size();
-        if (size > 0) {
-            LOG.debugf("Evicting %d rate-limit buckets", size);
-            buckets.clear();
+        if (isTrustedProxy) {
+            // 1. Check X-Forwarded-For header (reverse proxy scenario)
+            String xForwardedFor = context.getHeaderString("X-Forwarded-For");
+            if (xForwardedFor != null && !xForwardedFor.isEmpty()) {
+                // Take the leftmost IP (the original client IP claimed by the proxy chain)
+                return xForwardedFor.split(",")[0].trim();
+            }
+
+            // 2. Check X-Real-IP header
+            String xRealIp = context.getHeaderString("X-Real-IP");
+            if (xRealIp != null && !xRealIp.isEmpty()) {
+                return xRealIp;
+            }
         }
+
+        // 3. Fallback to the real remote IP if not a trusted proxy, or no spoofed
+        // headers
+        return remoteAddress;
     }
 
 }

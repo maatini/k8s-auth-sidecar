@@ -65,8 +65,9 @@ class AuthProxyFilterTest {
         when(req.getUriInfo()).thenReturn(uriInfo);
         when(uriInfo.getPath()).thenReturn("/q/health");
 
-        authProxyFilter.filter(req);
+        Response response = authProxyFilter.filter(req).await().indefinitely();
 
+        assertNull(response, "Should return null to continue filter chain");
         verify(authenticationService, never()).extractAuthContext(any());
     }
 
@@ -77,8 +78,9 @@ class AuthProxyFilterTest {
         when(req.getUriInfo()).thenReturn(uriInfo);
         when(uriInfo.getPath()).thenReturn("/public/test");
 
-        authProxyFilter.filter(req);
+        Response response = authProxyFilter.filter(req).await().indefinitely();
 
+        assertNull(response, "Should return null to continue filter chain");
         verify(authenticationService, never()).extractAuthContext(any());
     }
 
@@ -92,9 +94,10 @@ class AuthProxyFilterTest {
 
         when(authenticationService.extractAuthContext(any())).thenReturn(AuthContext.anonymous());
 
-        authProxyFilter.filter(req);
+        Response response = authProxyFilter.filter(req).await().indefinitely();
 
-        verify(req).abortWith(argThat(r -> r.getStatus() == 401));
+        assertNotNull(response);
+        assertEquals(401, response.getStatus());
     }
 
     @Test
@@ -115,9 +118,10 @@ class AuthProxyFilterTest {
         PolicyDecision denial = PolicyDecision.deny("Not an admin");
         when(policyService.evaluate(any(), any(), any(), any(), any())).thenReturn(Uni.createFrom().item(denial));
 
-        authProxyFilter.filter(req);
+        Response response = authProxyFilter.filter(req).await().indefinitely();
 
-        verify(req).abortWith(argThat(r -> r.getStatus() == 403));
+        assertNotNull(response);
+        assertEquals(403, response.getStatus());
     }
 
     @Test
@@ -138,9 +142,9 @@ class AuthProxyFilterTest {
         when(policyService.evaluate(any(), any(), any(), any(), any()))
                 .thenReturn(Uni.createFrom().item(PolicyDecision.allow()));
 
-        authProxyFilter.filter(req);
+        Response response = authProxyFilter.filter(req).await().indefinitely();
 
-        verify(req, never()).abortWith(any());
+        assertNull(response, "Should return null to continue filter chain");
     }
 
     @Test
@@ -153,8 +157,9 @@ class AuthProxyFilterTest {
 
         when(authenticationService.extractAuthContext(any())).thenThrow(new RuntimeException("Unexpected error"));
 
-        authProxyFilter.filter(req);
+        Response response = authProxyFilter.filter(req).await().indefinitely();
 
-        verify(req).abortWith(argThat(r -> r.getStatus() == 500));
+        assertNotNull(response);
+        assertEquals(500, response.getStatus());
     }
 }

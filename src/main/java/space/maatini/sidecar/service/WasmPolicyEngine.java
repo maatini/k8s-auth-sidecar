@@ -128,7 +128,7 @@ public class WasmPolicyEngine {
         watcherThread = new Thread(() -> {
             try (WatchService watchService = FileSystems.getDefault().newWatchService()) {
                 watchDir.register(watchService, StandardWatchEventKinds.ENTRY_MODIFY,
-                        StandardWatchEventKinds.ENTRY_CREATE);
+                        StandardWatchEventKinds.ENTRY_CREATE, StandardWatchEventKinds.ENTRY_DELETE);
                 LOG.infof("Hot-reload watcher started on directory %s", watchDir.toAbsolutePath());
 
                 while (watching) {
@@ -136,14 +136,16 @@ public class WasmPolicyEngine {
                     boolean changed = false;
                     for (WatchEvent<?> event : key.pollEvents()) {
                         String file = event.context().toString();
-                        if (file.endsWith(".rego") || file.endsWith(".wasm")) {
+                        // HOT-RELOAD FIX - Gemini 3 Flash P0.4: Catch Kubernetes ConfigMap updates
+                        // (..data symlink change)
+                        if (file.endsWith(".rego") || file.endsWith(".wasm") || file.contains("..data")) {
                             changed = true;
                             break;
                         }
                     }
                     if (changed) {
                         LOG.info("Detected changes in policies directory. Recompiling and reloading...");
-                        Thread.sleep(500);
+                        Thread.sleep(500); // Give filesystem time to settle
                         recompileWasm(watchDir);
                         loadWasmModule();
                     }

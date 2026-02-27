@@ -247,6 +247,10 @@ public interface SidecarConfig {
         @WithName("burst-size")
         @WithDefault("200")
         int burstSize();
+
+        @WithName("trusted-proxies")
+        @WithDefault("127.0.0.1,::1")
+        List<String> trustedProxies();
     }
 
     /**

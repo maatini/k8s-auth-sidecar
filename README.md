@@ -164,6 +164,20 @@ Du musst den Sidecar **nicht neu starten**, um OPA-Regeln zu ändern (bei `OPA_M
 | `OPA_WASM_PATH` | Pfad zur OPA-WASM-Datei (nur `embedded`) | `classpath:policies/authz.wasm` |
 | `OPA_URL` | Externer OPA-Server URL (nur `external`) | `http://localhost:8181` |
 | `QUARKUS_HTTP_CORS_ORIGINS` | Erlaubte CORS Origins | `*` (nur Dev!) |
+| `RATE_LIMIT_ENABLED` | Rate-Limiting aktivieren | `false` |
+| `RATE_LIMIT_RPS` | Requests pro Sekunde | `100` |
+| `RATE_LIMIT_BURST` | Burst-Größe | `200` |
+| `RATE_LIMIT_TRUSTED_PROXIES` | Trusted Proxy IPs (kommasepariert) | `127.0.0.1,::1` |
+
+> [!IMPORTANT]
+> **IP-Spoofing-Schutz**: Der `RateLimitFilter` wertet `X-Forwarded-For` / `X-Real-IP` Header **nur dann** aus, wenn die TCP-Remote-Adresse des Aufrufers in `trusted-proxies` steht. In Kubernetes muss hier die IP des Ingress-Controllers oder Load-Balancers eingetragen werden, z.B.:
+> ```yaml
+> sidecar:
+>   rate-limit:
+>     enabled: true
+>     trusted-proxies: 10.244.0.1,10.244.0.2  # Ingress NGINX Pod IPs
+> ```
+> Ohne korrektes Setzen wird jeder Client-Request anhand seiner echten TCP-IP limitiert (sicherste Variante).
 
 *Siehe `src/main/resources/application.yaml` für alle Konfigurationsmöglichkeiten inkl. des neuen `%dev` Profils.*
 
@@ -307,11 +321,11 @@ Das Projekt verfügt über eine umfassende Test-Suite (über 100 Tests), die all
 - **Testcontainers**: Werden für komplexe Integrationstests eingesetzt, z.B. um einen echten, externen OPA-Server hochzufahren und anzubinden.
 
 **Aktuelle Testabdeckung (Code Coverage via JaCoCo):**
-- **Lines:** ~67% 
-- **Instructions:** ~64%
-- **Branches:** ~45%
+- **Lines:** ~69.4% 
+- **Instructions:** ~68.9%
+- **Branches:** ~47.6%
 
-*Wichtige Kernkomponenten wie der `AuthProxyFilter` (die Haupt-Pipeline) sind mit über 97% Line-Coverage exzellent abgedeckt.*
+*Wichtige Kernkomponenten wie der `AuthProxyFilter` (die Haupt-Pipeline) sind mit über 95% Line-Coverage exzellent abgedeckt.*
 
 Du kannst die Tests und den Coverage-Report lokal wie folgt ausführen:
 

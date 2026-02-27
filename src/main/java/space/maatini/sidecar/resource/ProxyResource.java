@@ -2,16 +2,16 @@ package space.maatini.sidecar.resource;
 
 import io.smallrye.mutiny.Uni;
 import io.vertx.core.http.HttpServerRequest;
-import io.vertx.mutiny.core.buffer.Buffer;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.*;
+import jakarta.ws.rs.container.ContainerRequestContext;
 import org.jboss.logging.Logger;
 
+import space.maatini.sidecar.model.AuthContext;
 import space.maatini.sidecar.service.ProxyService;
 import space.maatini.sidecar.util.RequestUtils;
 
-import java.io.InputStream;
 import java.util.Map;
 
 /**
@@ -38,60 +38,67 @@ public class ProxyResource {
     @Context
     HttpServerRequest request;
 
+    @Context
+    ContainerRequestContext containerRequestContext;
+
     @Path("api/{path:.*}")
     @GET
     public Uni<Response> proxyGet(@PathParam("path") String path) {
-        return executeProxy("GET", "/api/" + path, null);
+        return executeProxy("GET", "/api/" + path, request);
     }
 
     @Path("api/{path:.*}")
     @POST
     @Consumes(MediaType.WILDCARD)
-    public Uni<Response> proxyPost(@PathParam("path") String path, InputStream body) {
-        return executeProxy("POST", "/api/" + path, readBody(body));
+    public Uni<Response> proxyPost(@PathParam("path") String path) {
+        return executeProxy("POST", "/api/" + path, request);
     }
 
     @Path("api/{path:.*}")
     @PUT
     @Consumes(MediaType.WILDCARD)
-    public Uni<Response> proxyPut(@PathParam("path") String path, InputStream body) {
-        return executeProxy("PUT", "/api/" + path, readBody(body));
+    public Uni<Response> proxyPut(@PathParam("path") String path) {
+        return executeProxy("PUT", "/api/" + path, request);
     }
 
     @Path("api/{path:.*}")
     @PATCH
     @Consumes(MediaType.WILDCARD)
-    public Uni<Response> proxyPatch(@PathParam("path") String path, InputStream body) {
-        return executeProxy("PATCH", "/api/" + path, readBody(body));
+    public Uni<Response> proxyPatch(@PathParam("path") String path) {
+        return executeProxy("PATCH", "/api/" + path, request);
     }
 
     @Path("api/{path:.*}")
     @DELETE
     public Uni<Response> proxyDelete(@PathParam("path") String path) {
-        return executeProxy("DELETE", "/api/" + path, null);
+        return executeProxy("DELETE", "/api/" + path, request);
     }
 
     @Path("api/{path:.*}")
     @OPTIONS
     public Uni<Response> proxyOptions(@PathParam("path") String path) {
-        return executeProxy("OPTIONS", "/api/" + path, null);
+        return executeProxy("OPTIONS", "/api/" + path, request);
     }
 
     @Path("api/{path:.*}")
     @HEAD
     public Uni<Response> proxyHead(@PathParam("path") String path) {
-        return executeProxy("HEAD", "/api/" + path, null);
+        return executeProxy("HEAD", "/api/" + path, request);
     }
 
     /**
      * Executes the proxy request. Auth context is already set by AuthProxyFilter.
      */
-    private Uni<Response> executeProxy(String method, String path, Buffer body) {
+    private Uni<Response> executeProxy(String method, String path, HttpServerRequest clientRequest) {
 
         Map<String, String> headerMap = RequestUtils.extractHeaders(headers);
         Map<String, String> queryParams = RequestUtils.extractQueryParams(uriInfo);
 
-        return proxyService.proxy(method, path, headerMap, queryParams, body, null)
+        // P0.6 FIX: Read AuthContext set by AuthProxyFilter
+        AuthContext authContext = (AuthContext) containerRequestContext.getProperty("auth.context");
+
+        // STREAMING FIX – Gemini 3 Flash P0.1
+        return proxyService.proxy(method, path, headerMap, queryParams, clientRequest, authContext)
                 .map(proxyResponse -> {
                     Response.ResponseBuilder responseBuilder = Response.status(proxyResponse.statusCode());
 
@@ -116,18 +123,5 @@ public class ProxyResource {
                             .entity(Map.of("error", "Internal server error"))
                             .build();
                 });
-    }
-
-    private Buffer readBody(InputStream inputStream) {
-        if (inputStream == null) {
-            return null;
-        }
-        try {
-            byte[] bytes = inputStream.readAllBytes();
-            return bytes.length > 0 ? Buffer.buffer(bytes) : null;
-        } catch (Exception e) {
-            LOG.warnf("Failed to read request body: %s", e.getMessage());
-            return null;
-        }
     }
 }

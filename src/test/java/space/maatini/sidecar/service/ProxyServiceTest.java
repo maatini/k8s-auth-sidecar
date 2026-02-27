@@ -105,19 +105,21 @@ class ProxyServiceTest {
     }
 
     @Test
-    void testProxy_WithBody_SendsBuffer() {
-        when(mockRequest.sendBuffer(any())).thenReturn(Uni.createFrom().item(mockResponse));
+    void testProxy_WithBody_SendsStream() {
+        when(mockRequest.sendStream(any(io.vertx.mutiny.core.streams.ReadStream.class)))
+                .thenReturn(Uni.createFrom().item(mockResponse));
         when(mockResponse.statusCode()).thenReturn(200);
         when(mockResponse.statusMessage()).thenReturn("OK");
         when(mockResponse.headers()).thenReturn(io.vertx.mutiny.core.MultiMap.caseInsensitiveMultiMap());
         when(mockResponse.body()).thenReturn(Buffer.buffer("ok"));
 
         AuthContext authContext = AuthContext.builder().userId("user1").build();
-        Buffer body = Buffer.buffer("request body");
+        io.vertx.core.http.HttpServerRequest mockClientRequest = mock(io.vertx.core.http.HttpServerRequest.class);
 
-        proxyService.proxy("POST", "/api/data", Map.of(), Map.of(), body, authContext).await().indefinitely();
+        proxyService.proxy("POST", "/api/data", Map.of(), Map.of(), mockClientRequest, authContext).await()
+                .indefinitely();
 
-        verify(mockRequest).sendBuffer(body);
+        verify(mockRequest).sendStream(any(io.vertx.mutiny.core.http.HttpServerRequest.class));
         verify(mockRequest, never()).send();
     }
 
