@@ -106,9 +106,39 @@ public class InMemoryRolesService implements RolesServiceClient {
             new RolesResponse(userId, Set.of("developer"), Set.of("read:all"), "tenant-A")
         );
     }
+    }
     // Implementiere die anderen Interface-Methoden identisch...
 }
 ```
+
+---
+
+## 🐳 Docker Compose Demo-Projekt (Sidecar in Action)
+
+Möchtest du den Sidecar **komplett mit Dummy-Apps** gefeuert sehen, ohne Kubernetes zu benötigen? Wir haben einen kompletten Demo-Stack (`docker-compose.demo.yml`) gebaut.
+
+Er beinhaltet:
+1. Einen **Dummy-Backend-Service** (`traefik/whoami`), der alle empfangenen HTTP-Headers anzeigt. Dieser Service ist von außen **nicht** erreichbar.
+2. Einen **OIDC Identity Provider** (gemockt via WireMock auf Port `8090`).
+3. Einen **Roles Microservice** (gemockt via WireMock auf Port `8089`).
+4. Den **K8s-Auth-Sidecar** (Port `8080`), der Anfragen filtert und an den Backend-Service routet.
+
+### Demo starten
+
+```bash
+docker compose -f docker-compose.demo.yml up -d --build
+```
+
+1. **Test-Token generieren:**
+   ```bash
+   export TOKEN=$(curl -s -X POST http://localhost:8090/realms/master/protocol/openid-connect/token | jq -r .access_token)
+   ```
+
+2. **Gesicherte Anfrage senden:**
+   ```bash
+   curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/v1/something
+   ```
+   *Du wirst sehen, dass die Dummy-App deine injizierten Rollen als HTTP-Header (`X-Auth-User-Role`) empfängt! Ohne Token erhältst du sofort einen `401 Unauthorized` vom Sidecar.*
 
 ---
 

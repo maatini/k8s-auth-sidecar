@@ -1,0 +1,78 @@
+version: '3.8'
+
+services:
+  # 1. Dummy Backend Application (Was geschützt werden soll)
+  backend-app:
+    image: traefik/whoami
+    container_name: demo-backend-app
+    # Wir exposen absichtlich keinen lokalen Port, 
+    # da der Zugriff NUR über den Sidecar (Port 8080) erfolgen soll!
+    networks:
+      - demo-network
+
+  # 2. WireMock OIDC (Mock-Identity-Provider für Tokens)
+  wiremock-oidc:
+    image: wiremock/wiremock:3.3.1
+    container_name: demo-wiremock-oidc
+    ports:
+      - "8090:8080"
+    volumes:
+      - ./wiremock/oidc:/home/wiremock
+    command:
+      - "--global-response-templating"
+    networks:
+      - demo-network
+
+  # 3. WireMock Roles (Mock-Microservice für Rollen/Attribute)
+  wiremock-roles:
+    image: wiremock/wiremock:3.3.1
+    container_name: demo-wiremock-roles
+    ports:
+      - "8089:8080"
+    volumes:
+      - ./wiremock/roles:/home/wiremock
+    command:
+      - "--global-response-templating"
+    networks:
+      - demo-network
+
+  # 4. K8s-Auth-Sidecar (Der Türsteher)
+  auth-sidecar:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: demo-auth-sidecar
+    ports:
+      - "8080:8080" # Das ist der einzige Port, den Clients aufrufen sollen
+    volumes:
+      # Optional: Lokale Policies mounten (Hot-Reload funktioniert auch hier!)
+      - ./src/main/resources/policies:/policies
+    environment:
+      # Ziel: Unsere Dummy-App im selben Docker-Netzwerk
+      PROXY_TARGET_HOST: "backend-app"
+      PROXY_TARGET_PORT: "80"
+
+      # Anbindung an die Mocks
+      OIDC_AUTH_SERVER_URL: "http://wiremock-oidc:8080/realms/master"
+      OIDC_CLIENT_ID: "k8s-auth-sidecar"
+      ROLES_SERVICE_URL: "http://wiremock-roles:8080"
+
+      # OPA Einstellungen
+      OPA_MODE: "embedded"
+      OPA_POLICY_DIR: "/policies"
+
+      # Rate Limiting
+      RATE_LIMIT_ENABLED: "false"
+
+      # Logging
+      QUARKUS_LOG_LEVEL: "INFO"
+    depends_on:
+      - backend-app
+      - wiremock-oidc
+      - wiremock-roles
+    networks:
+      - demo-network
+
+networks:
+  demo-network:
+    driver: bridge
