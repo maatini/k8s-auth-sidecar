@@ -16,13 +16,16 @@
 - 🏢 **Multi-Tenant OIDC-Support**: Standardisiert für Keycloak und Microsoft Entra ID (Azure AD).
 - 🧠 **Flexible Policy-Engine**: Eingebettete OPA-WASM-Engine (Chicory, In-Memory) mit Hot-Reload oder externer OPA-Server.
 - ➕ **Rollen-Enrichment**: Nahtlose Integration mit externem Roles/Permissions-Service.
-- ⚡ **Reaktive Pipeline**: Non-blocking AuthN → Enrichment → AuthZ Verarbeitung.
+- ⚡ **Reaktive Pipeline**: Vollständig non-blocking AuthN → Enrichment → AuthZ Verarbeitung mit Mutiny `Uni`.
 - 🛡️ **Zero-Trust**: Jede Anfrage wird validiert.
+- 📡 **Streaming Proxy**: Request-Bodies werden **nie** vollständig in den RAM geladen – echtes Vert.x Streaming für beliebig große Payloads.
+- 🔐 **IP-Spoofing-Schutz**: Rate-Limiting mit Trusted-Proxy-Konfiguration und Caffeine-Cache gegen Memory Leaks.
 - 🎯 **Zentrales Path-Matching**: Ant-Style Patterns (`/**`, `/*`) über praktisches `PathMatcher`-Utility.
 - 📊 **Observability**: Prometheus Metrics, JSON Logging und OpenTelemetry out-of-the-box.
 - 🔒 **Sicherer Lifecycle**: Ordnungsgemäße Ressourcen-Freigabe (`@PreDestroy`) aller Clients.
 - 🚀 **Native Image**: Voller Support für ressourcenschonende GraalVM Native Images.
 - 🚢 **Kubernetes-Ready**: Kustomize-basierte Deployment-Manifeste.
+- 🐳 **CVE-gehärtete Docker-Images**: Alpine-Pakete werden automatisch gepatcht, OPA-CLI v1.x vorinstalliert.
 
 ## 🚀 Lokale Entwicklung – In 60 Sekunden
 
@@ -141,8 +144,11 @@ Jeder Request durchläuft diese Pipeline:
 ### 3. Wie werden Regeln aktualisiert?
 Du musst den Sidecar **nicht neu starten**, um OPA-Regeln zu ändern (bei `OPA_MODE=embedded`):
 1. Regeln (.rego oder .wasm) liegen z.B. in einer Kubernetes **ConfigMap**.
-2. Kubernetes aktualisiert die Datei im Pod bei Änderungen.
-3. Der Sidecar lädt das neue WASM-Modul **automatisch (Hot Reload)** via In-Memory WatchService in wenigen Sekunden.
+2. Kubernetes aktualisiert die Datei im Pod bei Änderungen (atomarer Symlink-Swap auf `..data`).
+3. Der Sidecar erkennt die Änderung **automatisch (Hot Reload)** – auch bei Kubernetes-typischen `..data`-Events – und lädt das neue WASM-Modul in wenigen Sekunden.
+
+> [!TIP]
+> Die Docker-Images enthalten die **OPA CLI v1.x** vorinstalliert. Bei `.rego`-Änderungen wird das WASM automatisch im Container rekompiliert – ohne externen Build-Schritt.
 
 ## ⚙️ Konfiguration
 
@@ -294,10 +300,15 @@ spec:
 ## 🔐 Sicherheit
 
 - **Token-Validierung**: Signatur-Prüfung via JWKS, Expiration-Check, Issuer-Check.
+- **Streaming Proxy**: Request-Bodies werden per Vert.x `sendStream()` weitergeleitet – kein `readAllBytes()` im gesamten Projekt. Auch 500 MB+ Payloads verursachen keinen Memory-Spike.
+- **Reaktive Filter-Pipeline**: Der `AuthProxyFilter` ist vollständig non-blocking (`@ServerRequestFilter` + `Uni<Response>`), was den Durchsatz unter Last erhöht.
+- **Rate-Limiting mit IP-Spoofing-Schutz**: `X-Forwarded-For`/`X-Real-IP` werden nur von konfigurierten `trusted-proxies` akzeptiert. Buckets nutzen einen größen- und zeitlimitierten Caffeine-Cache statt einer unbegrenzten `ConcurrentHashMap`.
+- **CVE-gehärtete Container**: Alpine-Pakete werden via `apk upgrade` gepatcht, OPA-CLI ist auf v1.x aktualisiert (Go stdlib CVEs behoben).
 - **Best Practices**:
   - ✅ Secrets über K8s Secrets einspeisen.
   - ✅ TLS für externe Verbindungen (Roles Service, IdP).
   - ✅ Audit-Logging am Sidecar aktivieren.
+  - ✅ Trivy-Scan in CI-Pipeline für automatische Schwachstellen-Checks.
 
 ## 🚀 CI/CD & Releases
 
@@ -311,7 +322,7 @@ Das Projekt nutzt GitHub Actions für Continuous Integration und schnelles Deplo
 
 ### Unit & Integration Tests
 
-Das Projekt verfügt über eine umfassende Test-Suite (über 100 Tests), die alle wesentlichen Aspekte der Anwendung abdeckt:
+Das Projekt verfügt über eine umfassende Test-Suite (**110 Tests**), die alle wesentlichen Aspekte der Anwendung abdeckt:
 
 - **Unit-Tests**: Prüfen einzelne Klassen, rekordinhabende Utility-Methoden (`RequestUtils`, `IssuerUtils`, `PathMatcher`) und Service-Logik (`AuthenticationService`, `WasmPolicyEngine`).
 - **Integrationstests (`@QuarkusTest`)**: Testen das Zusammenspiel der Komponenten, u.a. die JWT-Validierung (OIDC), externe Calls an den Roles Service und die Request-Filter-Pipeline.
