@@ -41,9 +41,9 @@ Der **k8s-auth-sidecar** (Request Router Sidecar) ist ein Quarkus-basierter Micr
 - Hot-Reload von Policies (In-Memory Neuladen bei Datei-Änderung)
 
 ### 5. Proxy Service (`ProxyService`)
-- Leitet autorisierte Anfragen an den Main-Container weiter
-- Fügt Security-Headers hinzu
-- Propagiert relevante Claims
+- Leitet autorisierte Anfragen **via non-blocking Streaming** an den Main-Container weiter (kein komplettes Laden in den RAM).
+- Fügt Security-Headers hinzu und propagiert Auth-Claims (z. B. `X-Auth-User-Roles`).
+- Die gesamte HTTP-Filter-Pipeline ist vollständig reaktiv implementiert (`Mutiny Uni`), was höchste Parallelität bei minimalem Ressourcenverbrauch garantiert.
 
 ## Architektur für lokale Entwicklung (Dev-Profil & Mocking)
 
@@ -92,6 +92,12 @@ PROXY_TARGET_PORT=8081
 OPA_MODE=embedded
 OPA_WASM_PATH=/policies/authz.wasm
 OPA_DECISION_ENDPOINT=/v1/data/authz/allow
+
+# Rate Limiting
+RATE_LIMIT_ENABLED=true
+RATE_LIMIT_RPS=100
+RATE_LIMIT_BURST=200
+RATE_LIMIT_TRUSTED_PROXIES=10.244.0.1,10.244.0.2
 
 # Metrics & Logging
 QUARKUS_LOG_LEVEL=INFO
@@ -183,9 +189,10 @@ spec:
 
 ## Sicherheitsaspekte
 
-- **Zero-Trust**: Jede Anfrage wird validiert
-- **Token-Validierung**: Signatur, Expiration, Audience, Issuer
-- **Secure Defaults**: Deny by default
-- **TLS**: Kommunikation zwischen Services verschlüsselt
-- **Rate Limiting**: Schutz vor Brute-Force
-- **Audit Logging**: Alle Zugriffe werden protokolliert
+- **Zero-Trust**: Jede Anfrage wird strikt validiert.
+- **Token-Validierung**: Signatur (`JWKS`), Expiration, Audience, Issuer.
+- **Streaming Proxy**: Verhindert Out-of-Memory-Angriffe (OOM) bei sehr großen Payloads.
+- **Secure Defaults**: Deny by default.
+- **Rate Limiting & Anti-Spoofing**: Schutz vor Brute-Force; wertet `X-Forwarded-For` nur von konfigurierten Trusted Proxies (Loadbalancer) aus.
+- **In-Memory Caching**: Caches für Rollen und Rate-Limiting sind zeit- und größenlimitiert (Caffeine), um Memory Leaks zu verhindern.
+- **Audit Logging**: Alle relevanten Entscheidungen werden protokolliert.
