@@ -20,6 +20,7 @@ services:
       - ./wiremock/oidc:/home/wiremock
     command:
       - "--global-response-templating"
+      - "--verbose"
     networks:
       - demo-network
 
@@ -52,9 +53,15 @@ services:
       PROXY_TARGET_HOST: "backend-app"
       PROXY_TARGET_PORT: "80"
 
-      # Anbindung an die Mocks
+      # OIDC Settings
       OIDC_AUTH_SERVER_URL: "http://wiremock-oidc:8080/realms/master"
       OIDC_CLIENT_ID: "k8s-auth-sidecar"
+      QUARKUS_OIDC_TOKEN_ISSUER: "any"
+      QUARKUS_OIDC_JWKS_RESOLVE_EARLY: "false"
+      # WireMock returns a static token with iss: http://localhost:8090/realms/master
+      # By setting issuer: any and not validating early, Quarkus will skip validating the issuer claim
+      # The mock JWT signature is invalid. For the demo, disable Auth temporarily or fix token signing.
+      AUTH_ENABLED: "false"
       ROLES_SERVICE_URL: "http://wiremock-roles:8080"
 
       # OPA Einstellungen
@@ -65,7 +72,7 @@ services:
       RATE_LIMIT_ENABLED: "false"
 
       # Logging
-      QUARKUS_LOG_LEVEL: "INFO"
+      QUARKUS_LOG_LEVEL: "DEBUG"
     depends_on:
       - backend-app
       - wiremock-oidc

@@ -138,7 +138,11 @@ docker compose -f docker-compose.demo.yml up -d --build
    ```bash
    curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/v1/something
    ```
-   *Du wirst sehen, dass die Dummy-App deine injizierten Rollen als HTTP-Header (`X-Auth-User-Role`) empfängt! Ohne Token erhältst du sofort einen `401 Unauthorized` vom Sidecar.*
+   *Du wirst sehen, dass die Dummy-App deine injizierten Rollen als HTTP-Header (`X-Auth-User-Role`) empfängt!*
+
+   > [!NOTE]
+   > Wichtiger Hinweis zum Demo-Setup: Da WireMock in Version 3.3.1 bei jedem Start dynamisch einen neuen JWKS-Schlüsselbund (Public Keys) generiert, das zurückgegebene Mock-JWT aber statisch signiert ist, schlägt die OIDC-Signaturprüfung standardmäßig fehl. 
+   > Um den Proxy-Flow und die OPA-Policies im Demo-Setup (`docker-compose.demo.yml`) dennoch testen zu können, ist die Token-Vaildierung hier vorübergehend deaktiviert (`AUTH_ENABLED="false"`). Im `%dev` Profil (`mvn quarkus:dev`) wird der Token jedoch weiterhin normal vom Quarkus OIDC-Client validiert!
 
 ---
 
