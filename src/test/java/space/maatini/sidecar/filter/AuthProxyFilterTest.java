@@ -119,4 +119,42 @@ class AuthProxyFilterTest {
 
         verify(req).abortWith(argThat(r -> r.getStatus() == 403));
     }
+
+    @Test
+    void testFilter_Authorized_Passes() throws IOException {
+        ContainerRequestContext req = mock(ContainerRequestContext.class);
+        UriInfo uriInfo = mock(UriInfo.class);
+        when(req.getUriInfo()).thenReturn(uriInfo);
+        when(uriInfo.getPath()).thenReturn("/api/data");
+        when(req.getMethod()).thenReturn("GET");
+        when(uriInfo.getRequestUri()).thenReturn(URI.create("http://localhost/api/data"));
+
+        AuthContext context = AuthContext.builder().userId("user1").build();
+        when(authenticationService.extractAuthContext(any())).thenReturn(context);
+        when(rolesService.enrichWithRoles(any())).thenReturn(Uni.createFrom().item(context));
+        when(req.getHeaders()).thenReturn(mock(jakarta.ws.rs.core.MultivaluedMap.class));
+        when(req.getUriInfo().getQueryParameters()).thenReturn(mock(jakarta.ws.rs.core.MultivaluedMap.class));
+
+        when(policyService.evaluate(any(), any(), any(), any(), any()))
+                .thenReturn(Uni.createFrom().item(PolicyDecision.allow()));
+
+        authProxyFilter.filter(req);
+
+        verify(req, never()).abortWith(any());
+    }
+
+    @Test
+    void testFilter_InternalError_Returns500() throws IOException {
+        ContainerRequestContext req = mock(ContainerRequestContext.class);
+        UriInfo uriInfo = mock(UriInfo.class);
+        when(req.getUriInfo()).thenReturn(uriInfo);
+        when(uriInfo.getPath()).thenReturn("/api/data");
+        when(req.getMethod()).thenReturn("GET");
+
+        when(authenticationService.extractAuthContext(any())).thenThrow(new RuntimeException("Unexpected error"));
+
+        authProxyFilter.filter(req);
+
+        verify(req).abortWith(argThat(r -> r.getStatus() == 500));
+    }
 }

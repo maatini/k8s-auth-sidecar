@@ -296,6 +296,25 @@ Das Projekt nutzt GitHub Actions für Continuous Integration und schnelles Deplo
 ## 🧪 Testing & Docker Build
 
 ### Unit & Integration Tests
+
+Das Projekt verfügt über eine umfassende Test-Suite (über 100 Tests), die alle wesentlichen Aspekte der Anwendung abdeckt:
+
+- **Unit-Tests**: Prüfen einzelne Klassen, rekordinhabende Utility-Methoden (`RequestUtils`, `IssuerUtils`, `PathMatcher`) und Service-Logik (`AuthenticationService`, `WasmPolicyEngine`).
+- **Integrationstests (`@QuarkusTest`)**: Testen das Zusammenspiel der Komponenten, u.a. die JWT-Validierung (OIDC), externe Calls an den Roles Service und die Request-Filter-Pipeline.
+- **Mocking (WireMock)**: 
+  - `OidcWiremockTestResource` simuliert einen OIDC-Identity-Provider inkl. dynamischer JWT-Generierung.
+  - `RolesServiceWiremockTestResource` mockt detailliert diverse Rollen- und Berechtigungs-Szenarien.
+- **Testcontainers**: Werden für komplexe Integrationstests eingesetzt, z.B. um einen echten, externen OPA-Server hochzufahren und anzubinden.
+
+**Aktuelle Testabdeckung (Code Coverage via JaCoCo):**
+- **Lines:** ~67% 
+- **Instructions:** ~64%
+- **Branches:** ~45%
+
+*Wichtige Kernkomponenten wie der `AuthProxyFilter` (die Haupt-Pipeline) sind mit über 97% Line-Coverage exzellent abgedeckt.*
+
+Du kannst die Tests und den Coverage-Report lokal wie folgt ausführen:
+
 ```bash
 mvn test
 mvn verify

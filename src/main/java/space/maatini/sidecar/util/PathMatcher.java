@@ -74,4 +74,23 @@ public final class PathMatcher {
         }
         return false;
     }
+
+    /**
+     * Checks if a path is an internal Quarkus path or a standard health/metrics
+     * path.
+     *
+     * @param path The request path
+     * @return true if the path starts with /q/ or matches standard monitoring
+     *         endpoints
+     */
+    public static boolean isInternalPath(String path) {
+        if (path == null) {
+            return false;
+        }
+        return path.startsWith("/q/") ||
+                path.equals("/health") ||
+                path.equals("/metrics") ||
+                path.equals("/ready") ||
+                path.equals("/live");
+    }
 }

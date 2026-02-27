@@ -3,11 +3,12 @@ package space.maatini.sidecar.service;
 import io.quarkus.security.identity.SecurityIdentity;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import org.eclipse.microprofile.jwt.Claims;
 import org.eclipse.microprofile.jwt.JsonWebToken;
 import org.jboss.logging.Logger;
 import space.maatini.sidecar.config.SidecarConfig;
 import space.maatini.sidecar.model.AuthContext;
+
+import space.maatini.sidecar.util.IssuerUtils;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -23,12 +24,9 @@ public class AuthenticationService {
     private static final Logger LOG = Logger.getLogger(AuthenticationService.class);
 
     // Standard JWT claims
-    private static final String CLAIM_SUB = "sub";
     private static final String CLAIM_EMAIL = "email";
     private static final String CLAIM_NAME = "name";
     private static final String CLAIM_PREFERRED_USERNAME = "preferred_username";
-    private static final String CLAIM_ISS = "iss";
-    private static final String CLAIM_AUD = "aud";
     private static final String CLAIM_IAT = "iat";
     private static final String CLAIM_EXP = "exp";
     private static final String CLAIM_JTI = "jti";
@@ -88,7 +86,7 @@ public class AuthenticationService {
         }
 
         String issuer = jwt.getIssuer();
-        boolean isEntraToken = isEntraIssuer(issuer);
+        boolean isEntraToken = IssuerUtils.isEntraIssuer(issuer);
 
         String userId = extractUserId(jwt, isEntraToken);
         String email = extractClaim(jwt, CLAIM_EMAIL, String.class);
@@ -103,7 +101,7 @@ public class AuthenticationService {
         String tokenId = extractClaim(jwt, CLAIM_JTI, String.class);
         String tenant = isEntraToken
                 ? extractClaim(jwt, CLAIM_TID, String.class)
-                : extractTenantFromIssuer(issuer);
+                : IssuerUtils.extractTenantFromIssuer(issuer);
 
         Map<String, Object> claims = extractAllClaims(jwt);
 
@@ -181,7 +179,6 @@ public class AuthenticationService {
     /**
      * Extracts Keycloak realm roles from the 'realm_access' claim.
      */
-    @SuppressWarnings("unchecked")
     private Set<String> extractKeycloakRealmRoles(JsonWebToken jwt) {
         try {
             Map<String, Object> realmAccess = jwt.getClaim(CLAIM_REALM_ACCESS);
@@ -235,7 +232,6 @@ public class AuthenticationService {
     /**
      * Extracts the audience from the token.
      */
-    @SuppressWarnings("unchecked")
     private List<String> extractAudience(JsonWebToken jwt) {
         try {
             Set<String> audience = jwt.getAudience();
@@ -296,7 +292,6 @@ public class AuthenticationService {
     /**
      * Extracts a claim as a set of strings.
      */
-    @SuppressWarnings("unchecked")
     private Set<String> extractClaimAsStringSet(JsonWebToken jwt, String claimName) {
         try {
             Object value = jwt.getClaim(claimName);
@@ -312,26 +307,5 @@ public class AuthenticationService {
             LOG.debugf("Failed to extract string set claim '%s': %s", claimName, e.getMessage());
         }
         return Collections.emptySet();
-    }
-
-    /**
-     * Extracts tenant from Keycloak issuer URL.
-     * Assumes format: https://keycloak.example.com/realms/{realm}
-     */
-    private String extractTenantFromIssuer(String issuer) {
-        if (issuer != null && issuer.contains("/realms/")) {
-            int idx = issuer.lastIndexOf("/realms/");
-            return issuer.substring(idx + 8);
-        }
-        return null;
-    }
-
-    /**
-     * Checks if the issuer is a Microsoft Entra ID issuer.
-     */
-    private boolean isEntraIssuer(String issuer) {
-        return issuer != null && (issuer.contains("login.microsoftonline.com") ||
-                issuer.contains("sts.windows.net") ||
-                issuer.contains("login.microsoft.com"));
     }
 }

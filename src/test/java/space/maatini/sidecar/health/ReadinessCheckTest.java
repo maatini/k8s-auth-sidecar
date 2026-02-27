@@ -49,6 +49,7 @@ class ReadinessCheckTest {
         setField(readinessCheck, "webClient", mockWebClient);
 
         when(mockWebClient.get(anyInt(), anyString(), anyString())).thenReturn(mockRequest);
+        when(mockWebClient.getAbs(anyString())).thenReturn(mockRequest);
         when(mockRequest.timeout(anyLong())).thenReturn(mockRequest);
     }
 
@@ -74,5 +75,50 @@ class ReadinessCheckTest {
 
         HealthCheckResponse response = readinessCheck.call();
         assertEquals(HealthCheckResponse.Status.DOWN, response.getStatus());
+    }
+
+    @Test
+    void testCall_OpaExternalHealthy() {
+        SidecarConfig.OpaConfig opaConfig = config.opa();
+        SidecarConfig.OpaConfig.ExternalOpaConfig externalConfig = mock(
+                SidecarConfig.OpaConfig.ExternalOpaConfig.class);
+        when(opaConfig.enabled()).thenReturn(true);
+        when(opaConfig.mode()).thenReturn("external");
+        when(opaConfig.external()).thenReturn(externalConfig);
+        when(externalConfig.url()).thenReturn("http://opa:8181");
+
+        when(mockRequest.send()).thenReturn(Uni.createFrom().item(mockResponse));
+        when(mockResponse.statusCode()).thenReturn(200);
+
+        HealthCheckResponse response = readinessCheck.call();
+        assertEquals(HealthCheckResponse.Status.UP, response.getStatus());
+        assertTrue((Boolean) response.getData().get().get("opa.connected"));
+    }
+
+    @Test
+    void testCall_OpaExternalDown() {
+        SidecarConfig.OpaConfig opaConfig = config.opa();
+        SidecarConfig.OpaConfig.ExternalOpaConfig externalConfig = mock(
+                SidecarConfig.OpaConfig.ExternalOpaConfig.class);
+        when(opaConfig.enabled()).thenReturn(true);
+        when(opaConfig.mode()).thenReturn("external");
+        when(opaConfig.external()).thenReturn(externalConfig);
+        when(externalConfig.url()).thenReturn("http://opa:8181");
+
+        // Backend healthy, OPA fails
+        when(mockWebClient.get(anyInt(), anyString(), anyString())).thenReturn(mockRequest);
+        @SuppressWarnings("unchecked")
+        HttpRequest<Buffer> mockOpaRequest = mock(HttpRequest.class);
+        when(mockOpaRequest.timeout(anyLong())).thenReturn(mockOpaRequest);
+        when(mockWebClient.getAbs(anyString())).thenReturn(mockOpaRequest);
+
+        when(mockRequest.send()).thenReturn(Uni.createFrom().item(mockResponse));
+        when(mockResponse.statusCode()).thenReturn(200);
+
+        when(mockOpaRequest.send()).thenReturn(Uni.createFrom().failure(new RuntimeException("OPA Down")));
+
+        HealthCheckResponse response = readinessCheck.call();
+        assertEquals(HealthCheckResponse.Status.DOWN, response.getStatus());
+        assertFalse((Boolean) response.getData().get().get("opa.connected"));
     }
 }

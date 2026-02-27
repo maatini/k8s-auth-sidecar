@@ -9,9 +9,9 @@ import jakarta.ws.rs.core.*;
 import org.jboss.logging.Logger;
 
 import space.maatini.sidecar.service.ProxyService;
+import space.maatini.sidecar.util.RequestUtils;
 
 import java.io.InputStream;
-import java.util.HashMap;
 import java.util.Map;
 
 /**
@@ -88,8 +88,8 @@ public class ProxyResource {
      */
     private Uni<Response> executeProxy(String method, String path, Buffer body) {
 
-        Map<String, String> headerMap = extractHeaders();
-        Map<String, String> queryParams = extractQueryParams();
+        Map<String, String> headerMap = RequestUtils.extractHeaders(headers);
+        Map<String, String> queryParams = RequestUtils.extractQueryParams(uriInfo);
 
         return proxyService.proxy(method, path, headerMap, queryParams, body, null)
                 .map(proxyResponse -> {
@@ -116,24 +116,6 @@ public class ProxyResource {
                             .entity(Map.of("error", "Internal server error"))
                             .build();
                 });
-    }
-
-    private Map<String, String> extractHeaders() {
-        Map<String, String> headerMap = new HashMap<>();
-        for (String headerName : headers.getRequestHeaders().keySet()) {
-            headerMap.put(headerName, headers.getHeaderString(headerName));
-        }
-        return headerMap;
-    }
-
-    private Map<String, String> extractQueryParams() {
-        Map<String, String> params = new HashMap<>();
-        uriInfo.getQueryParameters().forEach((key, values) -> {
-            if (!values.isEmpty()) {
-                params.put(key, values.get(0));
-            }
-        });
-        return params;
     }
 
     private Buffer readBody(InputStream inputStream) {

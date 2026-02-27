@@ -125,4 +125,19 @@ class PathMatcherTest {
                 "Path '%s' should %smatch pattern '%s'"
                         .formatted(path, expected ? "" : "NOT ", pattern));
     }
+
+    @Test
+    void testIsInternalPath() {
+        assertTrue(PathMatcher.isInternalPath("/q/health"));
+        assertTrue(PathMatcher.isInternalPath("/q/metrics"));
+        assertTrue(PathMatcher.isInternalPath("/health"));
+        assertTrue(PathMatcher.isInternalPath("/metrics"));
+        assertTrue(PathMatcher.isInternalPath("/ready"));
+        assertTrue(PathMatcher.isInternalPath("/live"));
+
+        assertFalse(PathMatcher.isInternalPath("/api/data"));
+        assertFalse(PathMatcher.isInternalPath("/public/test"));
+        assertFalse(PathMatcher.isInternalPath(null));
+        assertFalse(PathMatcher.isInternalPath(""));
+    }
 }

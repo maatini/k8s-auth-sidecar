@@ -90,6 +90,50 @@ class AuditLogFilterTest {
     }
 
     @Test
+    void testFilter_WithoutAuthContext_DoesNotThrow() throws IOException {
+        ContainerRequestContext requestContext = mock(ContainerRequestContext.class);
+        ContainerResponseContext responseContext = mock(ContainerResponseContext.class);
+        jakarta.ws.rs.core.UriInfo uriInfo = mock(jakarta.ws.rs.core.UriInfo.class);
+
+        when(requestContext.getProperty("audit.startTime")).thenReturn(System.currentTimeMillis());
+        when(requestContext.getProperty("audit.requestId")).thenReturn("test-id");
+        when(requestContext.getProperty("auth.context")).thenReturn(null);
+        when(requestContext.getMethod()).thenReturn("GET");
+        when(requestContext.getUriInfo()).thenReturn(uriInfo);
+        when(uriInfo.getPath()).thenReturn("/api/test");
+        when(uriInfo.getRequestUri()).thenReturn(URI.create("http://localhost/api/test"));
+        when(requestContext.getHeaders()).thenReturn(new jakarta.ws.rs.core.MultivaluedHashMap<>());
+
+        when(responseContext.getStatus()).thenReturn(200);
+
+        assertDoesNotThrow(() -> auditLogFilter.filter(requestContext, responseContext));
+    }
+
+    @Test
+    void testFilter_SensitiveHeaderRedaction() throws IOException {
+        ContainerRequestContext requestContext = mock(ContainerRequestContext.class);
+        jakarta.ws.rs.core.UriInfo uriInfo = mock(jakarta.ws.rs.core.UriInfo.class);
+
+        when(requestContext.getProperty("audit.startTime")).thenReturn(System.currentTimeMillis());
+        when(requestContext.getProperty("audit.requestId")).thenReturn("test-id");
+        when(requestContext.getMethod()).thenReturn("POST");
+        when(requestContext.getUriInfo()).thenReturn(uriInfo);
+        when(uriInfo.getPath()).thenReturn("/api/test");
+        when(uriInfo.getRequestUri()).thenReturn(URI.create("http://localhost/api/test"));
+
+        jakarta.ws.rs.core.MultivaluedHashMap<String, String> headers = new jakarta.ws.rs.core.MultivaluedHashMap<>();
+        headers.add("Authorization", "Bearer secret-token");
+        headers.add("Cookie", "session=123");
+        headers.add("X-Public", "hello");
+        when(requestContext.getHeaders()).thenReturn(headers);
+
+        ContainerResponseContext responseContext = mock(ContainerResponseContext.class);
+        when(responseContext.getStatus()).thenReturn(200);
+
+        assertDoesNotThrow(() -> auditLogFilter.filter(requestContext, responseContext));
+    }
+
+    @Test
     void testDetermineOutcome() throws Exception {
         testOutcome(200, "SUCCESS");
         testOutcome(401, "AUTHENTICATION_FAILED");
@@ -111,5 +155,26 @@ class AuditLogFilterTest {
         when(res.getStatus()).thenReturn(status);
 
         assertDoesNotThrow(() -> auditLogFilter.filter(req, res));
+    }
+}
+
+@QuarkusTest
+@TestProfile(AuditLogFilterDisabledTest.DisabledProfile.class)
+class AuditLogFilterDisabledTest {
+    public static class DisabledProfile implements QuarkusTestProfile {
+        @Override
+        public Map<String, String> getConfigOverrides() {
+            return Map.of("sidecar.audit.enabled", "false");
+        }
+    }
+
+    @Inject
+    AuditLogFilter auditLogFilter;
+
+    @Test
+    void testFilter_AuditDisabled_DoesNotLog() throws IOException {
+        ContainerRequestContext requestContext = mock(ContainerRequestContext.class);
+        auditLogFilter.filter(requestContext);
+        verify(requestContext, never()).setProperty(anyString(), any());
     }
 }

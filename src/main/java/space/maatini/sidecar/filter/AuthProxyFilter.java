@@ -5,6 +5,7 @@ import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import io.quarkus.security.identity.SecurityIdentity;
 import io.smallrye.mutiny.Uni;
+import io.smallrye.common.annotation.Blocking;
 import io.vertx.core.http.HttpServerRequest;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.Priority;
@@ -26,9 +27,9 @@ import space.maatini.sidecar.service.PolicyService;
 import space.maatini.sidecar.service.ProxyService;
 import space.maatini.sidecar.service.RolesService;
 import space.maatini.sidecar.util.PathMatcher;
+import space.maatini.sidecar.util.RequestUtils;
 
 import java.io.IOException;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -43,6 +44,7 @@ import java.util.concurrent.TimeUnit;
 @Provider
 @Priority(Priorities.AUTHENTICATION)
 @ApplicationScoped
+@Blocking
 public class AuthProxyFilter implements ContainerRequestFilter {
 
     private static final Logger LOG = Logger.getLogger(AuthProxyFilter.class);
@@ -121,7 +123,7 @@ public class AuthProxyFilter implements ContainerRequestFilter {
         }
 
         // Skip auth for internal Quarkus paths
-        if (isInternalPath(path)) {
+        if (PathMatcher.isInternalPath(path)) {
             LOG.debugf("Skipping auth for internal path: %s", path);
             return;
         }
@@ -150,8 +152,8 @@ public class AuthProxyFilter implements ContainerRequestFilter {
             requestContext.setProperty(AUTH_CONTEXT_PROPERTY, authContext);
 
             // Enrich with roles and evaluate policy reactively, then block once
-            Map<String, String> headers = extractHeaders(requestContext);
-            Map<String, String> queryParams = extractQueryParams(requestContext);
+            Map<String, String> headers = RequestUtils.extractHeaders(requestContext);
+            Map<String, String> queryParams = RequestUtils.extractQueryParams(requestContext.getUriInfo());
 
             AuthContext enrichedContext = rolesService.enrichWithRoles(authContext)
                     .flatMap(enriched -> {
@@ -176,17 +178,7 @@ public class AuthProxyFilter implements ContainerRequestFilter {
             requestContext.setProperty(AUTH_CONTEXT_PROPERTY, enrichedContext);
 
         } catch (Exception e) {
-            AuthorizationDeniedException authzEx = null;
-            Throwable current = e;
-            while (current != null) {
-                if (current instanceof AuthorizationDeniedException) {
-                    authzEx = (AuthorizationDeniedException) current;
-                    break;
-                }
-                if (current.getCause() == current)
-                    break;
-                current = current.getCause();
-            }
+            AuthorizationDeniedException authzEx = findCause(e, AuthorizationDeniedException.class);
 
             if (authzEx != null) {
                 LOG.warnf("Authorization denied for user on %s %s: %s",
@@ -236,41 +228,6 @@ public class AuthProxyFilter implements ContainerRequestFilter {
     }
 
     /**
-     * Checks if a path is an internal Quarkus path.
-     */
-    private boolean isInternalPath(String path) {
-        return path.startsWith("/q/") ||
-                path.equals("/health") ||
-                path.equals("/metrics") ||
-                path.equals("/ready") ||
-                path.equals("/live");
-    }
-
-    /**
-     * Extracts headers from the request context.
-     */
-    private Map<String, String> extractHeaders(ContainerRequestContext requestContext) {
-        Map<String, String> headers = new HashMap<>();
-        for (String headerName : requestContext.getHeaders().keySet()) {
-            headers.put(headerName, requestContext.getHeaderString(headerName));
-        }
-        return headers;
-    }
-
-    /**
-     * Extracts query parameters from the request context.
-     */
-    private Map<String, String> extractQueryParams(ContainerRequestContext requestContext) {
-        Map<String, String> params = new HashMap<>();
-        requestContext.getUriInfo().getQueryParameters().forEach((key, values) -> {
-            if (!values.isEmpty()) {
-                params.put(key, values.get(0));
-            }
-        });
-        return params;
-    }
-
-    /**
      * Aborts the request with a 401 Unauthorized response.
      */
     private void abortWithUnauthorized(ContainerRequestContext requestContext, String message) {
@@ -302,6 +259,21 @@ public class AuthProxyFilter implements ContainerRequestFilter {
                 .status(Response.Status.INTERNAL_SERVER_ERROR)
                 .entity(new ErrorResponse("error", message))
                 .build());
+    }
+
+    /**
+     * Walks the exception cause chain to find an exception of the given type.
+     */
+    @SuppressWarnings("unchecked")
+    private static <T extends Throwable> T findCause(Throwable t, Class<T> type) {
+        Throwable current = t;
+        while (current != null) {
+            if (type.isInstance(current)) {
+                return (T) current;
+            }
+            current = current.getCause();
+        }
+        return null;
     }
 
     /**

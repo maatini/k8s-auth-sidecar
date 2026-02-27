@@ -19,113 +19,226 @@ import static org.junit.jupiter.api.Assertions.*;
 @QuarkusTest
 class PolicyServiceTest {
 
-    @Inject
-    PolicyService policyService;
+        @Inject
+        PolicyService policyService;
 
-    @Test
-    void testEvaluate_SuperadminAllowed() {
-        AuthContext authContext = AuthContext.builder()
-                .userId("superadmin-user")
-                .roles(Set.of("superadmin"))
-                .build();
+        @Test
+        void testEvaluate_SuperadminAllowed() {
+                AuthContext authContext = AuthContext.builder()
+                                .userId("superadmin-user")
+                                .roles(Set.of("superadmin"))
+                                .build();
 
-        PolicyDecision decision = policyService.evaluate(
-                authContext, "GET", "/api/admin/settings", Map.of(), Map.of()).await().atMost(Duration.ofSeconds(5));
+                PolicyDecision decision = policyService.evaluate(
+                                authContext, "GET", "/api/admin/settings", Map.of(), Map.of()).await()
+                                .atMost(Duration.ofSeconds(5));
 
-        assertTrue(decision.allowed());
-    }
+                assertTrue(decision.allowed());
+        }
 
-    @Test
-    void testEvaluate_AdminAccessToAdminPath() {
-        AuthContext authContext = AuthContext.builder()
-                .userId("admin-user")
-                .roles(Set.of("admin"))
-                .build();
+        @Test
+        void testEvaluate_AdminAccessToAdminPath() {
+                AuthContext authContext = AuthContext.builder()
+                                .userId("admin-user")
+                                .roles(Set.of("admin"))
+                                .build();
 
-        PolicyDecision decision = policyService.evaluate(
-                authContext, "GET", "/api/admin/settings", Map.of(), Map.of()).await().atMost(Duration.ofSeconds(5));
+                PolicyDecision decision = policyService.evaluate(
+                                authContext, "GET", "/api/admin/settings", Map.of(), Map.of()).await()
+                                .atMost(Duration.ofSeconds(5));
 
-        assertTrue(decision.allowed());
-    }
+                assertTrue(decision.allowed());
+        }
 
-    @Test
-    void testEvaluate_UserDeniedAdminPath() {
-        AuthContext authContext = AuthContext.builder()
-                .userId("regular-user")
-                .roles(Set.of("user"))
-                .build();
+        @Test
+        void testEvaluate_UserDeniedAdminPath() {
+                AuthContext authContext = AuthContext.builder()
+                                .userId("regular-user")
+                                .roles(Set.of("user"))
+                                .build();
 
-        PolicyDecision decision = policyService.evaluate(
-                authContext, "GET", "/api/admin/settings", Map.of(), Map.of()).await().atMost(Duration.ofSeconds(5));
+                PolicyDecision decision = policyService.evaluate(
+                                authContext, "GET", "/api/admin/settings", Map.of(), Map.of()).await()
+                                .atMost(Duration.ofSeconds(5));
 
-        assertFalse(decision.allowed());
-        assertNotNull(decision.reason());
-    }
+                assertFalse(decision.allowed());
+                assertNotNull(decision.reason());
+        }
 
-    @Test
-    void testEvaluate_UserManagerCanReadUsers() {
-        AuthContext authContext = AuthContext.builder()
-                .userId("manager-user")
-                .roles(Set.of("user-manager"))
-                .build();
+        @Test
+        void testEvaluate_UserManagerCanReadUsers() {
+                AuthContext authContext = AuthContext.builder()
+                                .userId("manager-user")
+                                .roles(Set.of("user-manager"))
+                                .build();
 
-        PolicyDecision decision = policyService.evaluate(
-                authContext, "GET", "/api/users", Map.of(), Map.of()).await().atMost(Duration.ofSeconds(5));
+                PolicyDecision decision = policyService.evaluate(
+                                authContext, "GET", "/api/users", Map.of(), Map.of()).await()
+                                .atMost(Duration.ofSeconds(5));
 
-        assertTrue(decision.allowed());
-    }
+                assertTrue(decision.allowed());
+        }
 
-    @Test
-    void testEvaluate_ViewerCannotWrite() {
-        AuthContext authContext = AuthContext.builder()
-                .userId("viewer-user")
-                .roles(Set.of("viewer"))
-                .build();
+        @Test
+        void testEvaluate_ViewerCannotWrite() {
+                AuthContext authContext = AuthContext.builder()
+                                .userId("viewer-user")
+                                .roles(Set.of("viewer"))
+                                .build();
 
-        PolicyDecision decision = policyService.evaluate(
-                authContext, "POST", "/api/users", Map.of(), Map.of()).await().atMost(Duration.ofSeconds(5));
+                PolicyDecision decision = policyService.evaluate(
+                                authContext, "POST", "/api/users", Map.of(), Map.of()).await()
+                                .atMost(Duration.ofSeconds(5));
 
-        assertFalse(decision.allowed());
-    }
+                assertFalse(decision.allowed());
+        }
 
-    @Test
-    void testEvaluate_UnauthenticatedDenied() {
-        AuthContext authContext = AuthContext.anonymous();
+        @Test
+        void testEvaluate_UnauthenticatedDenied() {
+                AuthContext authContext = AuthContext.anonymous();
 
-        PolicyDecision decision = policyService.evaluate(
-                authContext, "GET", "/api/users", Map.of(), Map.of()).await().atMost(Duration.ofSeconds(5));
+                PolicyDecision decision = policyService.evaluate(
+                                authContext, "GET", "/api/users", Map.of(), Map.of()).await()
+                                .atMost(Duration.ofSeconds(5));
 
-        assertFalse(decision.allowed());
-        assertNotNull(decision.reason());
-    }
+                assertFalse(decision.allowed());
+                assertNotNull(decision.reason());
+        }
 
-    @Test
-    void testPolicyDecision_Allow() {
-        PolicyDecision decision = PolicyDecision.allow();
+        @Test
+        void testEvaluate_PublicPathAllowed() {
+                AuthContext authContext = AuthContext.anonymous();
 
-        assertTrue(decision.allowed());
-        assertNull(decision.reason());
-        assertTrue(decision.violations().isEmpty());
-    }
+                PolicyDecision decision = policyService.evaluate(
+                                authContext, "GET", "/health", Map.of(), Map.of()).await()
+                                .atMost(Duration.ofSeconds(5));
 
-    @Test
-    void testPolicyDecision_DenyWithReason() {
-        PolicyDecision decision = PolicyDecision.deny("Access denied");
+                assertTrue(decision.allowed());
+        }
 
-        assertFalse(decision.allowed());
-        assertEquals("Access denied", decision.reason());
-        assertTrue(decision.violations().isEmpty());
-    }
+        @Test
+        void testEvaluate_ApiPublicPathAllowed() {
+                AuthContext authContext = AuthContext.anonymous();
 
-    @Test
-    void testPolicyDecision_DenyWithViolations() {
-        PolicyDecision decision = PolicyDecision.deny(
-                "Multiple violations",
-                List.of("Missing role: admin", "Expired token"));
+                PolicyDecision decision = policyService.evaluate(
+                                authContext, "GET", "/api/public/info", Map.of(), Map.of()).await()
+                                .atMost(Duration.ofSeconds(5));
 
-        assertFalse(decision.allowed());
-        assertEquals(2, decision.violations().size());
-        assertTrue(decision.firstViolation().isPresent());
-        assertEquals("Missing role: admin", decision.firstViolation().get());
-    }
+                assertTrue(decision.allowed());
+        }
+
+        @Test
+        void testEvaluate_UserCanAccessOwnResources() {
+                AuthContext authContext = AuthContext.builder()
+                                .userId("user1")
+                                .roles(Set.of("user"))
+                                .build();
+
+                PolicyDecision decision = policyService.evaluate(
+                                authContext, "GET", "/api/users/user1/profile", Map.of(), Map.of()).await()
+                                .atMost(Duration.ofSeconds(5));
+
+                assertTrue(decision.allowed());
+        }
+
+        @Test
+        void testEvaluate_UserCannotAccessOtherProfile() {
+                AuthContext authContext = AuthContext.builder()
+                                .userId("user1")
+                                .roles(Set.of("user"))
+                                .build();
+
+                PolicyDecision decision = policyService.evaluate(
+                                authContext, "GET", "/api/users/user2/profile", Map.of(), Map.of()).await()
+                                .atMost(Duration.ofSeconds(5));
+
+                assertFalse(decision.allowed());
+        }
+
+        @Test
+        void testEvaluate_SensitiveDataAccess() {
+                AuthContext authContext = AuthContext.builder()
+                                .userId("user1")
+                                .permissions(Set.of("sensitive-data-access"))
+                                .build();
+
+                PolicyDecision decision = policyService.evaluate(
+                                authContext, "GET", "/api/sensitive/secrets", Map.of(), Map.of()).await()
+                                .atMost(Duration.ofSeconds(5));
+
+                assertTrue(decision.allowed());
+        }
+
+        @Test
+        void testEvaluate_SensitiveDataDenied() {
+                AuthContext authContext = AuthContext.builder()
+                                .userId("user1")
+                                .roles(Set.of("admin")) // Even admin needs explicit permission for /api/sensitive in my
+                                                        // Rego
+                                .build();
+
+                PolicyDecision decision = policyService.evaluate(
+                                authContext, "GET", "/api/sensitive/secrets", Map.of(), Map.of()).await()
+                                .atMost(Duration.ofSeconds(5));
+
+                assertFalse(decision.allowed());
+        }
+
+        @Test
+        void testEvaluate_ViewerCanReadGenericResources() {
+                AuthContext authContext = AuthContext.builder()
+                                .userId("v1")
+                                .roles(Set.of("viewer"))
+                                .build();
+
+                PolicyDecision decision = policyService.evaluate(
+                                authContext, "GET", "/api/products", Map.of(), Map.of()).await()
+                                .atMost(Duration.ofSeconds(5));
+
+                assertTrue(decision.allowed());
+        }
+
+        @Test
+        void testEvaluate_UserCanWriteGenericResources() {
+                AuthContext authContext = AuthContext.builder()
+                                .userId("u1")
+                                .roles(Set.of("user"))
+                                .build();
+
+                PolicyDecision decision = policyService.evaluate(
+                                authContext, "POST", "/api/products", Map.of(), Map.of()).await()
+                                .atMost(Duration.ofSeconds(5));
+
+                assertTrue(decision.allowed());
+        }
+
+        @Test
+        void testPolicyDecision_Allow() {
+                PolicyDecision decision = PolicyDecision.allow();
+
+                assertTrue(decision.allowed());
+                assertNull(decision.reason());
+                assertTrue(decision.violations().isEmpty());
+        }
+
+        @Test
+        void testPolicyDecision_DenyWithReason() {
+                PolicyDecision decision = PolicyDecision.deny("Access denied");
+
+                assertFalse(decision.allowed());
+                assertEquals("Access denied", decision.reason());
+                assertTrue(decision.violations().isEmpty());
+        }
+
+        @Test
+        void testPolicyDecision_DenyWithViolations() {
+                PolicyDecision decision = PolicyDecision.deny(
+                                "Multiple violations",
+                                List.of("Missing role: admin", "Expired token"));
+
+                assertFalse(decision.allowed());
+                assertEquals(2, decision.violations().size());
+                assertTrue(decision.firstViolation().isPresent());
+                assertEquals("Missing role: admin", decision.firstViolation().get());
+        }
 }

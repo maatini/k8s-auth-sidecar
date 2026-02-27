@@ -1,5 +1,7 @@
 package space.maatini.sidecar.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.quarkus.oidc.OidcTenantConfig;
 import io.quarkus.oidc.TenantResolver;
 import io.quarkus.oidc.runtime.OidcUtils;
@@ -8,6 +10,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
+import space.maatini.sidecar.util.IssuerUtils;
 
 import java.util.Optional;
 
@@ -31,6 +34,9 @@ public class MultiTenantResolver implements TenantResolver {
 
     @ConfigProperty(name = "sidecar.auth.enabled", defaultValue = "true")
     boolean authEnabled;
+
+    @Inject
+    ObjectMapper objectMapper;
 
     /**
      * Resolves the OIDC tenant based on the request context.
@@ -59,10 +65,10 @@ public class MultiTenantResolver implements TenantResolver {
 
             if (issuer.isPresent()) {
                 String iss = issuer.get();
-                if (isEntraIssuer(iss)) {
+                if (IssuerUtils.isEntraIssuer(iss)) {
                     LOG.debugf("Tenant resolved from issuer (Entra ID): %s", iss);
                     return ENTRA_TENANT;
-                } else if (isKeycloakIssuer(iss)) {
+                } else if (IssuerUtils.isKeycloakIssuer(iss)) {
                     LOG.debugf("Tenant resolved from issuer (Keycloak): %s", iss);
                     return KEYCLOAK_TENANT;
                 }
@@ -89,9 +95,8 @@ public class MultiTenantResolver implements TenantResolver {
             String payload = new String(java.util.Base64.getUrlDecoder().decode(parts[1]));
 
             // Use Jackson for robust JSON parsing instead of fragile string manipulation
-            com.fasterxml.jackson.databind.JsonNode node = new com.fasterxml.jackson.databind.ObjectMapper()
-                    .readTree(payload);
-            com.fasterxml.jackson.databind.JsonNode issNode = node.get("iss");
+            JsonNode node = objectMapper.readTree(payload);
+            JsonNode issNode = node.get("iss");
 
             if (issNode != null && issNode.isTextual()) {
                 return Optional.of(issNode.asText());
@@ -102,20 +107,4 @@ public class MultiTenantResolver implements TenantResolver {
         return Optional.empty();
     }
 
-    /**
-     * Checks if the issuer is a Microsoft Entra ID (Azure AD) issuer.
-     */
-    private boolean isEntraIssuer(String issuer) {
-        return issuer != null && (issuer.contains("login.microsoftonline.com") ||
-                issuer.contains("sts.windows.net") ||
-                issuer.contains("login.microsoft.com"));
-    }
-
-    /**
-     * Checks if the issuer is a Keycloak issuer.
-     */
-    private boolean isKeycloakIssuer(String issuer) {
-        return issuer != null && (issuer.contains("/realms/") ||
-                issuer.contains("keycloak"));
-    }
 }

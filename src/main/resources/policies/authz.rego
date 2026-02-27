@@ -39,6 +39,7 @@ allow if {
     startswith(input.request.path, "/api/")
     not startswith(input.request.path, "/api/admin")
     not startswith(input.request.path, "/api/users")
+    not startswith(input.request.path, "/api/sensitive")
     input.request.method == "GET"
     role_match({"admin", "user", "viewer"})
 }
@@ -48,6 +49,7 @@ allow if {
     startswith(input.request.path, "/api/")
     not startswith(input.request.path, "/api/admin")
     not startswith(input.request.path, "/api/users")
+    not startswith(input.request.path, "/api/sensitive")
     input.request.method in ["POST", "PUT", "DELETE", "PATCH"]
     role_match({"admin", "user"})
 }

@@ -84,7 +84,7 @@ public class RateLimitFilter implements ContainerRequestFilter {
         String path = requestContext.getUriInfo().getPath();
 
         // Skip rate limit for internal health checks
-        if (isInternalPath(path)) {
+        if (space.maatini.sidecar.util.PathMatcher.isInternalPath(path)) {
             return;
         }
 
@@ -170,11 +170,4 @@ public class RateLimitFilter implements ContainerRequestFilter {
         }
     }
 
-    private boolean isInternalPath(String path) {
-        return path.startsWith("/q/") ||
-                path.equals("/health") ||
-                path.equals("/metrics") ||
-                path.equals("/ready") ||
-                path.equals("/live");
-    }
 }

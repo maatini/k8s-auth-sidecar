@@ -32,7 +32,6 @@ public record PolicyInput(
                         authContext.tenant()),
                 ResourceInfo.fromPath(path),
                 Map.of(
-                        "timestamp", System.currentTimeMillis(),
                         "source", "rr-sidecar"));
     }
 

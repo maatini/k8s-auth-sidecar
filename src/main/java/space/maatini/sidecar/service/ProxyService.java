@@ -56,7 +56,13 @@ public class ProxyService {
 
     @PostConstruct
     void init() {
-        this.webClient = WebClient.create(vertx);
+        WebClientOptions options = new WebClientOptions()
+                .setConnectTimeout(config.proxy().timeout().connect())
+                .setIdleTimeout(30)
+                .setMaxPoolSize(100)
+                .setKeepAlive(true);
+
+        this.webClient = WebClient.create(vertx, options);
 
         // Initialize metrics
         this.requestCounter = Counter.builder("sidecar.proxy.requests")

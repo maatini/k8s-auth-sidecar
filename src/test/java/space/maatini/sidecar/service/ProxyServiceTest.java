@@ -103,4 +103,106 @@ class ProxyServiceTest {
 
         assertEquals("Network error", exception.getMessage());
     }
+
+    @Test
+    void testProxy_WithBody_SendsBuffer() {
+        when(mockRequest.sendBuffer(any())).thenReturn(Uni.createFrom().item(mockResponse));
+        when(mockResponse.statusCode()).thenReturn(200);
+        when(mockResponse.statusMessage()).thenReturn("OK");
+        when(mockResponse.headers()).thenReturn(io.vertx.mutiny.core.MultiMap.caseInsensitiveMultiMap());
+        when(mockResponse.body()).thenReturn(Buffer.buffer("ok"));
+
+        AuthContext authContext = AuthContext.builder().userId("user1").build();
+        Buffer body = Buffer.buffer("request body");
+
+        proxyService.proxy("POST", "/api/data", Map.of(), Map.of(), body, authContext).await().indefinitely();
+
+        verify(mockRequest).sendBuffer(body);
+        verify(mockRequest, never()).send();
+    }
+
+    @Test
+    void testProxy_WithQueryParams_AddsToRequest() {
+        when(mockRequest.send()).thenReturn(Uni.createFrom().item(mockResponse));
+        when(mockResponse.statusCode()).thenReturn(200);
+        when(mockResponse.statusMessage()).thenReturn("OK");
+        when(mockResponse.headers()).thenReturn(io.vertx.mutiny.core.MultiMap.caseInsensitiveMultiMap());
+        when(mockResponse.body()).thenReturn(Buffer.buffer("ok"));
+
+        AuthContext authContext = AuthContext.builder().userId("user1").build();
+        Map<String, String> queryParams = Map.of("foo", "bar", "baz", "qux");
+
+        proxyService.proxy("GET", "/api/data", Map.of(), queryParams, null, authContext).await().indefinitely();
+
+        verify(mockRequest).addQueryParam("foo", "bar");
+        verify(mockRequest).addQueryParam("baz", "qux");
+    }
+
+    @Test
+    void testProxy_WithHeaders_PropagatesMatchingHeaders() {
+        when(mockRequest.send()).thenReturn(Uni.createFrom().item(mockResponse));
+        when(mockResponse.statusCode()).thenReturn(200);
+        when(mockResponse.statusMessage()).thenReturn("OK");
+        when(mockResponse.headers()).thenReturn(io.vertx.mutiny.core.MultiMap.caseInsensitiveMultiMap());
+        when(mockResponse.body()).thenReturn(Buffer.buffer("ok"));
+
+        // Configure propagated headers
+        when(config.proxy().propagateHeaders()).thenReturn(java.util.List.of("X-Request-ID", "X-Custom"));
+
+        AuthContext authContext = AuthContext.builder().userId("user1").build();
+        Map<String, String> headers = Map.of(
+                "X-Request-ID", "id-123",
+                "X-Custom", "custom-val",
+                "Authorization", "Bearer token" // Should NOT be propagated by propagateHeaders (handled by auth)
+        );
+
+        proxyService.proxy("GET", "/api/test", headers, Map.of(), null, authContext).await().indefinitely();
+
+        // Check that headers were put into the request
+        verify(mockRequest).putHeader("X-Request-ID", "id-123");
+        verify(mockRequest).putHeader("X-Custom", "custom-val");
+        verify(mockRequest, never()).putHeader("Authorization", "Bearer token");
+    }
+
+    @Test
+    void testProxy_AddHeaders_FromConfig() {
+        when(mockRequest.send()).thenReturn(Uni.createFrom().item(mockResponse));
+        when(mockResponse.statusCode()).thenReturn(200);
+        when(mockResponse.statusMessage()).thenReturn("OK");
+        when(mockResponse.headers()).thenReturn(io.vertx.mutiny.core.MultiMap.caseInsensitiveMultiMap());
+        when(mockResponse.body()).thenReturn(Buffer.buffer("ok"));
+
+        // Configure addHeaders
+        when(config.proxy().addHeaders()).thenReturn(Map.of("X-Sidecar", "RR"));
+
+        AuthContext authContext = AuthContext.builder().userId("user1").build();
+
+        proxyService.proxy("GET", "/api/test", Map.of(), Map.of(), null, authContext).await().indefinitely();
+
+        verify(mockRequest).putHeader("X-Sidecar", "RR");
+    }
+
+    @Test
+    void testFallbackProxy_Returns503() {
+        ProxyService.ProxyResponse response = proxyService.fallbackProxy("GET", "/api/test", Map.of(), Map.of(), null,
+                null, new RuntimeException("error")).await().indefinitely();
+        assertEquals(503, response.statusCode());
+        assertTrue(response.bodyAsString().contains("Service Unavailable"));
+    }
+
+    @Test
+    void testProxyResponse_Error_CreatesValidJson() {
+        ProxyService.ProxyResponse response = ProxyService.ProxyResponse.error(500, "Internal Error");
+        assertEquals(500, response.statusCode());
+        // error() serializes Map.of("error", message) → {"error":"Internal Error"}
+        assertTrue(response.bodyAsString().contains("\"error\":\"Internal Error\""));
+    }
+
+    @Test
+    void testProxyResponse_IsSuccess() {
+        assertTrue(new ProxyService.ProxyResponse(200, "OK", Map.of(), Buffer.buffer()).isSuccess());
+        assertTrue(new ProxyService.ProxyResponse(201, "Created", Map.of(), Buffer.buffer()).isSuccess());
+        assertFalse(new ProxyService.ProxyResponse(400, "Bad Request", Map.of(), Buffer.buffer()).isSuccess());
+        assertFalse(new ProxyService.ProxyResponse(500, "Error", Map.of(), Buffer.buffer()).isSuccess());
+    }
 }

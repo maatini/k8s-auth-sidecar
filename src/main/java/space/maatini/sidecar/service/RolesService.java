@@ -121,21 +121,11 @@ public class RolesService {
             combinedPermissions.addAll(rolesResponse.permissions());
         }
 
-        return AuthContext.builder()
-                .userId(original.userId())
-                .email(original.email())
-                .name(original.name())
-                .preferredUsername(original.preferredUsername())
-                .issuer(original.issuer())
-                .audience(original.audience())
-                .roles(combinedRoles)
-                .permissions(combinedPermissions)
-                .claims(original.claims())
-                .issuedAt(original.issuedAt())
-                .expiresAt(original.expiresAt())
-                .tokenId(original.tokenId())
-                .tenant(rolesResponse.tenant() != null ? rolesResponse.tenant() : original.tenant())
-                .build();
+        AuthContext enriched = original.withRolesAndPermissions(combinedRoles, combinedPermissions);
+        if (rolesResponse.tenant() != null) {
+            enriched = enriched.withTenant(rolesResponse.tenant());
+        }
+        return enriched;
     }
 
     // Fallback methods must have exactly the same return type and a compatible

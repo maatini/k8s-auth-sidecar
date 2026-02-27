@@ -117,6 +117,47 @@ public record AuthContext(
     }
 
     /**
+     * Creates a new AuthContext with the same data but updated roles and
+     * permissions.
+     */
+    public AuthContext withRolesAndPermissions(Set<String> roles, Set<String> permissions) {
+        return new AuthContext(
+                userId,
+                email,
+                name,
+                preferredUsername,
+                issuer,
+                audience,
+                roles != null ? Set.copyOf(roles) : Collections.emptySet(),
+                permissions != null ? Set.copyOf(permissions) : Collections.emptySet(),
+                claims,
+                issuedAt,
+                expiresAt,
+                tokenId,
+                tenant);
+    }
+
+    /**
+     * Returns a copy of this context with a new tenant.
+     */
+    public AuthContext withTenant(String tenant) {
+        return new AuthContext(
+                userId,
+                email,
+                name,
+                preferredUsername,
+                issuer,
+                audience,
+                roles,
+                permissions,
+                claims,
+                issuedAt,
+                expiresAt,
+                tokenId,
+                tenant);
+    }
+
+    /**
      * Builder for AuthContext.
      */
     public static class Builder {
