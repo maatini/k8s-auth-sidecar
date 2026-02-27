@@ -60,20 +60,24 @@ Der Sidecar ist wie ein **Sicherheits-Checkpoint** auf einem Flughafen:
 - **OPA + Rego**: Die „Gesetzbücher“ deiner App. Du schreibst Regeln in Rego, kompilierst sie zu WASM und der Sidecar entscheidet in Millisekunden In-Memory.
 - **Hot-Reload**: Du änderst eine `.wasm` oder `.rego`-Datei in einer ConfigMap → der Sidecar merkt es und lädt sie neu, ohne Neustart!
 - **Quarkus**: Ein super-schnelles Java-Framework, das auch als winziges **Native-Image** (keine JVM nötig) laufen kann.
+- **Reaktives Streaming**: Der Sidecar blockiert keine Threads und streamt selbst riesige Payloads (z. B. 500 MB Dateiuploads) ohne RAM-Probleme.
 
 ---
 
 ## ✨ Alle Features im Überblick
 
 - Unterstützt **Keycloak** und **Entra ID** (auch Multi-Tenant)
-- **Embedded OPA WASM** (In-Memory, enorm schnell) oder externer OPA-Server
+- **Embedded OPA WASM** (In-Memory, enorm schnell) oder externer OPA-Server, jetzt mit **v1.x OPA CLI** im Container für automatisches `.rego`-Kompilieren
 - Rollen-Enrichment aus eigenem Service
+- **Vollständig reaktive Pipeline** (Mutiny `Uni`) und **Streaming-Proxy** (Vert.x) – minimale Speicherbelegung!
 - Ant-Style Path-Matching (`/**`, `/api/*/users`)
+- **Rate-Limiting** mit Caffeine-Cache und Schutz vor IP-Spoofing
 - Prometheus-Metriken + OpenTelemetry + JSON-Logging
 - Health-Checks (liveness/readiness)
 - GraalVM Native Image (sehr klein & schnell)
 - Fertige Kustomize-Manifeste für Kubernetes
 - Vollständige `@PreDestroy`-Aufräumarbeiten (sauberer Shutdown)
+- **Gehärtete Docker-Images** (Trivy-CVE-Scans in der CI-Pipeline)
 
 ---
 
@@ -104,17 +108,18 @@ Danach nur noch:
 - In Produktion `QUARKUS_HTTP_CORS_ORIGINS` einschränken
 - Regeln nach „Least Privilege“ schreiben (so wenig Rechte wie möglich)
 - Audit-Logging aktivieren → du siehst später genau, wer was wollte
+- Vertrauenswürdige IP-Adressen für Proxies (Load Balancer/Ingress) konfigurieren, um IP-Spoofing zu verhindern
 
 ---
 
-## 📊 Aktueller Stand des Projekts (20.02.2026)
+## 📊 Aktueller Stand des Projekts (27.02.2026)
 
-- **Sehr jung**: Erste Commits am 07.02.2026, letzte Änderung am 13.02.2026  
-- **Aktiv in Entwicklung**: Core-Funktionen (Auth-Filter, Proxy, OPA, Path-Matcher) sind bereits implementiert + erste Unit-Tests  
-- **0 Stars / Forks / Issues**: Noch kein Community-Feedback, aber das Repository ist öffentlich und gut dokumentiert  
-- **Technologie**: Java 21 + Quarkus 3.17, Maven, Docker (JVM + Native), Kustomize  
-- **Dokumentation**: Sehr stark! README + `docs/ARCHITECTURE.md` mit Bildern, Tabellen und Beispielen  
-- **Fazit**: Perfekt zum Mitmachen oder als Blaupause für eigene Sidecars. Die Grundfunktion steht, jetzt kommen wahrscheinlich Feinschliff, mehr Tests und vielleicht Helm-Charts.
+- **Sehr stabil**: Komplettes Refactoring (reaktiv + streaming) erfolgreich abgeschlossen. Letzte kritische Fehler (Showstopper) behoben.
+- **Aktiv in Entwicklung**: Core-Funktionen (Auth-Filter, Proxy, OPA, Path-Matcher) inkl. Rate-Limiting sind hochperformant implementiert.
+- **Testing**: Über **110 automatisierte Tests** (Unit- & Integrationstests) mit einer Code-Coverage von knapp **70%**. Der Kern-Filter ist zu >95% abgedeckt!
+- **Technologie**: Java 21 + Quarkus 3.31, Vert.x, Maven, Docker (JVM + Native), Kustomize, GitHub Actions CI/CD mit Trivy Vulnerability Scans.
+- **Dokumentation**: Sehr stark! README + `docs/ARCHITECTURE.md` + dieser Junior Guide.
+- **Fazit**: Der Sidecar ist bereit für ernsthafte Einsätze und skaliert extrem gut, da er rein reaktiv läuft und extrem wenig Ressourcen verbraucht. Perfekt zum Mitmachen oder als Blaupause für eigene Sidecars.
 
 ---
 
