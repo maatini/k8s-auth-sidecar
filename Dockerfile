@@ -68,7 +68,7 @@ LABEL org.opencontainers.image.source="https://github.com/maatini/k8s-auth-sidec
 RUN addgroup -S sidecar && adduser -S sidecar -G sidecar
 
 # HOT-RELOAD FIX – P0.5: Install OPA CLI for in-container policy recompilation
-ARG OPA_VERSION=0.71.0
+ARG OPA_VERSION=0.70.0
 ARG TARGETARCH
 RUN wget -q -O /usr/local/bin/opa \
     "https://openpolicyagent.org/downloads/v${OPA_VERSION}/opa_linux_${TARGETARCH:-amd64}_static" && \
