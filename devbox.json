@@ -7,9 +7,7 @@
     "kustomize@latest",
     "quarkus@latest"
   ],
-  "env": {
-    "JAVA_HOME": "$DEVBOX_PACKAGES_DIR/jdk"
-  },
+  "env": {},
   "shell": {
     "init_hook": [
       "echo '🚀 K8s-Auth-Sidecar Devbox Environment'",
