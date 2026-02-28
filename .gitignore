@@ -47,4 +47,5 @@ coverage/
 generated/
 .gradle/
 
-.devbox
+.devbox/
+devbox.lock
