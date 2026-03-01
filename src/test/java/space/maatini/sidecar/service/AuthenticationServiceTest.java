@@ -26,7 +26,7 @@ class AuthenticationServiceTest {
     @Test
     void testExtractFromJwt_Keycloak() {
         JsonWebToken jwt = Mockito.mock(JsonWebToken.class);
-        
+
         when(jwt.getSubject()).thenReturn("user-123");
         when(jwt.getIssuer()).thenReturn("https://keycloak.example.com/realms/myrealm");
         when(jwt.getClaim("email")).thenReturn("user@example.com");
@@ -36,7 +36,7 @@ class AuthenticationServiceTest {
         when(jwt.getClaim("exp")).thenReturn(1704070800L);
         when(jwt.getClaim("jti")).thenReturn("token-id-123");
         when(jwt.getClaimNames()).thenReturn(Set.of("sub", "email", "name"));
-        
+
         // Keycloak realm_access claim
         Map<String, Object> realmAccess = Map.of("roles", Set.of("user", "admin"));
         when(jwt.getClaim("realm_access")).thenReturn(realmAccess);
@@ -58,7 +58,7 @@ class AuthenticationServiceTest {
     @Test
     void testExtractFromJwt_EntraId() {
         JsonWebToken jwt = Mockito.mock(JsonWebToken.class);
-        
+
         when(jwt.getSubject()).thenReturn("azure-sub-123");
         when(jwt.getIssuer()).thenReturn("https://login.microsoftonline.com/tenant-id/v2.0");
         when(jwt.getClaim("oid")).thenReturn("azure-oid-456");
@@ -71,7 +71,7 @@ class AuthenticationServiceTest {
         when(jwt.getClaim("exp")).thenReturn(1704070800L);
         when(jwt.getClaim("jti")).thenReturn("azure-token-id");
         when(jwt.getClaimNames()).thenReturn(Set.of("sub", "oid", "tid", "email", "name"));
-        
+
         // Entra ID roles claim
         when(jwt.getClaim("roles")).thenReturn(Set.of("User.Read", "User.Write"));
         when(jwt.getClaim("groups")).thenReturn(Set.of("group-1", "group-2"));
@@ -95,18 +95,32 @@ class AuthenticationServiceTest {
     @Test
     void testExtractFromJwt_NullToken() {
         AuthContext context = authenticationService.extractFromJwt(null);
-        
+
         assertNotNull(context);
         assertFalse(context.isAuthenticated());
         assertEquals("anonymous", context.userId());
     }
 
     @Test
+    void testGetCachedAuthContext_RoutesCorrectly() {
+        JsonWebToken jwt = Mockito.mock(JsonWebToken.class);
+        when(jwt.getSubject()).thenReturn("cache-user");
+        when(jwt.getClaimNames()).thenReturn(Set.of("sub"));
+
+        // This validates that the cached proxy method works and doesn't crash on
+        // standard processing
+        AuthContext context = authenticationService.getCachedAuthContext(jwt);
+
+        assertNotNull(context);
+        assertEquals("cache-user", context.userId());
+    }
+
+    @Test
     void testAuthContext_HasRole() {
         AuthContext context = AuthContext.builder()
-            .userId("user-123")
-            .roles(Set.of("user", "admin", "viewer"))
-            .build();
+                .userId("user-123")
+                .roles(Set.of("user", "admin", "viewer"))
+                .build();
 
         assertTrue(context.hasRole("user"));
         assertTrue(context.hasRole("admin"));
@@ -116,9 +130,9 @@ class AuthenticationServiceTest {
     @Test
     void testAuthContext_HasAnyRole() {
         AuthContext context = AuthContext.builder()
-            .userId("user-123")
-            .roles(Set.of("viewer"))
-            .build();
+                .userId("user-123")
+                .roles(Set.of("viewer"))
+                .build();
 
         assertTrue(context.hasAnyRole("admin", "viewer", "user"));
         assertFalse(context.hasAnyRole("admin", "superadmin"));
@@ -127,9 +141,9 @@ class AuthenticationServiceTest {
     @Test
     void testAuthContext_HasAllRoles() {
         AuthContext context = AuthContext.builder()
-            .userId("user-123")
-            .roles(Set.of("user", "admin"))
-            .build();
+                .userId("user-123")
+                .roles(Set.of("user", "admin"))
+                .build();
 
         assertTrue(context.hasAllRoles("user", "admin"));
         assertFalse(context.hasAllRoles("user", "admin", "superadmin"));

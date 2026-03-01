@@ -47,6 +47,7 @@ class ProxyServiceTest {
         when(targetConfig.port()).thenReturn(8081);
         when(targetConfig.scheme()).thenReturn("http");
         when(timeoutConfig.read()).thenReturn(5000);
+        when(proxyConfig.poolSize()).thenReturn(100);
         when(proxyConfig.propagateHeaders()).thenReturn(java.util.List.of());
 
         // Manually inject dependencies
@@ -196,8 +197,13 @@ class ProxyServiceTest {
     void testProxyResponse_Error_CreatesValidJson() {
         ProxyService.ProxyResponse response = ProxyService.ProxyResponse.error(500, "Internal Error");
         assertEquals(500, response.statusCode());
-        // error() serializes Map.of("error", message) → {"error":"Internal Error"}
         assertTrue(response.bodyAsString().contains("\"error\":\"Internal Error\""));
+    }
+
+    @Test
+    void testProxyResponse_Error_SanitizesDoubleQuotes() {
+        ProxyService.ProxyResponse response = ProxyService.ProxyResponse.error(500, "Error with \"quotes\"");
+        assertTrue(response.bodyAsString().contains("\"error\":\"Error with \\\"quotes\\\"\""));
     }
 
     @Test
