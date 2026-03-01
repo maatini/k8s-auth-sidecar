@@ -1,5 +1,4 @@
 # K8s-Auth-Sidecar – Der einfache AuthN/AuthZ-Sidecar für Kubernetes
-*(Stand: 20. Februar 2026 – sehr frühes, aber bereits lauffähiges Projekt)*
 
 Hallo Junior-Entwickler! 🎉  
 Stell dir vor, du baust eine coole Web-App (z. B. mit Spring Boot, Quarkus oder was auch immer). Plötzlich musst du dich um **Login**, **Rechte** und **Sicherheit** kümmern – für **jeden** Request. Das wird schnell kompliziert und du willst deine Haupt-App nicht mit diesem Kram „verschmutzen“.  
@@ -38,7 +37,7 @@ Der Sidecar ist wie ein **Sicherheits-Checkpoint** auf einem Flughafen:
 2. **Rollen-Anreicherung (Enrichment)**  
    - Im JWT stehen oft nur grobe Rollen (z. B. „user“).  
    - Der Sidecar fragt einen separaten **Roles-Service** (dein eigener Microservice): „Hey, was darf user-123 noch alles in Projekt-X?“  
-   - Antwort wird kurz **gecached** (schnell & ressourcenschonend).
+   - Die Antworten auf diese Rollenabfrage sowie die aufwändige JWT-Validierung selbst werden mittels eines **Caffeine-Caches in-Memory in Sekundenbruchteilen** zwischengespeichert ($O(1)$). Ersatz-Anfragen kosten also so gut wie gar keine Zeit.
 
 3. **Regel-Prüfung (AuthZ mit OPA)**  
    - Der Sidecar baut ein JSON mit allen Infos (User, Rollen, Request-Methode, Pfad …).  
@@ -60,7 +59,8 @@ Der Sidecar ist wie ein **Sicherheits-Checkpoint** auf einem Flughafen:
 - **OPA + Rego**: Die „Gesetzbücher“ deiner App. Du schreibst Regeln in Rego, kompilierst sie zu WASM und der Sidecar entscheidet in Millisekunden In-Memory.
 - **Hot-Reload**: Du änderst eine `.wasm` oder `.rego`-Datei in einer ConfigMap → der Sidecar merkt es und lädt sie neu, ohne Neustart!
 - **Quarkus**: Ein super-schnelles Java-Framework, das auch als winziges **Native-Image** (keine JVM nötig) laufen kann.
-- **Reaktives Streaming**: Der Sidecar blockiert keine Threads und streamt selbst riesige Payloads (z. B. 500 MB Dateiuploads) ohne RAM-Probleme.
+- **Reaktives Streaming**: Der Sidecar blockiert keine Threads und streamt selbst riesige Payloads (z. B. 500 MB Dateiuploads) ohne RAM-Probleme. Die Connection-Pools für solche Weiterleitungen (Proxy) sind dynamisch konfigurierbar.
+- **Micro-Caching**: Um bei jedem Nutzer nicht ständig aufwendig Kryptografie prüfen zu müssen, behält der Sidecar verifizierte Ausweise kurz im Gedächtnis (JWT Caffeine Cache).
 
 ---
 
@@ -75,9 +75,9 @@ Der Sidecar ist wie ein **Sicherheits-Checkpoint** auf einem Flughafen:
 - Prometheus-Metriken + OpenTelemetry + JSON-Logging
 - Health-Checks (liveness/readiness)
 - GraalVM Native Image (sehr klein & schnell)
-- Fertige Kustomize-Manifeste für Kubernetes
+- Fertige Kustomize-Manifeste für Kubernetes (inklusive striktem Zero-Trust `securityContext`)
 - Vollständige `@PreDestroy`-Aufräumarbeiten (sauberer Shutdown)
-- **Gehärtete Docker-Images** (Trivy-CVE-Scans in der CI-Pipeline)
+- **Gehärtete Docker-Images** (Trivy-CVE-Scans, smarte CI-Caching-Pipeline, distroless-Ansätze)
 
 ---
 
@@ -102,6 +102,50 @@ Danach nur noch:
 
 ---
 
+## 🧪 Schritt-für-Schritt: Den Sidecar lokal testen
+
+Lass uns in 4 schnellen Schritten sehen, wie der Sidecar aus der Perspektive eines Clients reagiert. Stell sicher, dass du wie im Schritt zuvor den Entwicklungsmodus (`mvn quarkus:dev`) und WireMock via Docker Compose am Laufen hast.
+
+### 1. Token holen
+Wir sagen dem WireMock-Server: *"Gib mir einen Ausweis für den Test-User!"*
+```bash
+export TOKEN=$(curl -s -X POST http://localhost:8090/realms/master/protocol/openid-connect/token | jq -r .access_token)
+```
+
+### 2. Szenario A: Der "Gute" Request (Erlaubt / 200 OK)
+Wir rufen einen Endpunkt auf. Unser Test-User bekommt vom gemockten Roles-Service standardmäßig die Rollen `admin` und `developer`. Wenn deine `.rego`-Policy Admin-Rechte verlangt, wird das hier klappen.
+```bash
+curl -i -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/admin/dashboard
+```
+**Was passiert?**
+1. Sidecar sieht: Token gültig ✅
+2. Sidecar fragt Roles-Service: User hat Rolle `admin` ✅
+3. Sidecar fragt OPA-Engine: Regel sagt "admin darf das" ✅
+4. Sidecar schickt es ans Backend weiter. Das Backend antwortet mit `200 OK`.
+
+### 3. Szenario B: Der "Böse" Request (Abgelehnt / 403 Forbidden)
+Nehmen wir an, in deinen OPA-Regeln (`.rego`) steht explizit: *Niemand darf auf `/api/geheim` zugreifen, außer der Superadmin.* Da unser Test-User nur `admin` ist, schlägt dies fehl.
+```bash
+curl -i -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/geheim
+```
+**Was passiert?**
+1. Token gültig ✅
+2. Rollen abgefragt ✅
+3. OPA-Engine sagt: Regel verbietet Zugriff ❌
+4. **Ergebnis:** Du bekommst sofort ein `HTTP 403 Forbidden` zurück. Die eigentliche App (`localhost:8081`) kriegt von diesem Request **absolut nichts mit**!
+
+### 4. Szenario C: Ohne gültigen "Ausweis" (Unautorisiert / 401 Unauthorized)
+Was passiert, wenn ein Hacker versucht, ohne Ticket durch den Türsteher zu kommen?
+```bash
+curl -i http://localhost:8080/api/irgendwas
+# oder auch mit ungültigem Token:
+curl -i -H "Authorization: Bearer FALSCHER_TOKEN_123" http://localhost:8080/api/irgendwas
+```
+**Was passiert?**
+Der Sidecar blockt das sofort an der Vordertür ab! Du erhältst `HTTP 401 Unauthorized` und die Prüfung wird direkt abgebrochen.
+
+---
+
 ## 🔐 Sicherheit & Best Practices (kurz & wichtig)
 
 - Immer Secrets über Kubernetes Secrets einbinden
@@ -112,14 +156,14 @@ Danach nur noch:
 
 ---
 
-## 📊 Aktueller Stand des Projekts (27.02.2026)
+## 📊 Projekt-Reife & Setup
 
-- **Sehr stabil**: Komplettes Refactoring (reaktiv + streaming) erfolgreich abgeschlossen. Letzte kritische Fehler (Showstopper) behoben.
-- **Aktiv in Entwicklung**: Core-Funktionen (Auth-Filter, Proxy, OPA, Path-Matcher) inkl. Rate-Limiting sind hochperformant implementiert.
-- **Testing**: Über **110 automatisierte Tests** (Unit- & Integrationstests) mit einer Code-Coverage von knapp **70%**. Der Kern-Filter ist zu >95% abgedeckt!
-- **Technologie**: Java 21 + Quarkus 3.31, Vert.x, Maven, Docker (JVM + Native), Kustomize, GitHub Actions CI/CD mit Trivy Vulnerability Scans.
+- **Sehr stabil**: Komplettes Refactoring (reaktiv + streaming + Memory-Optimierung) extrem performant. Null Objekt-Allokationen bei Fehler-Fallbacks.
+- **Aktiv in Entwicklung**: Core-Funktionen (Auth-Filter, Proxy, OPA, Path-Matcher) inkl. serverseitigen Caffeine-Caches (Session & Profiling) sind produktionsreif.
+- **Testing**: Über **112 automatisierte Tests** (Unit- & Integrationstests) verifizieren JWTs, Pools, Security Kontexte und das OPA Routing.
+- **Technologie**: Java 21 + Quarkus 3.31, Vert.x, Maven, Docker (JVM + Native mit intelligentem Builder-Skipping), Kustomize, GitHub Actions CI/CD mit Trivy Scans und SBOM-Generierung.
 - **Dokumentation**: Sehr stark! README + `docs/ARCHITECTURE.md` + dieser Junior Guide.
-- **Fazit**: Der Sidecar ist bereit für ernsthafte Einsätze und skaliert extrem gut, da er rein reaktiv läuft und extrem wenig Ressourcen verbraucht. Perfekt zum Mitmachen oder als Blaupause für eigene Sidecars.
+- **Fazit**: Der Sidecar ist bereit für ernsthafte Einsätze und skaliert logisch und fehlerfrei im Kubernetes Cluster.
 
 ---
 
@@ -130,7 +174,7 @@ Du lernst auf einmal:
 - Moderne AuthN/AuthZ (OIDC + OPA)
 - Reaktive, nicht-blockierende Filter in Quarkus
 - Hot-Reload von Policies
-- Observability (Metrics + Health)
+- Observability (Metrics + Health) & Memory Management (Caffeine Cache)
 
 Und deine Haupt-App bleibt so einfach wie `return "Hello World";` – die ganze Sicherheit macht der Sidecar!
 
@@ -141,5 +185,3 @@ Der k8s-auth-sidecar ist ein schlanker, hochperformanter „Türsteher“ für d
 
 Viel Spaß beim Ausprobieren!  
 Falls du Fragen hast oder mitentwickeln möchtest – das Repo ist frisch und offen. 💪
-
-*(Analyse basiert auf README.md, ARCHITECTURE.md, Commit-History und Projektstruktur vom 20.02.2026)*
