@@ -116,6 +116,62 @@ class AuthenticationServiceTest {
     }
 
     @Test
+    void testExtractFromJwt_EntraId_FallbackToSub() {
+        JsonWebToken jwt = Mockito.mock(JsonWebToken.class);
+        when(jwt.getIssuer()).thenReturn("https://login.microsoftonline.com/tenant-id/v2.0");
+        when(jwt.getSubject()).thenReturn("azure-sub-123");
+        when(jwt.getClaim("oid")).thenReturn(null); // Force fallback to 'sub'
+        when(jwt.getClaimNames()).thenReturn(Set.of("sub"));
+
+        AuthContext context = authenticationService.extractFromJwt(jwt);
+        assertEquals("azure-sub-123", context.userId());
+    }
+
+    @Test
+    void testExtractFromJwt_MalformedKeycloakRoles() {
+        JsonWebToken jwt = Mockito.mock(JsonWebToken.class);
+        when(jwt.getIssuer()).thenReturn("https://keycloak.example.com/realms/myrealm");
+        when(jwt.getClaimNames()).thenReturn(Set.of());
+
+        // Malformed realm_access (roles is not a collection)
+        Map<String, Object> realmAccess = Map.of("roles", "not-a-collection");
+        when(jwt.getClaim("realm_access")).thenReturn(realmAccess);
+
+        // Malformed resource_access
+        Map<String, Object> resourceAccess = Map.of(
+                "client1", "not-a-map",
+                "client2", Map.of("roles", "not-a-collection"));
+        when(jwt.getClaim("resource_access")).thenReturn(resourceAccess);
+
+        AuthContext context = authenticationService.extractFromJwt(jwt);
+        assertTrue(context.roles().isEmpty(), "Roles should be empty on malformed data");
+    }
+
+    @Test
+    void testExtractFromJwt_StringRoles() {
+        JsonWebToken jwt = Mockito.mock(JsonWebToken.class);
+        when(jwt.getIssuer()).thenReturn("https://login.microsoftonline.com/tenant/v2.0");
+        when(jwt.getClaim("roles")).thenReturn("SingleRoleAsString"); // String instead of Array
+        when(jwt.getClaimNames()).thenReturn(Set.of("roles"));
+
+        AuthContext context = authenticationService.extractFromJwt(jwt);
+        assertTrue(context.roles().contains("SingleRoleAsString"));
+    }
+
+    @Test
+    void testExtractFromJwt_ExceptionsCaught() {
+        JsonWebToken jwt = Mockito.mock(JsonWebToken.class);
+        when(jwt.getIssuer()).thenReturn("https://keycloak");
+        when(jwt.getClaimNames()).thenThrow(new RuntimeException("Simulated decoding error"));
+
+        // Should catch the exception in extractAllClaims and handle gracefully
+        AuthContext context = authenticationService.extractFromJwt(jwt);
+        assertNotNull(context);
+        assertNull(context.userId());
+        assertTrue(context.roles().isEmpty());
+    }
+
+    @Test
     void testAuthContext_HasRole() {
         AuthContext context = AuthContext.builder()
                 .userId("user-123")

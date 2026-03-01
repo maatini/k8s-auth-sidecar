@@ -19,6 +19,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
+@io.quarkus.test.junit.QuarkusTest
 class ProxyServiceTest {
 
     ProxyService proxyService;
@@ -107,7 +108,8 @@ class ProxyServiceTest {
 
     @Test
     void testProxy_WithBody_SendsStream() {
-        when(mockRequest.sendStream(any(io.vertx.mutiny.core.streams.ReadStream.class)))
+        when(mockRequest
+                .sendStream((io.vertx.mutiny.core.streams.ReadStream<Buffer>) org.mockito.ArgumentMatchers.any()))
                 .thenReturn(Uni.createFrom().item(mockResponse));
         when(mockResponse.statusCode()).thenReturn(200);
         when(mockResponse.statusMessage()).thenReturn("OK");
@@ -120,8 +122,68 @@ class ProxyServiceTest {
         proxyService.proxy("POST", "/api/data", Map.of(), Map.of(), mockClientRequest, authContext).await()
                 .indefinitely();
 
-        verify(mockRequest).sendStream(any(io.vertx.mutiny.core.http.HttpServerRequest.class));
+        verify(mockRequest)
+                .sendStream((io.vertx.mutiny.core.streams.ReadStream<Buffer>) org.mockito.ArgumentMatchers.any());
         verify(mockRequest, never()).send();
+    }
+
+    @Test
+    void testProxy_WithBody_SendsStream_PUT() {
+        when(mockRequest
+                .sendStream((io.vertx.mutiny.core.streams.ReadStream<Buffer>) org.mockito.ArgumentMatchers.any()))
+                .thenReturn(Uni.createFrom().item(mockResponse));
+        when(mockResponse.statusCode()).thenReturn(200);
+        when(mockResponse.statusMessage()).thenReturn("OK");
+        when(mockResponse.headers()).thenReturn(io.vertx.mutiny.core.MultiMap.caseInsensitiveMultiMap());
+        when(mockResponse.body()).thenReturn(Buffer.buffer("ok"));
+
+        AuthContext authContext = AuthContext.builder().userId("user1").build();
+        io.vertx.core.http.HttpServerRequest mockClientRequest = mock(io.vertx.core.http.HttpServerRequest.class);
+
+        proxyService.proxy("PUT", "/api/data", Map.of(), Map.of(), mockClientRequest, authContext).await()
+                .indefinitely();
+
+        verify(mockRequest)
+                .sendStream((io.vertx.mutiny.core.streams.ReadStream<Buffer>) org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void testProxy_WithBody_SendsStream_PATCH() {
+        when(mockRequest
+                .sendStream((io.vertx.mutiny.core.streams.ReadStream<Buffer>) org.mockito.ArgumentMatchers.any()))
+                .thenReturn(Uni.createFrom().item(mockResponse));
+        when(mockResponse.statusCode()).thenReturn(200);
+        when(mockResponse.statusMessage()).thenReturn("OK");
+        when(mockResponse.headers()).thenReturn(io.vertx.mutiny.core.MultiMap.caseInsensitiveMultiMap());
+        when(mockResponse.body()).thenReturn(Buffer.buffer("ok"));
+
+        AuthContext authContext = AuthContext.builder().userId("user1").build();
+        io.vertx.core.http.HttpServerRequest mockClientRequest = mock(io.vertx.core.http.HttpServerRequest.class);
+
+        proxyService.proxy("PATCH", "/api/data", Map.of(), Map.of(), mockClientRequest, authContext).await()
+                .indefinitely();
+
+        verify(mockRequest)
+                .sendStream((io.vertx.mutiny.core.streams.ReadStream<Buffer>) org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void testProxy_WithClientRequestButGET_DoesNotStream() {
+        when(mockRequest.send()).thenReturn(Uni.createFrom().item(mockResponse));
+        when(mockResponse.statusCode()).thenReturn(200);
+        when(mockResponse.statusMessage()).thenReturn("OK");
+        when(mockResponse.headers()).thenReturn(io.vertx.mutiny.core.MultiMap.caseInsensitiveMultiMap());
+        when(mockResponse.body()).thenReturn(Buffer.buffer("ok"));
+
+        AuthContext authContext = AuthContext.builder().userId("user1").build();
+        io.vertx.core.http.HttpServerRequest mockClientRequest = mock(io.vertx.core.http.HttpServerRequest.class);
+
+        proxyService.proxy("GET", "/api/data", Map.of(), Map.of(), mockClientRequest, authContext).await()
+                .indefinitely();
+
+        verify(mockRequest).send();
+        verify(mockRequest, never())
+                .sendStream((io.vertx.mutiny.core.streams.ReadStream<Buffer>) org.mockito.ArgumentMatchers.any());
     }
 
     @Test
@@ -183,6 +245,64 @@ class ProxyServiceTest {
         proxyService.proxy("GET", "/api/test", Map.of(), Map.of(), null, authContext).await().indefinitely();
 
         verify(mockRequest).putHeader("X-Sidecar", "RR");
+    }
+
+    @Test
+    void testProxy_PropagateHeaders_CaseInsensitive() {
+        when(mockRequest.send()).thenReturn(Uni.createFrom().item(mockResponse));
+        when(mockResponse.statusCode()).thenReturn(200);
+        when(mockResponse.headers()).thenReturn(io.vertx.mutiny.core.MultiMap.caseInsensitiveMultiMap());
+        when(config.proxy().propagateHeaders()).thenReturn(java.util.List.of("X-REQUEST-ID"));
+
+        AuthContext authContext = AuthContext.builder().userId("user1").build();
+        // Lowercase in map, uppercase in config
+        Map<String, String> headers = Map.of("x-request-id", "id-1234");
+
+        proxyService.proxy("GET", "/api/test", headers, null, null, authContext).await().indefinitely();
+        verify(mockRequest).putHeader("X-REQUEST-ID", "id-1234");
+    }
+
+    @Test
+    void testProxy_PropagateHeaders_NullHeadersAndNullAuth() {
+        when(mockRequest.send()).thenReturn(Uni.createFrom().item(mockResponse));
+        when(mockResponse.statusCode()).thenReturn(200);
+        when(mockResponse.headers()).thenReturn(io.vertx.mutiny.core.MultiMap.caseInsensitiveMultiMap());
+
+        // Run with completely null headers, empty query params, and null AuthContext
+        assertDoesNotThrow(() -> {
+            proxyService.proxy("POST", "/test", null, Map.of(), null, null).await().indefinitely();
+        });
+    }
+
+    @Test
+    void testProxy_AddAuthHeaders_WithPlaceholders() {
+        when(mockRequest.send()).thenReturn(Uni.createFrom().item(mockResponse));
+        when(mockResponse.statusCode()).thenReturn(200);
+        when(mockResponse.headers()).thenReturn(io.vertx.mutiny.core.MultiMap.caseInsensitiveMultiMap());
+        when(mockResponse.body()).thenReturn(Buffer.buffer());
+
+        when(config.proxy().addHeaders()).thenReturn(Map.of(
+                "X-User", "${user.id}",
+                "X-Email", "${user.email}",
+                "X-Roles", "${user.roles}",
+                "X-Tenant", "${user.tenant}",
+                "X-Name", "${user.name}"));
+
+        AuthContext authContext = AuthContext.builder()
+                .userId("u1")
+                .email("e@e.com")
+                .roles(java.util.Set.of("r1"))
+                .tenant("t1")
+                .name("n1")
+                .build();
+
+        proxyService.proxy("GET", "/val", Map.of(), Map.of(), null, authContext).await().indefinitely();
+
+        verify(mockRequest).putHeader("X-User", "u1");
+        verify(mockRequest).putHeader("X-Email", "e@e.com");
+        verify(mockRequest).putHeader("X-Roles", "r1");
+        verify(mockRequest).putHeader("X-Tenant", "t1");
+        verify(mockRequest).putHeader("X-Name", "n1");
     }
 
     @Test

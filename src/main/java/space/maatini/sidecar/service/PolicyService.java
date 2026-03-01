@@ -124,7 +124,7 @@ public class PolicyService {
      * Works for both external OPA HTTP responses and embedded WASM results.
      */
     static PolicyDecision parsePolicyResult(JsonNode result) {
-        if (result == null) {
+        if (result == null || result.isNull()) {
             return PolicyDecision.deny("No result from OPA");
         }
 

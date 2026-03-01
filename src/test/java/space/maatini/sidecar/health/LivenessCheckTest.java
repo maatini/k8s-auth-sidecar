@@ -11,6 +11,7 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.when;
 
+@io.quarkus.test.junit.QuarkusTest
 class LivenessCheckTest {
 
     LivenessCheck livenessCheck;

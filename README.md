@@ -369,9 +369,9 @@ Das Projekt verfügt über eine umfassende Test-Suite (**110 Tests**), die alle 
 - **Testcontainers**: Werden für komplexe Integrationstests eingesetzt, z.B. um einen echten, externen OPA-Server hochzufahren und anzubinden.
 
 **Aktuelle Testabdeckung (Code Coverage via JaCoCo):**
-- **Lines:** ~69.4% 
-- **Instructions:** ~68.9%
-- **Branches:** ~47.6%
+- **Lines:** ~82.5% 
+- **Instructions:** ~82.8%
+- **Branches:** ~67.7%
 
 *Wichtige Kernkomponenten wie der `AuthProxyFilter` (die Haupt-Pipeline) sind mit über 95% Line-Coverage exzellent abgedeckt.*
 

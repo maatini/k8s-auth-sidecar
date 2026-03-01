@@ -11,6 +11,7 @@ import static org.junit.jupiter.api.Assertions.*;
 /**
  * Tests for PathMatcher utility.
  */
+@io.quarkus.test.junit.QuarkusTest
 class PathMatcherTest {
 
     // --- Exact match ---

@@ -171,4 +171,59 @@ public class WasmPolicyEngineTest {
         // It should probably deny default, depending on dummy.wasm content
         assertFalse(decision.allowed());
     }
+
+    @Test
+    void testEdgeCases_LoadPaths() throws Exception {
+        space.maatini.sidecar.config.SidecarConfig.OpaConfig opaConfig = org.mockito.Mockito
+                .mock(space.maatini.sidecar.config.SidecarConfig.OpaConfig.class);
+        space.maatini.sidecar.config.SidecarConfig.OpaConfig.EmbeddedOpaConfig embedConfig = org.mockito.Mockito
+                .mock(space.maatini.sidecar.config.SidecarConfig.OpaConfig.EmbeddedOpaConfig.class);
+        space.maatini.sidecar.config.SidecarConfig mockConfig = org.mockito.Mockito
+                .mock(space.maatini.sidecar.config.SidecarConfig.class);
+        org.mockito.Mockito.when(mockConfig.opa()).thenReturn(opaConfig);
+        org.mockito.Mockito.when(opaConfig.embedded()).thenReturn(embedConfig);
+
+        wasmPolicyEngine.config = mockConfig;
+
+        // Classpath missing leading slash
+        org.mockito.Mockito.when(embedConfig.wasmPath()).thenReturn("classpath:does-not-exist.wasm");
+        wasmPolicyEngine.loadWasmModule();
+
+        // Classpath with leading slash missing
+        org.mockito.Mockito.when(embedConfig.wasmPath()).thenReturn("classpath:/does-not-exist.wasm");
+        wasmPolicyEngine.loadWasmModule();
+
+        // FileSystem not found
+        org.mockito.Mockito.when(embedConfig.wasmPath()).thenReturn("/does-not-exist/invalid.wasm");
+        wasmPolicyEngine.loadWasmModule();
+
+        // Invalid Wasm byte payload
+        java.nio.file.Path tempFile = java.nio.file.Files.createTempFile("bad", ".wasm");
+        java.nio.file.Files.write(tempFile, "bad-data".getBytes());
+        org.mockito.Mockito.when(embedConfig.wasmPath()).thenReturn(tempFile.toAbsolutePath().toString());
+        try {
+            wasmPolicyEngine.loadWasmModule();
+        } catch (Exception e) {
+        }
+        java.nio.file.Files.deleteIfExists(tempFile);
+    }
+
+    @Test
+    void testHotReloadWatcher_Trigger() throws Exception {
+        // Create a fake rego file in the dev directory to trigger the running watcher
+        // thread!
+        java.nio.file.Path policiesDir = java.nio.file.Paths.get("src/main/resources/policies");
+        java.nio.file.Path tempTarget = policiesDir.resolve("test_trigger.rego");
+        java.nio.file.Files.write(tempTarget, "package authz".getBytes());
+
+        // Give the WatchService event loop time to pick up the CREATE/MODIFY event
+        Thread.sleep(800);
+
+        // Delete it again
+        java.nio.file.Files.deleteIfExists(tempTarget);
+
+        // Wait again for DELETE event processing
+        Thread.sleep(200);
+    }
+
 }

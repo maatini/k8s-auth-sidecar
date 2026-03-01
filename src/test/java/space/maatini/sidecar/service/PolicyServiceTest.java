@@ -241,4 +241,96 @@ class PolicyServiceTest {
                 assertTrue(decision.firstViolation().isPresent());
                 assertEquals("Missing role: admin", decision.firstViolation().get());
         }
+
+        @Test
+        void testParsePolicyResult_NullResult() {
+                PolicyDecision decision = PolicyService.parsePolicyResult(null);
+                assertFalse(decision.allowed());
+                assertEquals("No result from OPA", decision.reason());
+        }
+
+        @Test
+        void testParsePolicyResult_BooleanTrue() {
+                com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+                com.fasterxml.jackson.databind.JsonNode node = mapper.getNodeFactory().booleanNode(true);
+                PolicyDecision decision = PolicyService.parsePolicyResult(node);
+                assertTrue(decision.allowed());
+        }
+
+        @Test
+        void testParsePolicyResult_BooleanFalse() {
+                com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+                com.fasterxml.jackson.databind.JsonNode node = mapper.getNodeFactory().booleanNode(false);
+                PolicyDecision decision = PolicyService.parsePolicyResult(node);
+                assertFalse(decision.allowed());
+        }
+
+        @Test
+        void testParsePolicyResult_ObjectAllowTrue() {
+                com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+                com.fasterxml.jackson.databind.node.ObjectNode node = mapper.createObjectNode();
+                node.put("allow", true);
+                PolicyDecision decision = PolicyService.parsePolicyResult(node);
+                assertTrue(decision.allowed());
+        }
+
+        @Test
+        void testParsePolicyResult_ObjectAllowFalse_WithReasonAndViolations() {
+                com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+                com.fasterxml.jackson.databind.node.ObjectNode node = mapper.createObjectNode();
+                node.put("allow", false);
+                node.put("reason", "Custom Reason");
+                com.fasterxml.jackson.databind.node.ArrayNode v = node.putArray("violations");
+                v.add("Missing permission");
+
+                PolicyDecision decision = PolicyService.parsePolicyResult(node);
+                assertFalse(decision.allowed());
+                assertEquals("Custom Reason", decision.reason());
+                assertEquals(1, decision.violations().size());
+                assertEquals("Missing permission", decision.firstViolation().get());
+        }
+
+        @Test
+        void testPolicyService_Evaluate_OpaDisabled() {
+                // Mock config where opa.enabled = false
+                space.maatini.sidecar.config.SidecarConfig mockConfig = org.mockito.Mockito
+                                .mock(space.maatini.sidecar.config.SidecarConfig.class);
+                space.maatini.sidecar.config.SidecarConfig.OpaConfig mockOpa = org.mockito.Mockito
+                                .mock(space.maatini.sidecar.config.SidecarConfig.OpaConfig.class);
+                org.mockito.Mockito.when(mockConfig.opa()).thenReturn(mockOpa);
+                org.mockito.Mockito.when(mockOpa.enabled()).thenReturn(false);
+
+                PolicyService svc = new PolicyService();
+                svc.config = mockConfig;
+                PolicyDecision decision = svc.evaluate(AuthContext.anonymous(), "GET", "/", Map.of(), Map.of()).await()
+                                .indefinitely();
+                assertTrue(decision.allowed());
+        }
+
+        @Test
+        void testParsePolicyResult_InvalidFormat() {
+                com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+                com.fasterxml.jackson.databind.JsonNode node = mapper.createArrayNode();
+                PolicyDecision decision = PolicyService.parsePolicyResult(node);
+                assertFalse(decision.allowed());
+                assertEquals("Unexpected OPA response format", decision.reason());
+        }
+
+        @Test
+        void testParsePolicyResult_ObjectMissingAllow() {
+                com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+                com.fasterxml.jackson.databind.JsonNode node = mapper.createObjectNode().put("someOtherField", true);
+                PolicyDecision decision = PolicyService.parsePolicyResult(node);
+                assertFalse(decision.allowed());
+        }
+
+        @Test
+        void testFallbackEvaluateExternal() {
+                PolicyDecision decision = policyService.fallbackEvaluateExternal(
+                                space.maatini.sidecar.model.PolicyInput.from(AuthContext.anonymous(), "GET", "/test",
+                                                Map.of(), Map.of()),
+                                new RuntimeException("Test Exception")).await().indefinitely();
+                assertFalse(decision.allowed());
+                assertTrue(decision.reason().contains("unavailable"));
+        }
 }
