@@ -59,7 +59,7 @@ public class ProxyService {
         WebClientOptions options = new WebClientOptions()
                 .setConnectTimeout(config.proxy().timeout().connect())
                 .setIdleTimeout(30)
-                .setMaxPoolSize(100)
+                .setMaxPoolSize(config.proxy().poolSize())
                 .setKeepAlive(true);
 
         this.webClient = WebClient.create(vertx, options);
@@ -298,17 +298,13 @@ public class ProxyService {
          * Creates an error response.
          */
         public static ProxyResponse error(int statusCode, String message) {
-            String safeJson;
-            try {
-                safeJson = new ObjectMapper().writeValueAsString(java.util.Map.of("error", message));
-            } catch (Exception e) {
-                safeJson = "{\"error\":\"Internal error\"}";
-            }
+            String sanitizedMessage = message != null ? message.replace("\"", "\\\"") : "Internal error";
+            String jsonRaw = "{\"error\":\"" + sanitizedMessage + "\"}";
             return new ProxyResponse(
                     statusCode,
                     message,
                     Map.of("Content-Type", "application/json"),
-                    Buffer.buffer(safeJson));
+                    Buffer.buffer(jsonRaw));
         }
 
         /**

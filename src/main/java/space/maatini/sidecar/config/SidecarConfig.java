@@ -59,6 +59,13 @@ public interface SidecarConfig {
         TimeoutConfig timeout();
 
         /**
+         * Connection pool size for the WebClient.
+         */
+        @WithDefault("100")
+        @WithName("pool-size")
+        int poolSize();
+
+        /**
          * Headers to propagate from incoming request to backend.
          */
         @WithDefault("X-Request-ID,X-Correlation-ID,X-Forwarded-For,X-Forwarded-Proto")

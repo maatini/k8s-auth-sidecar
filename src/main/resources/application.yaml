@@ -133,6 +133,7 @@ sidecar:
     timeout:
       connect: 5000
       read: 30000
+    pool-size: 100
     
     # Headers to propagate to backend
     propagate-headers:

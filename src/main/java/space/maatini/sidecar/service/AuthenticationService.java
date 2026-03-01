@@ -163,7 +163,6 @@ public class AuthenticationService {
     private String extractPreferredUsername(JsonWebToken jwt, boolean isEntraToken) {
         String username = extractClaim(jwt, CLAIM_PREFERRED_USERNAME, String.class);
         if (username == null && isEntraToken) {
-            // Entra ID might use 'upn' (User Principal Name) instead
             username = extractClaim(jwt, CLAIM_UPN, String.class);
         }
         return username;
@@ -281,7 +280,7 @@ public class AuthenticationService {
      */
     private <T> T extractClaim(JsonWebToken jwt, String claimName, Class<T> type) {
         try {
-            return jwt.getClaim(claimName);
+            return (T) jwt.getClaim(claimName);
         } catch (Exception e) {
             LOG.debugf("Failed to extract claim '%s': %s", claimName, e.getMessage());
             return null;
