@@ -73,6 +73,10 @@ quarkus:
         initial-capacity: 500
         maximum-size: 5000
         expire-after-write: 1m
+      "jwt-cache":
+        initial-capacity: 500
+        maximum-size: 10000
+        expire-after-write: 10m
 
   # Health and Metrics
   smallrye-health:

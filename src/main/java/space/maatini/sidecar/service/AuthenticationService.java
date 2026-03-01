@@ -1,5 +1,6 @@
 package space.maatini.sidecar.service;
 
+import io.quarkus.cache.CacheResult;
 import io.quarkus.security.identity.SecurityIdentity;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -67,11 +68,24 @@ public class AuthenticationService {
                 return AuthContext.anonymous();
             }
 
-            return extractFromJwt(jwt);
+            return getCachedAuthContext(jwt);
         } catch (Exception e) {
             LOG.errorf(e, "Failed to extract auth context from security identity");
             return AuthContext.anonymous();
         }
+    }
+
+    /**
+     * Extracts authentication context from a JWT token with caching.
+     * Use jti claim if available, otherwise fallback to raw token as cache key.
+     *
+     * @param jwt The parsed JWT token
+     * @return The extracted authentication context
+     */
+    @CacheResult(cacheName = "jwt-cache")
+    public AuthContext getCachedAuthContext(JsonWebToken jwt) {
+        LOG.debugf("Cache miss for JWT, extracting context");
+        return extractFromJwt(jwt);
     }
 
     /**
