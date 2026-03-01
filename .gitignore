@@ -48,3 +48,4 @@ generated/
 .gradle/
 
 .devbox/
+.agent/skills/.agent
