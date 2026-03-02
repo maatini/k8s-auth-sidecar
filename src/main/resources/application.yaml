@@ -305,9 +305,7 @@ auth:
       requests-per-second: 100
       burst-size: 200
   
-  # Disable fault tolerance globally for Dev-Profile to avoid interference with local debugging
-  smallrye:
-    faulttolerance:
+    fault-tolerance:
       enabled: false
 
 "%test":
@@ -316,17 +314,14 @@ auth:
       level: WARN
     oidc:
       auth-server-url: http://localhost:8180/realms/test
+    fault-tolerance:
+      enabled: false
   sidecar:
     auth:
       enabled: true
     authz:
       enabled: false
     opa:
-      enabled: false
-  
-  # Disable fault tolerance globally for Test-Profile to avoid interference unit tests logic
-  smallrye:
-    faulttolerance:
       enabled: false
 
 "%prod":

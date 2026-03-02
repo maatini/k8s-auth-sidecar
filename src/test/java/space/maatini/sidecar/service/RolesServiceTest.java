@@ -29,9 +29,9 @@ class RolesServiceTest {
         @Override
         public Map<String, String> getConfigOverrides() {
             return Map.of(
-                "sidecar.authz.roles-service.enabled", "true",
-                "quarkus.oidc.tenant-enabled", "true"
-            );
+                    "sidecar.authz.roles-service.enabled", "true",
+                    "quarkus.oidc.tenant-enabled", "true",
+                    "quarkus.fault-tolerance.enabled", "false");
         }
     }
 
@@ -45,20 +45,19 @@ class RolesServiceTest {
     @Test
     void testEnrichWithRoles_Success() {
         AuthContext initialContext = AuthContext.builder()
-            .userId("user123")
-            .roles(Set.of("user")) // Hat schon eine Rolle
-            .build();
+                .userId("user123")
+                .roles(Set.of("user")) // Hat schon eine Rolle
+                .build();
 
         // Mock externen Service Response
         RolesResponse response = new RolesResponse(
-            "user123",
-            Set.of("admin"), // Neue Rolle
-            Set.of("read:all"), // Permission
-            "tenant-1"
-        );
+                "user123",
+                Set.of("admin"), // Neue Rolle
+                Set.of("read:all"), // Permission
+                "tenant-1");
 
         when(rolesServiceClient.getRoles("user123"))
-            .thenReturn(Uni.createFrom().item(response));
+                .thenReturn(Uni.createFrom().item(response));
 
         AuthContext enriched = rolesService.enrichWithRoles(initialContext).await().indefinitely();
 
@@ -73,20 +72,21 @@ class RolesServiceTest {
     @Test
     void testEnrichWithRoles_ServiceFailure() {
         AuthContext initialContext = AuthContext.builder()
-            .userId("user-fail")
-            .roles(Set.of("user"))
-            .build();
+                .userId("user-fail")
+                .roles(Set.of("user"))
+                .build();
 
         // Simuliere Service-Fehler
         when(rolesServiceClient.getRoles("user-fail"))
-            .thenReturn(Uni.createFrom().failure(new RuntimeException("Service down")));
+                .thenReturn(Uni.createFrom().failure(new RuntimeException("Service down")));
 
         AuthContext result = rolesService.enrichWithRoles(initialContext).await().indefinitely();
 
-        // Sollte originalen Context zurückgeben (Fallback)
+        // Sollte originalen Context + Fallback-Rolle zurückgeben
         assertNotNull(result);
-        assertEquals(1, result.roles().size());
+        assertEquals(2, result.roles().size());
         assertTrue(result.roles().contains("user"));
+        assertTrue(result.roles().contains("offline-user"));
     }
 
     @Test
