@@ -359,7 +359,7 @@ Das Projekt nutzt GitHub Actions für Continuous Integration und schnelles Deplo
 
 ### Unit & Integration Tests
 
-Das Projekt verfügt über eine umfassende Test-Suite (**150 Tests**), die alle wesentlichen Aspekte der Anwendung abdeckt:
+Das Projekt verfügt über eine umfassende Test-Suite (**154 Tests**), die alle wesentlichen Aspekte der Anwendung abdeckt:
 
 - **Unit-Tests**: Prüfen einzelne Klassen, rekordinhabende Utility-Methoden (`RequestUtils`, `IssuerUtils`, `PathMatcher`) und Service-Logik (`AuthenticationService`, `WasmPolicyEngine`).
 - **Integrationstests (`@QuarkusTest`)**: Testen das Zusammenspiel der Komponenten, u.a. die JWT-Validierung (OIDC), externe Calls an den Roles Service und die Request-Filter-Pipeline.
@@ -372,9 +372,9 @@ Das Projekt verfügt über eine umfassende Test-Suite (**150 Tests**), die alle 
 > [!NOTE]
 > Die volle Testabdeckung wird nur erreicht, wenn Docker für die Integrationstests (Testcontainers) verfügbar ist.
 
-- **Lines:** ~82.5% 
-- **Instructions:** ~82.8%
-- **Branches:** ~67.7%
+- **Lines:** ~83.4% 
+- **Instructions:** ~82.0%
+- **Branches:** ~67.6%
 
 *Wichtige Kernkomponenten wie der `AuthProxyFilter` (die Haupt-Pipeline) sind mit über 95% Line-Coverage exzellent abgedeckt.*
 
