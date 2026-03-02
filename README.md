@@ -359,7 +359,7 @@ Das Projekt nutzt GitHub Actions für Continuous Integration und schnelles Deplo
 
 ### Unit & Integration Tests
 
-Das Projekt verfügt über eine umfassende Test-Suite (**110 Tests**), die alle wesentlichen Aspekte der Anwendung abdeckt:
+Das Projekt verfügt über eine umfassende Test-Suite (**150 Tests**), die alle wesentlichen Aspekte der Anwendung abdeckt:
 
 - **Unit-Tests**: Prüfen einzelne Klassen, rekordinhabende Utility-Methoden (`RequestUtils`, `IssuerUtils`, `PathMatcher`) und Service-Logik (`AuthenticationService`, `WasmPolicyEngine`).
 - **Integrationstests (`@QuarkusTest`)**: Testen das Zusammenspiel der Komponenten, u.a. die JWT-Validierung (OIDC), externe Calls an den Roles Service und die Request-Filter-Pipeline.
@@ -369,6 +369,9 @@ Das Projekt verfügt über eine umfassende Test-Suite (**110 Tests**), die alle 
 - **Testcontainers**: Werden für komplexe Integrationstests eingesetzt, z.B. um einen echten, externen OPA-Server hochzufahren und anzubinden.
 
 **Aktuelle Testabdeckung (Code Coverage via JaCoCo):**
+> [!NOTE]
+> Die volle Testabdeckung wird nur erreicht, wenn Docker für die Integrationstests (Testcontainers) verfügbar ist.
+
 - **Lines:** ~82.5% 
 - **Instructions:** ~82.8%
 - **Branches:** ~67.7%
