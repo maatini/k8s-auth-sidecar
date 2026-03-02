@@ -21,7 +21,7 @@ RUN --mount=type=cache,target=/root/.m2 mvn dependency:go-offline -B
 COPY src ./src
 
 # HOT-RELOAD FIX – P0.5: Install OPA CLI for down-level copying
-ARG OPA_VERSION=1.13.2
+ARG OPA_VERSION=1.14.0
 ARG TARGETARCH
 RUN microdnf install -y curl tar gzip && microdnf clean all && \
     curl -L -o /usr/local/bin/opa \
