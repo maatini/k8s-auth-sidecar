@@ -223,6 +223,27 @@ Du musst den Sidecar **nicht neu starten**, um OPA-Regeln zu ändern (bei `OPA_M
 
 *Siehe `src/main/resources/application.yaml` für alle Konfigurationsmöglichkeiten inkl. des neuen `%dev` Profils.*
 
+### Resilience / Fault Tolerance für Roles-Service (Edeka-Retail)
+
+Um bei temporären Ausfällen des zentralen Edeka-Roles-Services (z.B. während Datenbank-Migrationen oder Lastspitzen) die Produktionsstabilität zu gewährleisten, wurde eine robuste Fault-Tolerance-Schicht (via SmallRye Fault Tolerance) auf Basis von `@Retry`, `@CircuitBreaker`, `@Timeout` und `@Fallback` integriert.
+
+Diese ist primär für die Anforderungen des Edeka-Retail-Umfelds (z.B. Kassen-Checkouts, Hochverfügbarkeit) optimiert und vollständig konfigurierbar:
+
+| Property | Environment Variable | Default | Erklärung für Retail-Defaults |
+| :--- | :--- | :--- | :--- |
+| `auth.roles-service.fault-tolerance.retry.max-retries` | `ROLES_SERVICE_RETRY_MAX` | `3` | Fängt kurze Netzwerkrüttler sicher ab. |
+| `auth.roles-service.fault-tolerance.retry.delay` | `ROLES_SERVICE_RETRY_DELAY` | `400` (ms) | Gibt dem Backend genug Verschnaufpause zwischen Retries. |
+| `auth.roles-service.fault-tolerance.retry.jitter` | `ROLES_SERVICE_RETRY_JITTER` | `150` (ms) | `150ms` Jitter verhindert das "Thundering Herd"-Problem nach Micro-Ausfällen. |
+| `auth.roles-service.fault-tolerance.timeout` | `ROLES_SERVICE_TIMEOUT` | `1800` (ms) | Bei Hochlast (Weihnachtsgeschäft) ist ein Request nach 1,8s faktisch "tot" -> Fail-Fast! |
+| `auth.roles-service.fault-tolerance.circuit-breaker.request-volume-threshold` | `ROLES_SERVICE_CB_VOLUME` | `8` | Der Circuit Breaker reagiert schnell auf Anomalien. |
+| `auth.roles-service.fault-tolerance.circuit-breaker.failure-ratio` | `ROLES_SERVICE_CB_RATIO` | `0.4` | Bei 40% Fehlerquote auf 8 Aufrufe schützt der Breaker das Backend. |
+| `auth.roles-service.fault-tolerance.circuit-breaker.delay` | `ROLES_SERVICE_CB_DELAY` | `8000` (ms) | 8 Sekunden Pause, bevor wieder getestet wird, ob das Backend "am Leben" ist. |
+
+**Fallback-Strategie:** 
+Schlägt der Service durch Exception, Timeout oder offenen Circuit-Breaker fehl, wird ein Fallback ausgelöst. Dieser gibt einen leeren Status aus bzw. gewährt die Basis-Edeka-Rolle (`offline-user`), sodass essenzielle Basiszugriffe (sofern durch OPA erlaubt) in Kassen-Notfallsituationen aufrechterhalten werden können.
+
+> **Note:** Im `%dev` und `%test` Profil (z.B. bei der Nutzung von `InMemoryRolesService`) ist die Fault Tolerance global deaktiviert (`smallrye.faulttolerance.enabled=false`), um lokale Debugging-Loops nicht zu verfälschen.
+
 ## 📋 Policy-Konfiguration
 
 Policies werden in Rego geschrieben und im `/policies`-Verzeichnis abgelegt.

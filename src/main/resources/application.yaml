@@ -231,6 +231,48 @@ sidecar:
       - X-Api-Key
 
 # ===================
+# Edeka Retail: Fault Tolerance Configuration für RolesService
+# ===================
+auth:
+  roles-service:
+    fault-tolerance:
+      retry:
+        max-retries: ${ROLES_SERVICE_RETRY_MAX:3}
+        delay: ${ROLES_SERVICE_RETRY_DELAY:400}
+        jitter: ${ROLES_SERVICE_RETRY_JITTER:150}
+        max-duration: ${ROLES_SERVICE_RETRY_DURATION:3000}
+      circuit-breaker:
+        request-volume-threshold: ${ROLES_SERVICE_CB_VOLUME:8}
+        failure-ratio: ${ROLES_SERVICE_CB_RATIO:0.4}
+        delay: ${ROLES_SERVICE_CB_DELAY:8000}
+        success-threshold: ${ROLES_SERVICE_CB_SUCCESS:3}
+      timeout: ${ROLES_SERVICE_TIMEOUT:1800}
+
+# ===================
+# MicroProfile Fault Tolerance Mapping
+# ===================
+"space.maatini.sidecar.service.RolesService/fetchRoles/Retry/maxRetries": "${auth.roles-service.fault-tolerance.retry.max-retries}"
+"space.maatini.sidecar.service.RolesService/fetchRoles/Retry/delay": "${auth.roles-service.fault-tolerance.retry.delay}"
+"space.maatini.sidecar.service.RolesService/fetchRoles/Retry/jitter": "${auth.roles-service.fault-tolerance.retry.jitter}"
+"space.maatini.sidecar.service.RolesService/fetchRoles/Retry/maxDuration": "${auth.roles-service.fault-tolerance.retry.max-duration}"
+"space.maatini.sidecar.service.RolesService/fetchRoles/CircuitBreaker/requestVolumeThreshold": "${auth.roles-service.fault-tolerance.circuit-breaker.request-volume-threshold}"
+"space.maatini.sidecar.service.RolesService/fetchRoles/CircuitBreaker/failureRatio": "${auth.roles-service.fault-tolerance.circuit-breaker.failure-ratio}"
+"space.maatini.sidecar.service.RolesService/fetchRoles/CircuitBreaker/delay": "${auth.roles-service.fault-tolerance.circuit-breaker.delay}"
+"space.maatini.sidecar.service.RolesService/fetchRoles/CircuitBreaker/successThreshold": "${auth.roles-service.fault-tolerance.circuit-breaker.success-threshold}"
+"space.maatini.sidecar.service.RolesService/fetchRoles/Timeout/value": "${auth.roles-service.fault-tolerance.timeout}"
+
+"space.maatini.sidecar.service.RolesService/fetchPermissions/Retry/maxRetries": "${auth.roles-service.fault-tolerance.retry.max-retries}"
+"space.maatini.sidecar.service.RolesService/fetchPermissions/Retry/delay": "${auth.roles-service.fault-tolerance.retry.delay}"
+"space.maatini.sidecar.service.RolesService/fetchPermissions/Retry/jitter": "${auth.roles-service.fault-tolerance.retry.jitter}"
+"space.maatini.sidecar.service.RolesService/fetchPermissions/Retry/maxDuration": "${auth.roles-service.fault-tolerance.retry.max-duration}"
+"space.maatini.sidecar.service.RolesService/fetchPermissions/CircuitBreaker/requestVolumeThreshold": "${auth.roles-service.fault-tolerance.circuit-breaker.request-volume-threshold}"
+"space.maatini.sidecar.service.RolesService/fetchPermissions/CircuitBreaker/failureRatio": "${auth.roles-service.fault-tolerance.circuit-breaker.failure-ratio}"
+"space.maatini.sidecar.service.RolesService/fetchPermissions/CircuitBreaker/delay": "${auth.roles-service.fault-tolerance.circuit-breaker.delay}"
+"space.maatini.sidecar.service.RolesService/fetchPermissions/CircuitBreaker/successThreshold": "${auth.roles-service.fault-tolerance.circuit-breaker.success-threshold}"
+"space.maatini.sidecar.service.RolesService/fetchPermissions/Timeout/value": "${auth.roles-service.fault-tolerance.timeout}"
+
+
+# ===================
 # Profile-specific Configuration
 # ===================
 
@@ -262,6 +304,11 @@ sidecar:
       enabled: true
       requests-per-second: 100
       burst-size: 200
+  
+  # Disable fault tolerance globally for Dev-Profile to avoid interference with local debugging
+  smallrye:
+    faulttolerance:
+      enabled: false
 
 "%test":
   quarkus:
@@ -275,6 +322,11 @@ sidecar:
     authz:
       enabled: false
     opa:
+      enabled: false
+  
+  # Disable fault tolerance globally for Test-Profile to avoid interference unit tests logic
+  smallrye:
+    faulttolerance:
       enabled: false
 
 "%prod":

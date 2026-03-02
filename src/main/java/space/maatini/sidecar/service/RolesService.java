@@ -75,9 +75,9 @@ public class RolesService {
      * @return A Uni containing the roles response
      */
     @CacheResult(cacheName = "roles-cache")
-    @Retry(maxRetries = 2, delay = 500)
-    @Timeout(3000)
-    @CircuitBreaker(requestVolumeThreshold = 10, failureRatio = 0.5, delay = 10000)
+    @Retry(maxRetries = 3, delay = 400, jitter = 150, maxDuration = 3000)
+    @Timeout(1800)
+    @CircuitBreaker(requestVolumeThreshold = 8, failureRatio = 0.4, delay = 8000, successThreshold = 3)
     @Fallback(fallbackMethod = "fallbackFetchRoles")
     public Uni<RolesResponse> fetchRoles(String userId, String tenant) {
         LOG.debugf("Fetching roles for user: %s, tenant: %s", userId, tenant);
@@ -97,9 +97,9 @@ public class RolesService {
      * @return A Uni containing the roles response with permissions
      */
     @CacheResult(cacheName = "permissions-cache")
-    @Retry(maxRetries = 2, delay = 500)
-    @Timeout(3000)
-    @CircuitBreaker(requestVolumeThreshold = 10, failureRatio = 0.5, delay = 10000)
+    @Retry(maxRetries = 3, delay = 400, jitter = 150, maxDuration = 3000)
+    @Timeout(1800)
+    @CircuitBreaker(requestVolumeThreshold = 8, failureRatio = 0.4, delay = 8000, successThreshold = 3)
     @Fallback(fallbackMethod = "fallbackFetchPermissions")
     public Uni<RolesResponse> fetchPermissions(String userId) {
         LOG.debugf("Fetching permissions for user: %s", userId);
@@ -132,12 +132,17 @@ public class RolesService {
     // signature
 
     public Uni<RolesResponse> fallbackFetchRoles(String userId, String tenant, Throwable t) {
-        LOG.warnf("Fallback triggered for fetching roles (user: %s): %s", userId, t.getMessage());
-        return Uni.createFrom().item(RolesResponse.empty(userId));
+        LOG.warnf("Fallback triggered for fetching roles (user: %s, tenant: %s) after external service failure: %s",
+                userId, tenant, t.getMessage());
+        // Standard Edeka fallback roles to maintain basic accessibility during outages
+        return Uni.createFrom().item(new RolesResponse(userId, Set.of("offline-user"), Set.of(), tenant));
     }
 
     public Uni<RolesResponse> fallbackFetchPermissions(String userId, Throwable t) {
-        LOG.warnf("Fallback triggered for fetching permissions (user: %s): %s", userId, t.getMessage());
-        return Uni.createFrom().item(RolesResponse.empty(userId));
+        LOG.warnf("Fallback triggered for fetching permissions (user: %s) after external service failure: %s", userId,
+                t.getMessage());
+        // Standard Edeka fallback permissions to maintain basic accessibility during
+        // outages
+        return Uni.createFrom().item(new RolesResponse(userId, Set.of(), Set.of("offline-read"), null));
     }
 }
