@@ -1,7 +1,7 @@
 {
     "request": {
-        "method": "GET",
-        "url": "/realms/master/.well-known/openid-configuration"
+        "method": "ANY",
+        "urlPath": "/realms/master/.well-known/openid-configuration"
     },
     "response": {
         "status": 200,

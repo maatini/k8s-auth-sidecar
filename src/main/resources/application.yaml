@@ -281,32 +281,41 @@ auth:
     http:
       port: 8080
     log:
+      level: INFO
       console:
         json: false
-      level: DEBUG
+      category:
+        "io.quarkus.oidc":
+          level: WARN
+        "io.quarkus.config":
+          level: WARN
+        "io.micrometer":
+          level: WARN
     oidc:
       auth-server-url: http://localhost:8090/realms/master
-
+      token:
+        issuer: any
+        verification:
+          enabled: false     # ← WICHTIG für WireMock-Token (bypasst Signatur-Prüfung)
+      jwks:
+        resolve-early: false
     rest-client:
       "space.maatini.sidecar.client.RolesServiceClient":
         url: http://localhost:8089
     cache:
       enabled: false
+
   sidecar:
     auth:
-      enabled: true
+      enabled: true          # Auth wieder aktiv
+    rate-limit:
+      enabled: false
     authz:
       enabled: true
     opa:
       enabled: true
       mode: embedded
-    rate-limit:
-      enabled: true
-      requests-per-second: 100
-      burst-size: 200
-  
-    fault-tolerance:
-      enabled: false
+                  
 
 "%test":
   quarkus:
@@ -314,8 +323,6 @@ auth:
       level: WARN
     oidc:
       auth-server-url: http://localhost:8180/realms/test
-    fault-tolerance:
-      enabled: false
   sidecar:
     auth:
       enabled: true

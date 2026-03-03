@@ -1,7 +1,7 @@
 {
   "request": {
-    "method": "GET",
-    "url": "/realms/master/protocol/openid-connect/certs"
+    "method": "ANY",
+    "urlPath": "/realms/master/protocol/openid-connect/certs"
   },
   "response": {
     "status": 200,
