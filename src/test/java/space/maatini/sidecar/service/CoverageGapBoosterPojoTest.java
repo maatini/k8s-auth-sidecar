@@ -20,7 +20,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-class CoverageGapBoosterTest {
+class CoverageGapBoosterPojoTest {
 
     PolicyService policyService;
     SidecarConfig config;

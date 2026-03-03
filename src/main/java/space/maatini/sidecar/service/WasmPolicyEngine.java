@@ -111,16 +111,9 @@ public class WasmPolicyEngine {
     /**
      * Starts a WatchService to monitor policy directories for changes.
      */
-    private void startHotReloadWatcher() {
-        Path devPolicies = Paths.get("src/main/resources/policies");
-        Path prodPolicies = Paths.get("/policies");
-
-        final Path watchDir;
-        if (Files.exists(devPolicies)) {
-            watchDir = devPolicies;
-        } else if (Files.exists(prodPolicies)) {
-            watchDir = prodPolicies;
-        } else {
+    protected void startHotReloadWatcher() {
+        final Path watchDir = resolveWatchDir();
+        if (watchDir == null) {
             LOG.info("No policy directory found to watch for hot-reloading.");
             return;
         }
@@ -136,8 +129,6 @@ public class WasmPolicyEngine {
                     boolean changed = false;
                     for (WatchEvent<?> event : key.pollEvents()) {
                         String file = event.context().toString();
-                        // HOT-RELOAD FIX - Gemini 3 Flash P0.4: Catch Kubernetes ConfigMap updates
-                        // (..data symlink change)
                         if (file.endsWith(".rego") || file.endsWith(".wasm") || file.contains("..data")) {
                             changed = true;
                             break;
@@ -162,7 +153,19 @@ public class WasmPolicyEngine {
         watcherThread.start();
     }
 
-    private void recompileWasm(Path policyDir) {
+    protected Path resolveWatchDir() {
+        Path devPolicies = Paths.get("src/main/resources/policies");
+        Path prodPolicies = Paths.get("/policies");
+
+        if (Files.exists(devPolicies)) {
+            return devPolicies;
+        } else if (Files.exists(prodPolicies)) {
+            return prodPolicies;
+        }
+        return null;
+    }
+
+    protected void recompileWasm(Path policyDir) {
         try {
             ProcessBuilder checkPb = new ProcessBuilder("opa", "version");
             if (checkPb.start().waitFor() != 0) {

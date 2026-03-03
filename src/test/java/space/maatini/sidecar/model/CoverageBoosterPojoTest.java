@@ -6,8 +6,7 @@ import java.util.List;
 import java.util.Map;
 import static org.junit.jupiter.api.Assertions.*;
 
-@io.quarkus.test.junit.QuarkusTest
-public class CoverageBoosterTest {
+public class CoverageBoosterPojoTest {
 
     @Test
     void testAuthContextBuilder() {

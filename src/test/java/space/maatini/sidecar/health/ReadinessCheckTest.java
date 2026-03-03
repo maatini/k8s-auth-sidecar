@@ -14,7 +14,6 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-@io.quarkus.test.junit.QuarkusTest
 class ReadinessCheckTest {
 
     ReadinessCheck readinessCheck;

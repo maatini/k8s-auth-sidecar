@@ -193,19 +193,23 @@ public class AuthenticationService {
      * Extracts Keycloak realm roles from the 'realm_access' claim.
      */
     private Set<String> extractKeycloakRealmRoles(JsonWebToken jwt) {
+        Object rolesObj;
         try {
             Map<String, Object> realmAccess = jwt.getClaim(CLAIM_REALM_ACCESS);
-            if (realmAccess != null && realmAccess.containsKey("roles")) {
-                Object rolesObj = realmAccess.get("roles");
-                if (rolesObj instanceof Collection) {
-                    return ((Collection<?>) rolesObj).stream()
-                            .filter(String.class::isInstance)
-                            .map(String.class::cast)
-                            .collect(Collectors.toSet());
-                }
+            if (realmAccess == null || !realmAccess.containsKey("roles")) {
+                return Collections.emptySet();
             }
+            rolesObj = realmAccess.get("roles");
         } catch (Exception e) {
             LOG.debugf("Failed to extract Keycloak realm roles: %s", e.getMessage());
+            return Collections.emptySet();
+        }
+
+        if (rolesObj instanceof Collection) {
+            return ((Collection<?>) rolesObj).stream()
+                    .filter(String.class::isInstance)
+                    .map(String.class::cast)
+                    .collect(Collectors.toSet());
         }
         return Collections.emptySet();
     }
@@ -216,28 +220,31 @@ public class AuthenticationService {
     @SuppressWarnings("unchecked")
     private Set<String> extractKeycloakResourceRoles(JsonWebToken jwt) {
         Set<String> roles = new HashSet<>();
+        Map<String, Object> resourceAccess;
         try {
-            Map<String, Object> resourceAccess = jwt.getClaim(CLAIM_RESOURCE_ACCESS);
-            if (resourceAccess != null) {
-                for (Map.Entry<String, Object> entry : resourceAccess.entrySet()) {
-                    String clientId = entry.getKey();
-                    if (entry.getValue() instanceof Map) {
-                        Map<String, Object> clientAccess = (Map<String, Object>) entry.getValue();
-                        if (clientAccess.containsKey("roles")) {
-                            Object rolesObj = clientAccess.get("roles");
-                            if (rolesObj instanceof Collection) {
-                                ((Collection<?>) rolesObj).stream()
-                                        .filter(String.class::isInstance)
-                                        .map(String.class::cast)
-                                        .map(role -> clientId + ":" + role)
-                                        .forEach(roles::add);
-                            }
+            resourceAccess = jwt.getClaim(CLAIM_RESOURCE_ACCESS);
+        } catch (Exception e) {
+            LOG.debugf("Failed to extract Keycloak resource roles: %s", e.getMessage());
+            return roles;
+        }
+
+        if (resourceAccess != null) {
+            for (Map.Entry<String, Object> entry : resourceAccess.entrySet()) {
+                String clientId = entry.getKey();
+                if (entry.getValue() instanceof Map) {
+                    Map<String, Object> clientAccess = (Map<String, Object>) entry.getValue();
+                    if (clientAccess.containsKey("roles")) {
+                        Object rolesObj = clientAccess.get("roles");
+                        if (rolesObj instanceof Collection) {
+                            ((Collection<?>) rolesObj).stream()
+                                    .filter(String.class::isInstance)
+                                    .map(String.class::cast)
+                                    .map(role -> clientId + ":" + role)
+                                    .forEach(roles::add);
                         }
                     }
                 }
             }
-        } catch (Exception e) {
-            LOG.debugf("Failed to extract Keycloak resource roles: %s", e.getMessage());
         }
         return roles;
     }
@@ -246,13 +253,16 @@ public class AuthenticationService {
      * Extracts the audience from the token.
      */
     private List<String> extractAudience(JsonWebToken jwt) {
+        Set<String> audience;
         try {
-            Set<String> audience = jwt.getAudience();
-            if (audience != null) {
-                return new ArrayList<>(audience);
-            }
+            audience = jwt.getAudience();
         } catch (Exception e) {
             LOG.debugf("Failed to extract audience: %s", e.getMessage());
+            return Collections.emptyList();
+        }
+
+        if (audience != null) {
+            return new ArrayList<>(audience);
         }
         return Collections.emptyList();
     }
@@ -291,13 +301,16 @@ public class AuthenticationService {
      * Extracts a long claim from the token.
      */
     private long extractLongClaim(JsonWebToken jwt, String claimName) {
+        Object value;
         try {
-            Object value = jwt.getClaim(claimName);
-            if (value instanceof Number) {
-                return ((Number) value).longValue();
-            }
+            value = jwt.getClaim(claimName);
         } catch (Exception e) {
             LOG.debugf("Failed to extract long claim '%s': %s", claimName, e.getMessage());
+            return 0;
+        }
+
+        if (value instanceof Number) {
+            return ((Number) value).longValue();
         }
         return 0;
     }
@@ -306,18 +319,21 @@ public class AuthenticationService {
      * Extracts a claim as a set of strings.
      */
     private Set<String> extractClaimAsStringSet(JsonWebToken jwt, String claimName) {
+        Object value;
         try {
-            Object value = jwt.getClaim(claimName);
-            if (value instanceof Collection) {
-                return ((Collection<?>) value).stream()
-                        .filter(String.class::isInstance)
-                        .map(String.class::cast)
-                        .collect(Collectors.toSet());
-            } else if (value instanceof String) {
-                return Set.of((String) value);
-            }
+            value = jwt.getClaim(claimName);
         } catch (Exception e) {
             LOG.debugf("Failed to extract string set claim '%s': %s", claimName, e.getMessage());
+            return Collections.emptySet();
+        }
+
+        if (value instanceof Collection) {
+            return ((Collection<?>) value).stream()
+                    .filter(String.class::isInstance)
+                    .map(String.class::cast)
+                    .collect(Collectors.toSet());
+        } else if (value instanceof String) {
+            return Set.of((String) value);
         }
         return Collections.emptySet();
     }

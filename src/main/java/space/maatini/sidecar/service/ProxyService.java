@@ -174,7 +174,7 @@ public class ProxyService {
     /**
      * Propagates configured headers from the original request.
      */
-    private void propagateHeaders(HttpRequest<Buffer> request, Map<String, String> headers) {
+    void propagateHeaders(HttpRequest<Buffer> request, Map<String, String> headers) {
         if (headers == null) {
             return;
         }
@@ -185,7 +185,7 @@ public class ProxyService {
             if (value == null) {
                 // Try case-insensitive lookup
                 value = headers.entrySet().stream()
-                        .filter(e -> e.getKey().equalsIgnoreCase(headerName))
+                        .filter(e -> e.getKey().equalsIgnoreCase(headerName) && e.getValue() != null)
                         .map(Map.Entry::getValue)
                         .findFirst()
                         .orElse(null);
@@ -217,7 +217,7 @@ public class ProxyService {
     /**
      * Adds authentication context information as headers.
      */
-    private void addAuthContextHeaders(HttpRequest<Buffer> request, AuthContext authContext) {
+    void addAuthContextHeaders(HttpRequest<Buffer> request, AuthContext authContext) {
         if (authContext == null || !authContext.isAuthenticated()) {
             return;
         }
@@ -252,7 +252,7 @@ public class ProxyService {
      * Resolves placeholders in header values.
      * Supports: ${user.id}, ${user.email}, ${user.roles}, ${user.tenant}
      */
-    private String resolvePlaceholders(String template, AuthContext authContext) {
+    String resolvePlaceholders(String template, AuthContext authContext) {
         if (template == null) {
             return null;
         }

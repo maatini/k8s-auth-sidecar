@@ -4,11 +4,12 @@ import org.junit.jupiter.api.Test;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-class ModelTest {
+class ModelPojoTest {
 
     @Test
     void testAuthContextBuilderAndMethods() {
@@ -19,12 +20,51 @@ class ModelTest {
 
         assertTrue(context.hasRole("admin"));
         assertTrue(context.hasAnyRole("guest", "user"));
+        assertFalse(context.hasAnyRole("unknown"));
         assertTrue(context.hasAllRoles("admin"));
+        assertFalse(context.hasAllRoles("admin", "unknown"));
         assertFalse(context.hasRole("superadmin"));
+
+        AuthContext emptyContext = AuthContext.builder().build();
+        assertFalse(emptyContext.hasRole("admin"));
+        assertFalse(emptyContext.hasAnyRole("admin"));
+        assertFalse(emptyContext.hasAllRoles("admin"));
 
         AuthContext anon = AuthContext.anonymous();
         assertFalse(anon.isAuthenticated());
         assertEquals("anonymous", anon.userId());
+        assertFalse(anon.getClaim("test").isPresent());
+
+        AuthContext withClaims = AuthContext.builder()
+                .userId("u2")
+                .claims(Map.of("key", "value", "list", List.of(1)))
+                .audience(List.of("aud1"))
+                .name("tester")
+                .preferredUsername("test")
+                .issuer("iss")
+                .issuedAt(100L)
+                .tokenId("tid")
+                .tenant("tenantXYZ")
+                .build();
+
+        assertTrue(withClaims.getClaim("key").isPresent());
+        assertEquals("value", withClaims.getClaim("key").get());
+        assertTrue(withClaims.getClaim("unknown").isEmpty());
+
+        AuthContext modified = withClaims.withRolesAndPermissions(Set.of("new_role"), Set.of("new_perm"));
+        assertTrue(modified.hasRole("new_role"));
+        assertTrue(modified.hasPermission("new_perm"));
+
+        AuthContext newTenant = withClaims.withTenant("new_tenant");
+        assertEquals("new_tenant", newTenant.tenant());
+
+        AuthContext nullCases = AuthContext.builder()
+                .roles(null)
+                .permissions(null)
+                .audience(null)
+                .claims(null)
+                .build();
+        assertTrue(nullCases.roles().isEmpty());
     }
 
     @Test

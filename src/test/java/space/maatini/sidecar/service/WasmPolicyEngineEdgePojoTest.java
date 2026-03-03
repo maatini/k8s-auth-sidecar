@@ -10,8 +10,7 @@ import java.nio.file.Path;
 
 import static org.mockito.Mockito.when;
 
-@io.quarkus.test.junit.QuarkusTest
-public class WasmPolicyEngineEdgeTest {
+public class WasmPolicyEngineEdgePojoTest {
 
     @Test
     void testEdgeCases() throws Exception {
