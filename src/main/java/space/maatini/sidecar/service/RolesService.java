@@ -74,7 +74,7 @@ public class RolesService {
      * @param tenant The tenant context
      * @return A Uni containing the roles response
      */
-    @CacheResult(cacheName = "roles-cache")
+//    @CacheResult(cacheName = "roles-cache")
     @Retry(maxRetries = 3, delay = 400, jitter = 150, maxDuration = 3000)
     @Timeout(1800)
     @CircuitBreaker(requestVolumeThreshold = 8, failureRatio = 0.4, delay = 8000, successThreshold = 3)
@@ -96,7 +96,7 @@ public class RolesService {
      * @param userId The user ID
      * @return A Uni containing the roles response with permissions
      */
-    @CacheResult(cacheName = "permissions-cache")
+//    @CacheResult(cacheName = "permissions-cache")
     @Retry(maxRetries = 3, delay = 400, jitter = 150, maxDuration = 3000)
     @Timeout(1800)
     @CircuitBreaker(requestVolumeThreshold = 8, failureRatio = 0.4, delay = 8000, successThreshold = 3)

@@ -82,7 +82,7 @@ public class AuthenticationService {
      * @param jwt The parsed JWT token
      * @return The extracted authentication context
      */
-    @CacheResult(cacheName = "jwt-cache")
+//    @CacheResult(cacheName = "jwt-cache")
     public AuthContext getCachedAuthContext(JsonWebToken jwt) {
         LOG.debugf("Cache miss for JWT, extracting context");
         return extractFromJwt(jwt);

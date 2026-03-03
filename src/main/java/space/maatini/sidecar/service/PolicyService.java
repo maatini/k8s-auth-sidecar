@@ -87,7 +87,7 @@ public class PolicyService {
      * Evaluates a policy using the OPA HTTP API (either external or locally
      * embedded server).
      */
-    @CacheResult(cacheName = "policy-decision-cache")
+//    @CacheResult(cacheName = "policy-decision-cache")
     @Retry(maxRetries = 2, delay = 200, retryOn = Exception.class)
     @Timeout(3000)
     @CircuitBreaker(requestVolumeThreshold = 10, failureRatio = 0.5, delay = 5000)

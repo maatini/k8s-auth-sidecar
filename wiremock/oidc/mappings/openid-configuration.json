@@ -9,10 +9,10 @@
             "Content-Type": "application/json"
         },
         "jsonBody": {
-            "issuer": "http://wiremock-oidc:8080/realms/master",
-            "authorization_endpoint": "http://wiremock-oidc:8080/realms/master/protocol/openid-connect/auth",
-            "token_endpoint": "http://wiremock-oidc:8080/realms/master/protocol/openid-connect/token",
-            "jwks_uri": "http://wiremock-oidc:8080/realms/master/protocol/openid-connect/certs",
+            "issuer": "http://localhost:8090/realms/master",
+            "authorization_endpoint": "http://localhost:8090/realms/master/protocol/openid-connect/auth",
+            "token_endpoint": "http://localhost:8090/realms/master/protocol/openid-connect/token",
+            "jwks_uri": "http://localhost:8090/realms/master/protocol/openid-connect/certs",
             "subject_types_supported": [
                 "public",
                 "pairwise"
