@@ -41,14 +41,7 @@ quarkus:
     
     # Multi-tenancy configuration
     tenant-enabled: ${OIDC_TENANT_ENABLED:false}
-    
-    # Microsoft Entra ID Tenant
-    entra:
-      auth-server-url: ${ENTRA_AUTH_SERVER_URL:https://login.microsoftonline.com/common/v2.0}
-      client-id: ${ENTRA_CLIENT_ID:}
-      token:
-        issuer: ${ENTRA_TOKEN_ISSUER:}
-        audience: ${ENTRA_TOKEN_AUDIENCE:}
+
 
   # REST Client Configuration
   rest-client:
@@ -282,22 +275,28 @@ auth:
       port: 8080
     log:
       level: INFO
-      console:
-        json: false
       category:
         "io.quarkus.oidc":
-          level: WARN
+          level: DEBUG
         "io.quarkus.config":
           level: WARN
         "io.micrometer":
           level: WARN
+      console:
+        json:
+          enabled: ${QUARKUS_LOG_JSON:false}
+        format: "%d{yyyy-MM-dd HH:mm:ss,SSS} %-5p [%c{3.}] (%t) %s%e%n"
     oidc:
       auth-server-url: http://localhost:8090/realms/master
+      client-id: k8s-auth-sidecar
       token:
         issuer: any
         verification:
       jwks:
         resolve-early: false
+#      credentials:
+#        secret: dIsj79u0eW61FHWi3IxtnJPLl5jIJHbi
+      tenant-enabled: true
     rest-client:
       "space.maatini.sidecar.client.RolesServiceClient":
         url: http://localhost:8089
@@ -306,7 +305,7 @@ auth:
 
   sidecar:
     auth:
-      enabled: false          # Auth wieder aktiv
+      enabled: true          # Auth wieder aktiv
     rate-limit:
       enabled: false
     authz:
@@ -324,11 +323,11 @@ auth:
       auth-server-url: http://localhost:8180/realms/test
   sidecar:
     auth:
-      enabled: true
+      enabled: false
     authz:
-      enabled: false
+      enabled: true
     opa:
-      enabled: false
+      enabled: true
 
 "%prod":
   quarkus:
