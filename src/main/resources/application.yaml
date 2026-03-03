@@ -296,7 +296,6 @@ auth:
       token:
         issuer: any
         verification:
-          enabled: false     # ← WICHTIG für WireMock-Token (bypasst Signatur-Prüfung)
       jwks:
         resolve-early: false
     rest-client:
@@ -307,7 +306,7 @@ auth:
 
   sidecar:
     auth:
-      enabled: true          # Auth wieder aktiv
+      enabled: false          # Auth wieder aktiv
     rate-limit:
       enabled: false
     authz:
@@ -315,7 +314,7 @@ auth:
     opa:
       enabled: true
       mode: embedded
-                  
+
 
 "%test":
   quarkus:
