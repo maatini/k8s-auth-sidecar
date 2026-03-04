@@ -69,11 +69,13 @@ Der Sidecar fungiert als intelligenter Reverse-Proxy vor deinem Anwendungs-Conta
 ```mermaid
 graph TD
     Client((Client)) -->|Request + JWT| Sidecar[K8s-Auth-Sidecar]
-    Sidecar -->|1. Validierung| OIDC[(OIDC Provider<br/>z.B. Keycloak)]
+    Sidecar -->|1. Validierung & Cache| OIDC[(OIDC Provider<br/>z.B. Keycloak/Entra ID)]
     OIDC -.->|JWKS / User Info| Sidecar
-    Sidecar -->|2. Evaluierung| OPA{In-Memory<br/>OPA-WASM}
+    Sidecar -->|2. Rollen-Enrichment| RS[(Roles Service)]
+    RS -.->|User Roles| Sidecar
+    Sidecar -->|3. Evaluierung| OPA{In-Memory<br/>OPA-WASM}
     OPA -.->|Allow / Deny| Sidecar
-    Sidecar -->|3. Proxy| Backend[App Container]
+    Sidecar -->|4. Proxy (Streaming)| Backend[App Container]
     
     style Sidecar fill:#1792E5,stroke:#fff,stroke-width:2px,color:#fff
     style Backend fill:#1E2B3C,stroke:#000,stroke-width:2px,color:#fff
@@ -95,18 +97,21 @@ sequenceDiagram
     actor C as Client
     participant S as Sidecar<br/>(AuthProxyFilter)
     participant A as AuthService
+    participant R as RolesService
     participant P as PolicyEngine
     participant X as ProxyService
     participant B as Backend Container
 
     C->>S: HTTP Request (inkl. JWT)
-    S->>A: Token validieren & Kontext extrahieren
+    S->>A: Token validieren (inkl. Caching)
     
     alt Token ungültig
         A-->>S: AuthContext (isAuth = false)
         S-->>C: 401 Unauthorized
     else Token gültig
-        A-->>S: AuthContext (userId, email, roles)
+        A-->>S: AuthContext (userId, email)
+        S->>R: Rollen abrufen & anreichern
+        R-->>S: AuthContext (+ roles)
         S->>P: Evaluiere Policy (Input: Request + User)
         P-->>S: PolicyDecision (allow/deny)
         
