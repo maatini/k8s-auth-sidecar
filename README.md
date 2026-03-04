@@ -66,6 +66,19 @@ Beschleunige deine lokale Entwicklung mit unserer vorkonfigurierten Dev-Umgebung
 
 Der Sidecar fungiert als intelligenter Reverse-Proxy vor deinem Anwendungs-Container. Er fängt alle eingehenden Anfragen ab, validiert die Identität des Aufrufers gegen einen OIDC-Provider und prüft die Berechtigungen gegen lokal geladene OPA-WASM-Policies.
 
+```mermaid
+graph TD
+    Client((Client)) -->|Request + JWT| Sidecar[K8s-Auth-Sidecar]
+    Sidecar -->|1. Validierung| OIDC[(OIDC Provider<br/>z.B. Keycloak)]
+    OIDC -.->|JWKS / User Info| Sidecar
+    Sidecar -->|2. Evaluierung| OPA{In-Memory<br/>OPA-WASM}
+    OPA -.->|Allow / Deny| Sidecar
+    Sidecar -->|3. Proxy| Backend[App Container]
+    
+    style Sidecar fill:#1792E5,stroke:#fff,stroke-width:2px,color:#fff
+    style Backend fill:#1E2B3C,stroke:#000,stroke-width:2px,color:#fff
+```
+
 ## 🧠 Funktionsweise im Detail
 
 Jeder Request durchläuft diese Pipeline:
@@ -75,6 +88,39 @@ Jeder Request durchläuft diese Pipeline:
 3. **🚀 Proxy**:
    - **Erlaubt:** Request wird an das Backend (Port 8081) weitergeleitet.
    - **Verboten:** User erhält `403 Forbidden`.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor C as Client
+    participant S as Sidecar<br/>(AuthProxyFilter)
+    participant A as AuthService
+    participant P as PolicyEngine
+    participant X as ProxyService
+    participant B as Backend Container
+
+    C->>S: HTTP Request (inkl. JWT)
+    S->>A: Token validieren & Kontext extrahieren
+    
+    alt Token ungültig
+        A-->>S: AuthContext (isAuth = false)
+        S-->>C: 401 Unauthorized
+    else Token gültig
+        A-->>S: AuthContext (userId, email, roles)
+        S->>P: Evaluiere Policy (Input: Request + User)
+        P-->>S: PolicyDecision (allow/deny)
+        
+        alt Zugriff verweigert
+            S-->>C: 403 Forbidden
+        else Zugriff erlaubt
+            S->>X: Proxy Request einleiten
+            X->>B: HTTP Request (+ X-Auth-* Headers)
+            B-->>X: HTTP Response (Stream)
+            X-->>S: HTTP Response (gespiegelt)
+            S-->>C: HTTP Response
+        end
+    end
+```
 
 ### Hot Reload
 OPA-Regeln (`.rego` Dateien) im `/policies`-Verzeichnis werden automatisch überwacht. Bei Änderungen wird das WASM-Modul im Hintergrund rekompiliert und neu geladen, ohne den Sidecar neu zu starten.
