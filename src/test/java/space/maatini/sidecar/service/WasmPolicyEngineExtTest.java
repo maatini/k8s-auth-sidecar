@@ -12,11 +12,13 @@ import space.maatini.sidecar.model.PolicyInput;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.concurrent.atomic.AtomicReference;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.Files;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
-@io.quarkus.test.junit.QuarkusTest
 class WasmPolicyEngineExtTest {
 
     private WasmPolicyEngine engine;
@@ -130,11 +132,10 @@ class WasmPolicyEngineExtTest {
     }
 
     @Test
-    void testResolveWatchDir() throws Exception {
-        Method m = WasmPolicyEngine.class.getDeclaredMethod("resolveWatchDir");
-        m.setAccessible(true);
-        java.nio.file.Path p = (java.nio.file.Path) m.invoke(engine);
-        // Will return null or the legit path, just covering the branch
+    void testResolveWatchDir_Default() {
+        Path p = engine.resolveWatchDir();
+        assertNotNull(p);
+        assertTrue(Files.isDirectory(p));
     }
 
     @Test
@@ -154,5 +155,165 @@ class WasmPolicyEngineExtTest {
         refField.setAccessible(true);
         AtomicReference<OpaPolicy> ref = (AtomicReference<OpaPolicy>) refField.get(engine);
         // Should catch the IO exception, log it, and leave ref as null originally
+    }
+
+    @Test
+    void testEvaluateEmbeddedWasm_NullResult() throws Exception {
+        Field refField = WasmPolicyEngine.class.getDeclaredField("wasmPolicyRef");
+        refField.setAccessible(true);
+        @SuppressWarnings("unchecked")
+        AtomicReference<OpaPolicy> ref = (AtomicReference<OpaPolicy>) refField.get(engine);
+        ref.set(mockPolicy);
+
+        when(mockPolicy.evaluate(anyString())).thenReturn(null);
+
+        PolicyInput input = new PolicyInput(
+                new PolicyInput.RequestInfo("GET", "/api", java.util.Map.of(), java.util.Map.of()),
+                new PolicyInput.UserInfo("u1", "e1", java.util.Set.of(), java.util.Set.of()),
+                new PolicyInput.ResourceInfo("api", null, null),
+                java.util.Map.of());
+
+        PolicyDecision decision = engine.evaluateEmbeddedWasm(input).await().indefinitely();
+        assertFalse(decision.allowed());
+        assertTrue(decision.reason().contains("null result"));
+    }
+
+    @Test
+    void testEvaluateEmbeddedWasm_MalformedJson() throws Exception {
+        Field refField = WasmPolicyEngine.class.getDeclaredField("wasmPolicyRef");
+        refField.setAccessible(true);
+        AtomicReference<OpaPolicy> ref = (AtomicReference<OpaPolicy>) refField.get(engine);
+        ref.set(mockPolicy);
+
+        when(mockPolicy.evaluate(anyString())).thenReturn("not-json");
+
+        PolicyInput input = new PolicyInput(
+                new PolicyInput.RequestInfo("GET", "/api", java.util.Map.of(), java.util.Map.of()),
+                new PolicyInput.UserInfo("u1", "e1", java.util.Set.of(), java.util.Set.of()),
+                new PolicyInput.ResourceInfo("api", null, null),
+                java.util.Map.of());
+
+        PolicyDecision decision = engine.evaluateEmbeddedWasm(input).await().indefinitely();
+        assertFalse(decision.allowed());
+    }
+
+    @Test
+    void testInit_OpaDisabled() throws Exception {
+        SidecarConfig.OpaConfig opa = mock(SidecarConfig.OpaConfig.class);
+        when(config.opa()).thenReturn(opa);
+        when(opa.enabled()).thenReturn(false);
+
+        // Should not call loadWasmModule
+        engine.init();
+        assertFalse(engine.isModuleLoaded());
+    }
+
+    @Test
+    void testLoadWasmModule_InvalidClasspath() {
+        SidecarConfig.OpaConfig opa = mock(SidecarConfig.OpaConfig.class);
+        SidecarConfig.OpaConfig.EmbeddedOpaConfig embedded = mock(SidecarConfig.OpaConfig.EmbeddedOpaConfig.class);
+        when(config.opa()).thenReturn(opa);
+        when(opa.embedded()).thenReturn(embedded);
+        when(embedded.wasmPath()).thenReturn("classpath:non-existent.wasm");
+
+        // Should handle failure gracefully (not load module)
+        engine.loadWasmModule();
+        assertFalse(engine.isModuleLoaded());
+    }
+
+    @Test
+    void testEvaluateEmbeddedWasm_EmptyArray() throws Exception {
+        Field refField = WasmPolicyEngine.class.getDeclaredField("wasmPolicyRef");
+        refField.setAccessible(true);
+        @SuppressWarnings("unchecked")
+        AtomicReference<OpaPolicy> ref = (AtomicReference<OpaPolicy>) refField.get(engine);
+        ref.set(mockPolicy);
+
+        when(mockPolicy.evaluate(anyString())).thenReturn("[]");
+
+        PolicyInput input = new PolicyInput(
+                new PolicyInput.RequestInfo("GET", "/api", java.util.Map.of(), java.util.Map.of()),
+                new PolicyInput.UserInfo("u1", "e1", java.util.Set.of(), java.util.Set.of()),
+                new PolicyInput.ResourceInfo("api", null, null),
+                java.util.Map.of());
+
+        PolicyDecision decision = engine.evaluateEmbeddedWasm(input).await().indefinitely();
+        assertFalse(decision.allowed());
+    }
+
+    @Test
+    void testResolvePath_Local() {
+        Path p = engine.resolvePath("src/main/resources/policies/authz.wasm");
+        assertNotNull(p);
+        assertTrue(Files.exists(p));
+    }
+
+    @Test
+    void testShutdown() throws Exception {
+        // Mock a thread to ensure it's interrupted
+        Thread mockThread = mock(Thread.class);
+        Field watcherField = WasmPolicyEngine.class.getDeclaredField("watcherThread");
+        watcherField.setAccessible(true);
+        watcherField.set(engine, mockThread);
+
+        engine.shutdown();
+        verify(mockThread).interrupt();
+
+        Field watchingField = WasmPolicyEngine.class.getDeclaredField("watching");
+        watchingField.setAccessible(true);
+        assertFalse((Boolean) watchingField.get(engine));
+    }
+
+    @Test
+    void testRecompileWasm_OpaMissing() {
+        engine.recompileWasm(Paths.get("src/main/resources/policies"));
+    }
+
+    @Test
+    void testIsModuleLoaded() {
+        assertFalse(engine.isModuleLoaded());
+    }
+
+    @Test
+    void testStartHotReloadWatcher_NoDir() {
+        engine.startHotReloadWatcher();
+    }
+
+    @Test
+    void testResolveWatchDir_Invalid() throws Exception {
+        Method m = WasmPolicyEngine.class.getDeclaredMethod("resolveWatchDir");
+        m.setAccessible(true);
+        // This method checks hardcoded paths "src/main/resources/policies" and
+        // "/policies"
+        // Correctly invoking the zero-argument method.
+        Object result = m.invoke(engine);
+        // result might be null or Path depending on environment, but we ensure no
+        // crash.
+    }
+
+    @Test
+    void testResolvePath_Classpath_Survivor() throws Exception {
+        Method m = WasmPolicyEngine.class.getDeclaredMethod("resolvePath", String.class);
+        m.setAccessible(true);
+        Path p = (Path) m.invoke(engine, "classpath:policies/authz.wasm");
+        assertNotNull(p);
+        assertTrue(p.toString().endsWith("authz.wasm"));
+    }
+
+    @Test
+    void testResolvePath_File_Survivor() throws Exception {
+        Method m = WasmPolicyEngine.class.getDeclaredMethod("resolvePath", String.class);
+        m.setAccessible(true);
+        Files.createDirectories(Paths.get("target/test-ops"));
+        Path tempFile = Paths.get("target/test-ops/dummy.wasm");
+        Files.writeString(tempFile, "dummy");
+        Path p = (Path) m.invoke(engine, tempFile.toAbsolutePath().toString());
+        assertNotNull(p);
+        assertEquals(tempFile.toAbsolutePath(), p.toAbsolutePath());
+    }
+
+    @Test
+    void testRecompileWasm_Direct() {
+        engine.recompileWasm(Paths.get("src/main/resources/policies"));
     }
 }

@@ -14,7 +14,6 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
-@io.quarkus.test.junit.QuarkusTest
 class ProxyServiceExtTest {
 
         @Test
@@ -76,22 +75,58 @@ class ProxyServiceExtTest {
         }
 
         @Test
-        void testResolvePropagatedHeaders_MatchesCaseInsensitive() {
+        void testResolvePropagatedHeaders_Full() {
                 ProxyService service = new ProxyService();
                 service.config = mock(SidecarConfig.class);
                 SidecarConfig.ProxyConfig proxyConfig = mock(SidecarConfig.ProxyConfig.class);
                 when(service.config.proxy()).thenReturn(proxyConfig);
-                when(proxyConfig.propagateHeaders()).thenReturn(List.of("important-header"));
 
-                // Use different case
-                Map<String, String> headers = Map.of("IMPORTANT-HEADER", "value123", "content-type", "application/json",
-                                "accept", "text/html");
+                // One matches, one doesnt match propagation list
+                when(proxyConfig.propagateHeaders()).thenReturn(List.of("X-Trace-Id"));
+
+                Map<String, String> headers = Map.of(
+                                "x-trace-id", "trace-123",
+                                "x-not-propagated", "gone",
+                                "Content-Type", "application/json");
 
                 Map<String, String> result = service.resolvePropagatedHeaders(headers);
 
-                assertEquals("value123", result.get("important-header"));
+                // Verify specific mappings and preservation of case/keys
+                assertEquals("trace-123", result.get("X-Trace-Id")); // Key from propagateList
                 assertEquals("application/json", result.get("Content-Type"));
-                assertEquals("text/html", result.get("Accept"));
+                assertNull(result.get("x-not-propagated"));
+                assertEquals(2, result.size());
+
+                // Mutation killer: check if changing mapped value survives
+                assertNotEquals("wrong", result.get("X-Trace-Id"));
+        }
+
+        @Test
+        void testResolvePropagatedHeaders_EmptyList() {
+                ProxyService service = new ProxyService();
+                service.config = mock(SidecarConfig.class);
+                SidecarConfig.ProxyConfig proxyConfig = mock(SidecarConfig.ProxyConfig.class);
+                when(service.config.proxy()).thenReturn(proxyConfig);
+                when(proxyConfig.propagateHeaders()).thenReturn(List.of());
+
+                Map<String, String> headers = Map.of("X-Trace-Id", "123");
+                Map<String, String> result = service.resolvePropagatedHeaders(headers);
+                assertTrue(result.isEmpty());
+        }
+
+        @Test
+        void testResolvePlaceholders_SupportedVariables() {
+                ProxyService service = new ProxyService();
+                AuthContext ctx = AuthContext.builder()
+                                .userId("u1")
+                                .email("e1")
+                                .name("n1")
+                                .roles(java.util.Set.of("r1"))
+                                .build();
+
+                String template = "${user.id}|${user.email}|${user.name}|${user.roles}";
+                String expected = "u1|e1|n1|r1";
+                assertEquals(expected, service.resolvePlaceholders(template, ctx));
         }
 
         @Test
@@ -153,5 +188,89 @@ class ProxyServiceExtTest {
                 Map<String, String> headers = service.resolveAuthContextHeaders(ctx);
                 assertEquals("user123", headers.get("X-Target-User"));
                 assertEquals("${unknown}", headers.get("X-Empty"));
+        }
+
+        @Test
+        void testResolveAuthContextHeaders_Complex() {
+                ProxyService service = new ProxyService();
+                service.config = mock(SidecarConfig.class);
+                SidecarConfig.ProxyConfig proxyConfig = mock(SidecarConfig.ProxyConfig.class);
+                when(service.config.proxy()).thenReturn(proxyConfig);
+
+                // Add headers with mix of standard and custom placeholders
+                when(proxyConfig.addHeaders()).thenReturn(Map.of(
+                                "X-User-ID", "${user.id}",
+                                "X-User-Email", "${user.email}",
+                                "X-User-Name", "${user.name}",
+                                "X-User-Roles", "${user.roles}",
+                                "X-Static", "static-val"));
+
+                AuthContext ctx = AuthContext.builder()
+                                .userId("u1")
+                                .email("e1")
+                                .name("n1")
+                                .roles(java.util.Set.of("r1", "r2"))
+                                .build();
+
+                Map<String, String> headers = service.resolveAuthContextHeaders(ctx);
+                assertEquals("u1", headers.get("X-User-ID"));
+                assertEquals("e1", headers.get("X-User-Email"));
+                assertEquals("n1", headers.get("X-User-Name"));
+                assertTrue(headers.get("X-User-Roles").contains("r1"));
+                assertTrue(headers.get("X-User-Roles").contains("r2"));
+                assertEquals("static-val", headers.get("X-Static"));
+
+                // Default headers should NOT be present if custom are specified
+                assertNull(headers.get("X-Auth-User-Id"));
+        }
+
+        @Test
+        void testResolvePropagatedHeaders_CaseInsensitive() {
+                ProxyService service = new ProxyService();
+                service.config = mock(SidecarConfig.class);
+                SidecarConfig.ProxyConfig proxyConfig = mock(SidecarConfig.ProxyConfig.class);
+                when(service.config.proxy()).thenReturn(proxyConfig);
+
+                when(proxyConfig.propagateHeaders()).thenReturn(List.of("X-TRACE-ID"));
+
+                Map<String, String> headers = Map.of("x-trace-id", "val123");
+                Map<String, String> result = service.resolvePropagatedHeaders(headers);
+
+                assertEquals("val123", result.get("X-TRACE-ID"));
+                assertEquals(1, result.size());
+        }
+
+        @Test
+        void testResolvePropagatedHeaders_Strict() {
+                ProxyService service = new ProxyService();
+                service.config = mock(SidecarConfig.class);
+                SidecarConfig.ProxyConfig proxyConfig = mock(SidecarConfig.ProxyConfig.class);
+                when(service.config.proxy()).thenReturn(proxyConfig);
+
+                when(proxyConfig.propagateHeaders()).thenReturn(List.of("X-Required"));
+
+                Map<String, String> headers = Map.of("X-Required", "present", "X-Other", "ignore");
+                Map<String, String> result = service.resolvePropagatedHeaders(headers);
+
+                assertEquals("present", result.get("X-Required"));
+                assertNull(result.get("X-Other"));
+                assertEquals(1, result.size());
+        }
+
+        @Test
+        void testResolvePropagatedHeaders_NullInput() {
+                ProxyService service = new ProxyService();
+                assertTrue(service.resolvePropagatedHeaders(null).isEmpty());
+        }
+
+        @Test
+        void testCalculateDuration_MutationKiller() {
+                ProxyService service = new ProxyService();
+                long start = System.nanoTime();
+                long dur = service.calculateDuration(start);
+                // If mutated to (+), dur would be ~2 * now (huge).
+                // If original (-), dur is ~small.
+                assertTrue(dur >= 0, "Duration must be positive");
+                assertTrue(dur < 10_000_000_000L, "Duration should be relatively small, not (now + start)");
         }
 }

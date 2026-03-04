@@ -62,22 +62,26 @@ public class WasmPolicyEngine {
             return Uni.createFrom().item(PolicyDecision.deny("WASM module not initialized"));
         }
 
-        return Uni.createFrom().item(() -> {
+        return Uni.createFrom().<PolicyDecision>deferred(() -> {
             try {
                 String inputJson = objectMapper.writeValueAsString(input);
                 String resultJson = policy.evaluate(inputJson);
                 LOG.debugf("WASM evaluation result: %s", resultJson);
 
+                if (resultJson == null) {
+                    return Uni.createFrom().item(PolicyDecision.deny("WASM evaluation returned null result"));
+                }
+
                 JsonNode resultNode = objectMapper.readTree(resultJson);
                 if (resultNode.isArray() && resultNode.size() > 0) {
                     JsonNode resultObj = resultNode.get(0).get("result");
-                    return PolicyService.parsePolicyResult(resultObj);
+                    return Uni.createFrom().item(PolicyService.parsePolicyResult(resultObj));
                 }
 
-                return PolicyService.parsePolicyResult(resultNode);
+                return Uni.createFrom().item(PolicyService.parsePolicyResult(resultNode));
             } catch (Exception e) {
-                LOG.errorf(e, "WASM evaluation failed");
-                throw new RuntimeException("WASM evaluation failed", e);
+                LOG.errorf(e, "WASM evaluation failed: %s", e.getMessage());
+                return Uni.createFrom().item(PolicyDecision.deny("WASM evaluation failed: " + e.getMessage()));
             }
         });
     }

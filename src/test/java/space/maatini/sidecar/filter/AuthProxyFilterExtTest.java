@@ -6,7 +6,6 @@ import java.lang.reflect.Field;
 import jakarta.ws.rs.core.Response;
 import static org.junit.jupiter.api.Assertions.*;
 
-@io.quarkus.test.junit.QuarkusTest
 class AuthProxyFilterExtTest {
     @Test
     void testCreateErrorResponse() throws Exception {

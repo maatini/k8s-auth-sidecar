@@ -240,6 +240,7 @@
                     </targetClasses>
                     <targetTests>
                         <param>space.maatini.sidecar.*PojoTest</param>
+                        <param>space.maatini.sidecar.*ExtTest</param>
                     </targetTests>
                     <excludedTestClasses>
                         <param>space.maatini.sidecar.*IT</param>

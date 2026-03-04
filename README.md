@@ -191,14 +191,14 @@ Das Projekt verfügt über eine umfassende Test-Suite (**über 90 automatisierte
 
 | Klasse | Line Coverage | Branch Coverage | Mutation Score |
 |---|---|---|---|
-| **AuthenticationService** | 90.2% | **100.0%** | **53.0%** |
+| **AuthenticationService** | 90.2% | **100.0%** | **86.0%** |
 | **AuditLogFilter** | 100.0% | **100.0%** | 44.0% |
-| **ProxyService** | 100.0% | 87.1% | 45.0% |
-| **PolicyService** | 100.0% | 86.4% | **91.0%** |
+| **ProxyService** | 86.0% | 87.1% | **73.0%** |
+| **PolicyService** | 100.0% | **100.0%** | **91.0%** |
 | **AuthProxyFilter** | 90.6% | 65.4% | 44.0%* |
-| **WasmPolicyEngine** | 71.9% | 55.8% | 19.0% |
+| **WasmPolicyEngine** | 73.0% | 55.8% | **35.0%** |
 | **PathMatcher** | 100.0% | 97.5% | **88.0%** |
-| **GESAMT** | **89.8%** | **80.0%** | **57.0%** |
+| **GESAMT** | **84.0%** | **80.0%** | **66.0%** |
 
 *\*Paket-Durchschnittswert*
 

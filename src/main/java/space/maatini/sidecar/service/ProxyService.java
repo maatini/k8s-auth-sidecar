@@ -134,8 +134,10 @@ public class ProxyService {
 
         return responseUni
                 .onItem().transform(response -> {
-                    long duration = System.nanoTime() - startTime;
-                    requestTimer.record(duration, TimeUnit.NANOSECONDS);
+                    long duration = calculateDuration(startTime);
+                    if (requestTimer != null) {
+                        requestTimer.record(duration, TimeUnit.NANOSECONDS);
+                    }
 
                     LOG.debugf("Proxy response: status=%d, duration=%dms",
                             response.statusCode(), TimeUnit.NANOSECONDS.toMillis(duration));
@@ -301,5 +303,9 @@ public class ProxyService {
                 config.proxy().target().host(),
                 config.proxy().target().port(),
                 path);
+    }
+
+    protected long calculateDuration(long startTime) {
+        return System.nanoTime() - startTime;
     }
 }

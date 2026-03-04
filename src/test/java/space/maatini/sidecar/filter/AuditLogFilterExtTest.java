@@ -8,7 +8,6 @@ import space.maatini.sidecar.config.SidecarConfig;
 
 import static org.mockito.Mockito.*;
 
-@io.quarkus.test.junit.QuarkusTest
 class AuditLogFilterExtTest {
 
     private AuditLogFilter filter;
