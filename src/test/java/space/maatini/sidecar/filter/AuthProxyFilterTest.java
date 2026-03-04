@@ -88,7 +88,8 @@ class AuthProxyFilterTest {
         when(uriInfo.getPath()).thenReturn("/api/data");
         when(req.getMethod()).thenReturn("GET");
 
-        when(authenticationService.extractAuthContext(any())).thenReturn(AuthContext.anonymous());
+        when(authenticationService.extractAuthContext(any()))
+                .thenReturn(Uni.createFrom().item(AuthContext.anonymous()));
 
         Response response = authProxyFilter.filter(req).await().indefinitely();
 
@@ -106,7 +107,7 @@ class AuthProxyFilterTest {
         when(uriInfo.getRequestUri()).thenReturn(URI.create("http://localhost/api/admin"));
 
         AuthContext context = AuthContext.builder().userId("user1").build();
-        when(authenticationService.extractAuthContext(any())).thenReturn(context);
+        when(authenticationService.extractAuthContext(any())).thenReturn(Uni.createFrom().item(context));
         when(req.getHeaders()).thenReturn(mock(jakarta.ws.rs.core.MultivaluedMap.class));
         when(req.getUriInfo().getQueryParameters()).thenReturn(mock(jakarta.ws.rs.core.MultivaluedMap.class));
 
@@ -129,7 +130,7 @@ class AuthProxyFilterTest {
         when(uriInfo.getRequestUri()).thenReturn(URI.create("http://localhost/api/data"));
 
         AuthContext context = AuthContext.builder().userId("user1").build();
-        when(authenticationService.extractAuthContext(any())).thenReturn(context);
+        when(authenticationService.extractAuthContext(any())).thenReturn(Uni.createFrom().item(context));
         when(req.getHeaders()).thenReturn(mock(jakarta.ws.rs.core.MultivaluedMap.class));
         when(req.getUriInfo().getQueryParameters()).thenReturn(mock(jakarta.ws.rs.core.MultivaluedMap.class));
 

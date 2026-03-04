@@ -189,10 +189,10 @@ Das Projekt verfügt über eine umfassende Test-Suite (**über 90 automatisierte
 > [!NOTE]
 > Die volle Testabdeckung wird nur erreicht, wenn Docker für die Integrationstests (Testcontainers) verfügbar ist.
 
-- **Lines:** ~66.1% 
-- **Instructions:** ~64.9%
-- **Branches:** ~44.0%
-- **Mutation Score (Service Layer):** ~40.0% (Target: 85%)
+- **Lines:** ~66.6% 
+- **Instructions:** ~65.0%
+- **Branches:** ~45.4%
+- **Mutation Score (Service Layer):** ~55.0%
 
 *Wichtige Kernkomponenten wie der `AuthProxyFilter` (die Haupt-Pipeline) sind mit über 95% Line-Coverage exzellent abgedeckt.*
 

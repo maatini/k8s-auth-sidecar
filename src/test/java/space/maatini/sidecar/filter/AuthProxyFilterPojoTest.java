@@ -103,7 +103,8 @@ class AuthProxyFilterPojoTest {
         when(uriInfo.getPath()).thenReturn("/api/data");
         when(context.getMethod()).thenReturn("GET");
 
-        when(authService.extractAuthContext(eq(securityIdentity))).thenReturn(AuthContext.anonymous());
+        when(authService.extractAuthContext(eq(securityIdentity)))
+                .thenReturn(Uni.createFrom().item(AuthContext.anonymous()));
 
         Response res = filter.filter(context).await().indefinitely();
         assertNotNull(res);
@@ -121,7 +122,7 @@ class AuthProxyFilterPojoTest {
         when(context.getHeaders()).thenReturn(new MultivaluedHashMap<>());
 
         AuthContext authCtx = AuthContext.builder().userId("u123").email("u@u").build();
-        when(authService.extractAuthContext(eq(securityIdentity))).thenReturn(authCtx);
+        when(authService.extractAuthContext(eq(securityIdentity))).thenReturn(Uni.createFrom().item(authCtx));
         when(policyService.evaluate(any(), any(), any(), any(), any()))
                 .thenReturn(Uni.createFrom().item(PolicyDecision.allow()));
 
@@ -141,7 +142,7 @@ class AuthProxyFilterPojoTest {
         when(context.getHeaders()).thenReturn(new MultivaluedHashMap<>());
 
         AuthContext authCtx = AuthContext.builder().userId("u123").email("u@u").build();
-        when(authService.extractAuthContext(eq(securityIdentity))).thenReturn(authCtx);
+        when(authService.extractAuthContext(eq(securityIdentity))).thenReturn(Uni.createFrom().item(authCtx));
         when(policyService.evaluate(any(), any(), any(), any(), any()))
                 .thenReturn(Uni.createFrom().item(PolicyDecision.deny("Denied by test")));
 

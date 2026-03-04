@@ -95,11 +95,10 @@ public class ProxyService {
         long startTime = System.nanoTime();
         requestCounter.increment();
 
-        String targetHost = config.proxy().target().host();
         int targetPort = config.proxy().target().port();
-        String targetScheme = config.proxy().target().scheme();
+        String targetHost = config.proxy().target().host();
 
-        String targetUrl = String.format("%s://%s:%d%s", targetScheme, targetHost, targetPort, path);
+        String targetUrl = buildTargetUrl(path);
         LOG.debugf("Proxying %s request to: %s", method, targetUrl);
 
         HttpMethod httpMethod = HttpMethod.valueOf(method.toUpperCase());
@@ -284,5 +283,16 @@ public class ProxyService {
         public String bodyAsString() {
             return body != null ? body.toString() : "";
         }
+    }
+
+    /**
+     * Extracted to make the URL building easily testable
+     */
+    String buildTargetUrl(String path) {
+        return String.format("%s://%s:%d%s",
+                config.proxy().target().scheme(),
+                config.proxy().target().host(),
+                config.proxy().target().port(),
+                path);
     }
 }

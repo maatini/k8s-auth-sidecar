@@ -95,7 +95,7 @@ public class AuthProxyFilter {
                 .register(meterRegistry);
     }
 
-    @ServerRequestFilter(priority = Priorities.AUTHENTICATION)
+    @ServerRequestFilter(priority = Priorities.AUTHORIZATION)
     public Uni<Response> filter(ContainerRequestContext requestContext) {
         long startTime = System.nanoTime();
         String path = requestContext.getUriInfo().getPath();
@@ -118,62 +118,57 @@ public class AuthProxyFilter {
             return Uni.createFrom().nullItem();
         }
 
-        return Uni.createFrom().item(() -> {
-            try {
-                return authenticationService.extractAuthContext(securityIdentity);
-            } catch (Exception e) {
-                LOG.errorf(e, "Error during authentication extraction: %s", e.getClass().getName());
-                throw new InternalAuthException(e);
-            }
-        }).flatMap(authContext -> {
-            if (!authContext.isAuthenticated()) {
-                LOG.warnf("Authentication failed for request: %s %s", method, path);
-                authFailureCounter.increment();
-                return Uni.createFrom().item(createUnauthorizedResponse("Authentication required"));
-            }
+        return authenticationService.extractAuthContext(securityIdentity)
+                .flatMap(authContext -> {
+                    if (!authContext.isAuthenticated()) {
+                        LOG.warnf("Authentication failed for request: %s %s", method, path);
+                        authFailureCounter.increment();
+                        return Uni.createFrom().item(createUnauthorizedResponse("Authentication required"));
+                    }
 
-            authSuccessCounter.increment();
-            LOG.debugf("Authenticated user: %s", authContext.userId());
+                    authSuccessCounter.increment();
+                    LOG.debugf("Authenticated user: %s", authContext.userId());
 
-            requestContext.setProperty(AUTH_CONTEXT_PROPERTY, authContext);
+                    requestContext.setProperty(AUTH_CONTEXT_PROPERTY, authContext);
 
-            // Evaluate policy directly (no roles enrichment step)
-            if (!config.authz().enabled()) {
-                return Uni.createFrom().item((Response) null);
-            }
+                    // Evaluate policy directly (no roles enrichment step)
+                    if (!config.authz().enabled()) {
+                        return Uni.createFrom().item((Response) null);
+                    }
 
-            Map<String, String> headers = RequestUtils.extractHeaders(requestContext);
-            Map<String, String> queryParams = RequestUtils.extractQueryParams(requestContext.getUriInfo());
+                    Map<String, String> headers = RequestUtils.extractHeaders(requestContext);
+                    Map<String, String> queryParams = RequestUtils.extractQueryParams(requestContext.getUriInfo());
 
-            return policyService.evaluate(authContext, method, path, headers, queryParams)
-                    .map(decision -> {
-                        if (!decision.allowed()) {
-                            throw new AuthorizationDeniedException(decision);
-                        }
-                        authzAllowCounter.increment();
-                        LOG.debugf("Authorization allowed for user %s on %s %s",
-                                authContext.userId(), method, path);
-                        return (Response) null; // Continue filter chain
-                    });
-        }).onFailure().recoverWithItem(error -> {
-            AuthorizationDeniedException authzEx = findCause(error, AuthorizationDeniedException.class);
-            if (authzEx != null) {
-                LOG.warnf("Authorization denied for user on %s %s: %s",
-                        method, path, authzEx.decision.reason());
-                authzDenyCounter.increment();
-                return createForbiddenResponse(authzEx.decision);
-            }
-            InternalAuthException intAuthEx = findCause(error, InternalAuthException.class);
-            if (intAuthEx != null) {
-                return createErrorResponse("Internal authentication error");
-            }
+                    return policyService.evaluate(authContext, method, path, headers, queryParams)
+                            .map(decision -> {
+                                if (!decision.allowed()) {
+                                    throw new AuthorizationDeniedException(decision);
+                                }
+                                authzAllowCounter.increment();
+                                LOG.debugf("Authorization allowed for user %s on %s %s",
+                                        authContext.userId(), method, path);
+                                return (Response) null; // Continue filter chain
+                            });
+                }).onFailure().recoverWithItem(error -> {
+                    AuthorizationDeniedException authzEx = findCause(error, AuthorizationDeniedException.class);
+                    if (authzEx != null) {
+                        LOG.warnf("Authorization denied for user on %s %s: %s",
+                                method, path, authzEx.decision.reason());
+                        authzDenyCounter.increment();
+                        return createForbiddenResponse(authzEx.decision);
+                    }
+                    InternalAuthException intAuthEx = findCause(error, InternalAuthException.class);
+                    if (intAuthEx != null) {
+                        return createErrorResponse("Internal authentication error");
+                    }
 
-            LOG.errorf(error, "Unexpected error during authentication/authorization: %s", error.getClass().getName());
-            return createErrorResponse("Internal server error");
-        }).onItemOrFailure().invoke((response, throwable) -> {
-            long duration = System.nanoTime() - startTime;
-            authTimer.record(duration, TimeUnit.NANOSECONDS);
-        });
+                    LOG.errorf(error, "Unexpected error during authentication/authorization: %s",
+                            error.getClass().getName());
+                    return createErrorResponse("Internal server error");
+                }).onItemOrFailure().invoke((response, throwable) -> {
+                    long duration = System.nanoTime() - startTime;
+                    authTimer.record(duration, TimeUnit.NANOSECONDS);
+                });
     }
 
     private static class AuthorizationDeniedException extends RuntimeException {

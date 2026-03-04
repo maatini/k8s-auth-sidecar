@@ -36,24 +36,41 @@ class AuditLogFilterPojoTest {
     }
 
     @Test
-    void testFilterResponse() {
+    void testFilterResponse_FullAudit() {
         ContainerRequestContext req = mock(ContainerRequestContext.class);
         ContainerResponseContext res = mock(ContainerResponseContext.class);
         UriInfo uriInfo = mock(UriInfo.class);
 
         when(req.getUriInfo()).thenReturn(uriInfo);
-        when(uriInfo.getPath()).thenReturn("/test");
+        when(uriInfo.getPath()).thenReturn("/api/test");
         when(req.getMethod()).thenReturn("GET");
         when(res.getStatus()).thenReturn(200);
-        when(req.getProperty("audit.start_time")).thenReturn(System.currentTimeMillis() - 100);
+        when(req.getProperty("audit.start_time")).thenReturn(System.currentTimeMillis() - 150);
 
         AuthContext auth = AuthContext.builder().userId("user123").build();
         when(req.getProperty("auth.context")).thenReturn(auth);
 
         filter.filterResponse(req, res);
 
-        // Verify no crash and basic interactions
         verify(req).getProperty("audit.start_time");
+        verify(res).getStatus();
+    }
+
+    @Test
+    void testFilterResponse_NoAuthContext_ErrorStatus() {
+        ContainerRequestContext req = mock(ContainerRequestContext.class);
+        ContainerResponseContext res = mock(ContainerResponseContext.class);
+        UriInfo uriInfo = mock(UriInfo.class);
+
+        when(req.getUriInfo()).thenReturn(uriInfo);
+        when(uriInfo.getPath()).thenReturn("/api/secret");
+        when(req.getMethod()).thenReturn("POST");
+        when(res.getStatus()).thenReturn(401);
+        when(req.getProperty("audit.start_time")).thenReturn(null); // Missing start time
+        // No AuthContext injected
+
+        filter.filterResponse(req, res);
+
         verify(res).getStatus();
     }
 }

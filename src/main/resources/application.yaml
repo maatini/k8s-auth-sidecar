@@ -193,8 +193,6 @@ sidecar:
   quarkus:
     log:
       level: WARN
-    oidc:
-      auth-server-url: http://localhost:8180/realms/test
   sidecar:
     auth:
       enabled: true

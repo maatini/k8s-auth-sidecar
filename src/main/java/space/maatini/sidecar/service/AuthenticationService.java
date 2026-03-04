@@ -1,5 +1,6 @@
 package space.maatini.sidecar.service;
 
+import io.smallrye.mutiny.Uni;
 import io.quarkus.cache.CacheResult;
 import io.quarkus.security.identity.SecurityIdentity;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -40,10 +41,10 @@ public class AuthenticationService {
     /**
      * Extracts authentication context from a SecurityIdentity.
      */
-    public AuthContext extractAuthContext(SecurityIdentity identity) {
+    public Uni<AuthContext> extractAuthContext(SecurityIdentity identity) {
         if (identity == null || identity.isAnonymous()) {
             LOG.debug("No security identity or anonymous user");
-            return AuthContext.anonymous();
+            return Uni.createFrom().item(AuthContext.anonymous());
         }
 
         try {
@@ -53,13 +54,13 @@ public class AuthenticationService {
 
             if (jwt == null) {
                 LOG.warn("Principal is not a JWT token");
-                return AuthContext.anonymous();
+                return Uni.createFrom().item(AuthContext.anonymous());
             }
 
             return getCachedAuthContext(jwt);
         } catch (Exception e) {
             LOG.errorf(e, "Failed to extract auth context from security identity");
-            return AuthContext.anonymous();
+            return Uni.createFrom().item(AuthContext.anonymous());
         }
     }
 
@@ -67,9 +68,9 @@ public class AuthenticationService {
      * Extracts authentication context from a JWT token with caching.
      */
     @CacheResult(cacheName = "jwt-cache")
-    public AuthContext getCachedAuthContext(JsonWebToken jwt) {
+    public Uni<AuthContext> getCachedAuthContext(JsonWebToken jwt) {
         LOG.debugf("Cache miss for JWT, extracting context");
-        return extractFromJwt(jwt);
+        return Uni.createFrom().item(() -> extractFromJwt(jwt));
     }
 
     /**
@@ -121,7 +122,23 @@ public class AuthenticationService {
         Set<String> roles = new HashSet<>();
         roles.addAll(extractKeycloakRealmRoles(jwt));
         roles.addAll(extractKeycloakResourceRoles(jwt));
+        roles.addAll(extractGroupsClaim(jwt));
         return roles;
+    }
+
+    /**
+     * Extracts roles from the 'groups' claim.
+     */
+    private Set<String> extractGroupsClaim(JsonWebToken jwt) {
+        try {
+            Set<String> groups = jwt.getGroups();
+            if (groups != null) {
+                return groups;
+            }
+        } catch (Exception e) {
+            LOG.debugf("Failed to extract groups: %s", e.getMessage());
+        }
+        return Collections.emptySet();
     }
 
     /**

@@ -60,4 +60,21 @@ class WasmPolicyEnginePojoTest {
         assertFalse(decision.allowed());
         assertEquals("WASM module not initialized", decision.reason());
     }
+
+    @Test
+    void testIsModuleLoaded() {
+        assertFalse(engine.isModuleLoaded());
+        // Wir können die native Kompilierung im POJO-Test nur schwer simulieren,
+        // daher testen wir primär die Fallbacks des boolean Flags.
+    }
+
+    @Test
+    void testResolveWatchDir() throws Exception {
+        java.lang.reflect.Method method = engine.getClass().getDeclaredMethod("resolveWatchDir");
+        method.setAccessible(true);
+
+        Path res1 = (Path) method.invoke(engine);
+        assertNotNull(res1);
+        assertTrue(res1.toString().endsWith("policies"));
+    }
 }
