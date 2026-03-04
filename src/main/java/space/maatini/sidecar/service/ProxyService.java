@@ -35,7 +35,10 @@ public class ProxyService {
     private static final Logger LOG = Logger.getLogger(ProxyService.class);
 
     @Inject
-    SidecarConfig config;
+    protected SidecarConfig config;
+
+    @Inject
+    protected io.micrometer.core.instrument.Timer requestTimer;
 
     @Inject
     Vertx vertx;
@@ -46,10 +49,9 @@ public class ProxyService {
     @Inject
     ObjectMapper objectMapper;
 
-    private WebClient webClient;
-    private Counter requestCounter;
-    private Counter errorCounter;
-    private Timer requestTimer;
+    protected WebClient webClient;
+    protected Counter requestCounter;
+    protected Counter errorCounter;
 
     @PostConstruct
     void init() {
@@ -134,14 +136,7 @@ public class ProxyService {
 
         return responseUni
                 .onItem().transform(response -> {
-                    long duration = calculateDuration(startTime);
-                    if (requestTimer != null) {
-                        requestTimer.record(duration, TimeUnit.NANOSECONDS);
-                    }
-
-                    LOG.debugf("Proxy response: status=%d, duration=%dms",
-                            response.statusCode(), TimeUnit.NANOSECONDS.toMillis(duration));
-
+                    recordRequestMetrics(startTime, response.statusCode());
                     return toProxyResponse(response);
                 })
                 .onFailure().recoverWithItem(error -> {
@@ -251,7 +246,7 @@ public class ProxyService {
     /**
      * Converts a Vert.x HTTP response to a ProxyResponse.
      */
-    private ProxyResponse toProxyResponse(HttpResponse<Buffer> response) {
+    protected ProxyResponse toProxyResponse(HttpResponse<Buffer> response) {
         Map<String, String> responseHeaders = new java.util.HashMap<>();
         MultiMap headers = response.headers();
         for (String name : headers.names()) {
@@ -307,5 +302,14 @@ public class ProxyService {
 
     protected long calculateDuration(long startTime) {
         return System.nanoTime() - startTime;
+    }
+
+    protected void recordRequestMetrics(long startTime, int statusCode) {
+        long duration = calculateDuration(startTime);
+        if (requestTimer != null) {
+            requestTimer.record(duration, TimeUnit.NANOSECONDS);
+        }
+        LOG.debugf("Proxy response: status=%d, duration=%dms",
+                statusCode, TimeUnit.NANOSECONDS.toMillis(duration));
     }
 }

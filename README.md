@@ -193,18 +193,18 @@ Das Projekt verfügt über eine umfassende Test-Suite (**über 90 automatisierte
 |---|---|---|---|
 | **AuthenticationService** | 90.2% | **100.0%** | **86.0%** |
 | **AuditLogFilter** | 100.0% | **100.0%** | 44.0% |
-| **ProxyService** | 86.0% | 87.1% | **73.0%** |
+| **PathMatcher** | 100.0% | 97.5% | **88.0%** |
+| **ProxyService** | 86.0% | 87.1% | **85.0%** |
 | **PolicyService** | 100.0% | **100.0%** | **91.0%** |
 | **AuthProxyFilter** | 90.6% | 65.4% | 44.0%* |
 | **WasmPolicyEngine** | 73.0% | 55.8% | **35.0%** |
-| **PathMatcher** | 100.0% | 97.5% | **88.0%** |
-| **GESAMT** | **84.0%** | **80.0%** | **66.0%** |
+| **GESAMT** | **84.0%** | **80.0%** | **65.0%** |
 
 *\*Paket-Durchschnittswert*
 
 - **Tests:** 143 (0 Failures, 0 Errors)
 
-*Wichtige Kernkomponenten wie `AuthenticationService` und `AuditLogFilter` erreichen 100% Branch Coverage. Der Mutation Score von 57% reflektiert primär die Abdeckung durch reine Unit-Tests (POJOs), da PIT Integration-Tests derzeit überspringt.*
+*Wichtige Kernkomponenten wie `AuthenticationService`, `PolicyService` und `ProxyService` erreichen `>= 85%` Mutation Score.*
 
 Du kannst die Tests und den Coverage-Report lokal wie folgt ausführen:
 
