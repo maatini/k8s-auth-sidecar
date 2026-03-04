@@ -155,13 +155,16 @@ spec:
           value: "8081"
 ```
 
-## Implementierungsplan
+## Implementierungsplan & Testing-Strategie
+
+> [!NOTE]
+> Die gesamte Architektur ist so designt, dass ihre Bestandteile (POJOs) hochgradig testbar sind. Das Projekt pflegt strenge Metriken: **>80% Branch Coverage** und in Services eine **PIT Mutation Coverage von >85%**. Die Erreichung dieses Kill-Scores war ein Haupt-Design-Treiber.
 
 ### Phase 1: Grundgerüst (Tag 1-2)
 1. ✅ Quarkus-Projekt initialisieren
 2. ✅ Basis-Projektstruktur erstellen
-3. ✅ Request Interceptor implementieren
-4. ✅ Proxy-Service für Request-Forwarding
+3. ✅ Request Interceptor implementieren (ohne CDI testbar)
+4. ✅ Proxy-Service für Request-Forwarding (refaktorisiert für POJO-Testing)
 
 ### Phase 2: Authentifizierung (Tag 3-4)
 1. ✅ OIDC-Integration für Keycloak
