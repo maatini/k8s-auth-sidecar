@@ -17,10 +17,12 @@ import jakarta.ws.rs.core.UriInfo;
 import org.jboss.logging.Logger;
 import org.jboss.resteasy.reactive.server.ServerRequestFilter;
 import space.maatini.sidecar.config.SidecarConfig;
+import space.maatini.sidecar.model.AuthContext;
 import space.maatini.sidecar.model.PolicyDecision;
 import space.maatini.sidecar.service.AuthenticationService;
 import space.maatini.sidecar.service.PolicyService;
 import space.maatini.sidecar.service.ProxyService;
+import space.maatini.sidecar.service.RolesService;
 import space.maatini.sidecar.util.PathMatcher;
 import space.maatini.sidecar.util.RequestUtils;
 
@@ -53,6 +55,9 @@ public class AuthProxyFilter {
 
     @Inject
     PolicyService policyService;
+
+    @Inject
+    RolesService rolesService;
 
     @Inject
     ProxyService proxyService;
@@ -123,30 +128,37 @@ public class AuthProxyFilter {
                     if (!authContext.isAuthenticated()) {
                         LOG.warnf("Authentication failed for request: %s %s", method, path);
                         authFailureCounter.increment();
-                        return Uni.createFrom().item(createUnauthorizedResponse("Authentication required"));
+                        return Uni.createFrom().item((Object) createUnauthorizedResponse("Authentication required"));
                     }
 
                     authSuccessCounter.increment();
                     LOG.debugf("Authenticated user: %s", authContext.userId());
 
-                    requestContext.setProperty(AUTH_CONTEXT_PROPERTY, authContext);
+                    return rolesService.enrich(authContext);
+                })
+                .flatMap(enrichedContext -> {
+                    if (enrichedContext instanceof Response) {
+                        return Uni.createFrom().item((Response) enrichedContext);
+                    }
+                    AuthContext authCtx = (AuthContext) enrichedContext;
+                    requestContext.setProperty(AUTH_CONTEXT_PROPERTY, authCtx);
 
-                    // Evaluate policy directly (no roles enrichment step)
+                    // Evaluate policy directly (with enriched roles)
                     if (!config.authz().enabled()) {
-                        return Uni.createFrom().item((Response) null);
+                        return Uni.createFrom().<Response>item(null);
                     }
 
                     Map<String, String> headers = RequestUtils.extractHeaders(requestContext);
                     Map<String, String> queryParams = RequestUtils.extractQueryParams(requestContext.getUriInfo());
 
-                    return policyService.evaluate(authContext, method, path, headers, queryParams)
-                            .map(decision -> {
+                    return policyService.evaluate(authCtx, method, path, headers, queryParams)
+                            .map((PolicyDecision decision) -> {
                                 if (!decision.allowed()) {
                                     throw new AuthorizationDeniedException(decision);
                                 }
                                 authzAllowCounter.increment();
                                 LOG.debugf("Authorization allowed for user %s on %s %s",
-                                        authContext.userId(), method, path);
+                                        authCtx.userId(), method, path);
                                 return (Response) null; // Continue filter chain
                             });
                 }).onFailure().recoverWithItem(error -> {

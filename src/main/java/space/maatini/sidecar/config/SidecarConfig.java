@@ -24,6 +24,31 @@ public interface SidecarConfig {
 
     AuditConfig audit();
 
+    RolesConfig roles();
+
+    /**
+     * Configuration for the external Roles Microservice.
+     */
+    interface RolesConfig {
+        @WithDefault("false")
+        boolean enabled();
+
+        @WithDefault("http://localhost:8081")
+        String url();
+
+        @WithDefault("/api/v1/users/{userId}/roles")
+        String path();
+
+        @WithDefault("30s")
+        java.time.Duration timeout();
+
+        @WithDefault("1000")
+        int cacheSize();
+
+        @WithDefault("10m")
+        java.time.Duration cacheTtl();
+    }
+
     /**
      * Proxy configuration for the backend service.
      */

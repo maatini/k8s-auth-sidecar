@@ -13,9 +13,11 @@ import org.junit.jupiter.api.Test;
 import space.maatini.sidecar.config.SidecarConfig;
 import space.maatini.sidecar.model.AuthContext;
 import space.maatini.sidecar.model.PolicyDecision;
+import space.maatini.sidecar.model.RolesResponse;
 import space.maatini.sidecar.service.AuthenticationService;
 import space.maatini.sidecar.service.PolicyService;
 import space.maatini.sidecar.service.ProxyService;
+import space.maatini.sidecar.service.RolesService;
 
 import java.lang.reflect.Field;
 import java.util.Collections;
@@ -33,6 +35,7 @@ class AuthProxyFilterPojoTest {
     private AuthenticationService authService;
     private PolicyService policyService;
     private ProxyService proxyService;
+    private RolesService rolesService;
     private MeterRegistry meterRegistry;
 
     @BeforeEach
@@ -43,6 +46,7 @@ class AuthProxyFilterPojoTest {
         authService = mock(AuthenticationService.class);
         policyService = mock(PolicyService.class);
         proxyService = mock(ProxyService.class);
+        rolesService = mock(RolesService.class);
         meterRegistry = new SimpleMeterRegistry();
 
         setField(filter, "config", config);
@@ -50,6 +54,7 @@ class AuthProxyFilterPojoTest {
         setField(filter, "authenticationService", authService);
         setField(filter, "policyService", policyService);
         setField(filter, "proxyService", proxyService);
+        setField(filter, "rolesService", rolesService);
         setField(filter, "meterRegistry", meterRegistry);
 
         // Common config
@@ -105,6 +110,8 @@ class AuthProxyFilterPojoTest {
 
         when(authService.extractAuthContext(eq(securityIdentity)))
                 .thenReturn(Uni.createFrom().item(AuthContext.anonymous()));
+        when(rolesService.enrich(any(AuthContext.class)))
+                .thenAnswer(inv -> Uni.createFrom().item((AuthContext) inv.getArgument(0)));
 
         Response res = filter.filter(context).await().indefinitely();
         assertNotNull(res);
@@ -123,6 +130,8 @@ class AuthProxyFilterPojoTest {
 
         AuthContext authCtx = AuthContext.builder().userId("u123").email("u@u").build();
         when(authService.extractAuthContext(eq(securityIdentity))).thenReturn(Uni.createFrom().item(authCtx));
+        when(rolesService.enrich(any(AuthContext.class)))
+                .thenAnswer(inv -> Uni.createFrom().item((AuthContext) inv.getArgument(0)));
         when(policyService.evaluate(any(), any(), any(), any(), any()))
                 .thenReturn(Uni.createFrom().item(PolicyDecision.allow()));
 
@@ -143,6 +152,8 @@ class AuthProxyFilterPojoTest {
 
         AuthContext authCtx = AuthContext.builder().userId("u123").email("u@u").build();
         when(authService.extractAuthContext(eq(securityIdentity))).thenReturn(Uni.createFrom().item(authCtx));
+        when(rolesService.enrich(any(AuthContext.class)))
+                .thenAnswer(inv -> Uni.createFrom().item((AuthContext) inv.getArgument(0)));
         when(policyService.evaluate(any(), any(), any(), any(), any()))
                 .thenReturn(Uni.createFrom().item(PolicyDecision.deny("Denied by test")));
 

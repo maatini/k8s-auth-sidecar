@@ -118,6 +118,11 @@ public class WasmPolicyEngineTest {
             public ProxyConfig proxy() {
                 return null;
             }
+
+            @Override
+            public RolesConfig roles() {
+                return null;
+            }
         };
 
         wasmPolicyEngine.config = mockConfig;

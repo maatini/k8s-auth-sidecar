@@ -37,7 +37,6 @@ public class ProxyService {
     @Inject
     protected SidecarConfig config;
 
-    @Inject
     protected io.micrometer.core.instrument.Timer requestTimer;
 
     @Inject
@@ -55,6 +54,10 @@ public class ProxyService {
 
     @PostConstruct
     void init() {
+        requestTimer = meterRegistry.timer("sidecar_proxy_latency_seconds");
+        requestCounter = meterRegistry.counter("sidecar_proxy_requests_total");
+        errorCounter = meterRegistry.counter("sidecar_proxy_errors_total");
+
         WebClientOptions options = new WebClientOptions()
                 .setConnectTimeout(config.proxy().timeout().connect())
                 .setIdleTimeout(30)
@@ -62,18 +65,6 @@ public class ProxyService {
                 .setKeepAlive(true);
 
         this.webClient = WebClient.create(vertx, options);
-
-        this.requestCounter = Counter.builder("sidecar.proxy.requests")
-                .description("Total number of proxied requests")
-                .register(meterRegistry);
-
-        this.errorCounter = Counter.builder("sidecar.proxy.errors")
-                .description("Total number of proxy errors")
-                .register(meterRegistry);
-
-        this.requestTimer = Timer.builder("sidecar.proxy.duration")
-                .description("Proxy request duration")
-                .register(meterRegistry);
     }
 
     @PreDestroy

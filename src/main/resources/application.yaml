@@ -44,6 +44,17 @@ quarkus:
         initial-capacity: 500
         maximum-size: 10000
         expire-after-write: 10m
+      "roles-cache":
+        initial-capacity: 100
+        maximum-size: 1000
+        expire-after-write: 10m
+
+  # REST Client Configuration for Roles Enrichment
+  rest-client:
+    "roles-api":
+      url: ${sidecar.roles.url}
+      connect-timeout: 2000
+      read-timeout: 5000
 
   # Health and Metrics
   smallrye-health:
@@ -150,6 +161,15 @@ sidecar:
       - Authorization
       - Cookie
       - X-Api-Key
+
+  # Roles Microservice (Enrichment)
+  roles:
+    enabled: ${ROLES_ENABLED:false}
+    url: ${ROLES_SERVICE_URL:http://localhost:8081}
+    path: ${ROLES_SERVICE_PATH:/api/v1/users/{userId}/roles}
+    timeout: 30s
+    cache-size: 1000
+    cache-ttl: 10m
 
 # ===================
 # Profile-specific Configuration

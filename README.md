@@ -237,20 +237,20 @@ Das Projekt verfügt über eine umfassende Test-Suite (**über 90 automatisierte
 
 | Klasse | Line Coverage | Branch Coverage | Mutation Score |
 |---|---|---|---|
-| **AuthenticationService** | 90.2% | **100.0%** | **86.0%** |
-| **AuditLogFilter** | 100.0% | **100.0%** | 44.0% |
+| **AuthenticationService** | 90.2% | **100.0%** | **83.0%** |
+| **AuditLogFilter** | 100.0% | **100.0%** | 56.0% |
 | **PathMatcher** | 100.0% | 97.5% | **88.0%** |
 | **ProxyService** | 86.0% | 87.1% | **85.0%** |
 | **PolicyService** | 100.0% | **100.0%** | **91.0%** |
-| **AuthProxyFilter** | 90.6% | 65.4% | 44.0%* |
+| **AuthProxyFilter** | 90.6% | 65.4% | 52.0%* |
 | **WasmPolicyEngine** | 73.0% | 55.8% | **35.0%** |
-| **GESAMT** | **84.0%** | **80.0%** | **65.0%** |
+| **GESAMT** | **86.0%** | **80.0%** | **71.0%** |
 
 *\*Paket-Durchschnittswert*
 
-- **Tests:** 143 (0 Failures, 0 Errors)
+- **Tests:** 184 (0 Failures, 0 Errors)
 
-*Wichtige Kernkomponenten wie `AuthenticationService`, `PolicyService` und `ProxyService` erreichen `>= 85%` Mutation Score.*
+*Wichtige Kernkomponenten wie `AuthenticationService`, `PolicyService` und `ProxyService` erreichen `>= 71%` Mutation Score.*
 
 ### 🔍 Erklärung der Mutation Scores
 

@@ -72,7 +72,7 @@ class AuthProxyFilterTest {
         ContainerRequestContext req = mock(ContainerRequestContext.class);
         UriInfo uriInfo = mock(UriInfo.class);
         when(req.getUriInfo()).thenReturn(uriInfo);
-        when(uriInfo.getPath()).thenReturn("/public/test");
+        when(uriInfo.getPath()).thenReturn("/api/public/test");
 
         Response response = authProxyFilter.filter(req).await().indefinitely();
 
