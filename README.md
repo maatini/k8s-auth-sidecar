@@ -75,7 +75,7 @@ graph TD
     RS -.->|User Roles| Sidecar
     Sidecar -->|3. Evaluierung| OPA{In-Memory<br/>OPA-WASM}
     OPA -.->|Allow / Deny| Sidecar
-    Sidecar -->|4. Proxy (Streaming)| Backend[App Container]
+    Sidecar -->|4. Streaming Proxy| Backend[App Container]
     
     style Sidecar fill:#1792E5,stroke:#fff,stroke-width:2px,color:#fff
     style Backend fill:#1E2B3C,stroke:#000,stroke-width:2px,color:#fff
