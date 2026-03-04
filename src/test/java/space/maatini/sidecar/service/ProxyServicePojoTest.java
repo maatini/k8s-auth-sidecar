@@ -162,4 +162,51 @@ class ProxyServicePojoTest {
         verify(request).putHeader("x-custom", "cv");
         verify(request).putHeader("x-added", "av");
     }
+
+    @Test
+    void testProxy_WithNullAndEmptyQueryParams() {
+        when(request.send()).thenReturn(Uni.createFrom().item(response));
+        when(response.statusCode()).thenReturn(200);
+        when(response.headers()).thenReturn(io.vertx.mutiny.core.MultiMap.caseInsensitiveMultiMap());
+        when(response.body()).thenReturn(Buffer.buffer("ok"));
+
+        proxyService.proxy("GET", "/test", null, null, null, null).await().indefinitely();
+        verify(request, never()).addQueryParam(anyString(), anyString());
+
+        proxyService.proxy("GET", "/test", null, java.util.Map.of(), null, null).await().indefinitely();
+        verify(request, never()).addQueryParam(anyString(), anyString());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void testProxy_WithMethodsThatSendClientRequestStream() {
+        io.vertx.core.http.HttpServerRequest clientReq = mock(io.vertx.core.http.HttpServerRequest.class);
+        when(request.sendStream(any(io.vertx.mutiny.core.http.HttpServerRequest.class)))
+                .thenReturn(Uni.createFrom().item(response));
+        when(request.send()).thenReturn(Uni.createFrom().item(response));
+        when(response.statusCode()).thenReturn(204);
+        when(response.headers()).thenReturn(io.vertx.mutiny.core.MultiMap.caseInsensitiveMultiMap());
+        when(response.body()).thenReturn(Buffer.buffer("ok"));
+
+        // PUT
+        proxyService.proxy("PUT", "/test", null, null, clientReq, null).await().indefinitely();
+        verify(request, times(1)).sendStream(any(io.vertx.mutiny.core.http.HttpServerRequest.class));
+
+        // PATCH
+        proxyService.proxy("PATCH", "/test", null, null, clientReq, null).await().indefinitely();
+        verify(request, times(2)).sendStream(any(io.vertx.mutiny.core.http.HttpServerRequest.class));
+
+        // GET with clientReq should NOT sendStream but instead use .send()
+        proxyService.proxy("GET", "/test", null, null, clientReq, null).await().indefinitely();
+        verify(request, times(1)).send();
+    }
+
+    @Test
+    void testShutdown_WithNullWebClient() throws Exception {
+        setField(proxyService, "webClient", null);
+        java.lang.reflect.Method m = proxyService.getClass().getDeclaredMethod("shutdown");
+        m.setAccessible(true);
+        m.invoke(proxyService);
+        verify(webClient, never()).close();
+    }
 }

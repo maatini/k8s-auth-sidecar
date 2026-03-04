@@ -189,12 +189,22 @@ Das Projekt verfügt über eine umfassende Test-Suite (**über 90 automatisierte
 > [!NOTE]
 > Die volle Testabdeckung wird nur erreicht, wenn Docker für die Integrationstests (Testcontainers) verfügbar ist.
 
-- **Lines:** ~66.6% 
-- **Instructions:** ~65.0%
-- **Branches:** ~45.4%
-- **Mutation Score (Service Layer):** ~55.0%
+| Klasse | Line Coverage | Branch Coverage | Mutation Score |
+|---|---|---|---|
+| **AuthenticationService** | 90.2% | **100.0%** | **53.0%** |
+| **AuditLogFilter** | 100.0% | **100.0%** | 44.0% |
+| **ProxyService** | 100.0% | 87.1% | 45.0% |
+| **PolicyService** | 100.0% | 86.4% | **91.0%** |
+| **AuthProxyFilter** | 90.6% | 65.4% | 44.0%* |
+| **WasmPolicyEngine** | 71.9% | 55.8% | 19.0% |
+| **PathMatcher** | 100.0% | 97.5% | **88.0%** |
+| **GESAMT** | **89.8%** | **80.0%** | **57.0%** |
 
-*Wichtige Kernkomponenten wie der `AuthProxyFilter` (die Haupt-Pipeline) sind mit über 95% Line-Coverage exzellent abgedeckt.*
+*\*Paket-Durchschnittswert*
+
+- **Tests:** 143 (0 Failures, 0 Errors)
+
+*Wichtige Kernkomponenten wie `AuthenticationService` und `AuditLogFilter` erreichen 100% Branch Coverage. Der Mutation Score von 57% reflektiert primär die Abdeckung durch reine Unit-Tests (POJOs), da PIT Integration-Tests derzeit überspringt.*
 
 Du kannst die Tests und den Coverage-Report lokal wie folgt ausführen:
 

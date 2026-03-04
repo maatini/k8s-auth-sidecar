@@ -114,10 +114,12 @@ public class ProxyService {
         }
 
         // Propagate configured headers
-        propagateHeaders(request, headers);
+        Map<String, String> propagated = resolvePropagatedHeaders(headers);
+        propagated.forEach(request::putHeader);
 
         // Add authentication context headers
-        addAuthContextHeaders(request, authContext);
+        Map<String, String> authHeaders = resolveAuthContextHeaders(authContext);
+        authHeaders.forEach(request::putHeader);
 
         // Send request with or without body
         Uni<HttpResponse<Buffer>> responseUni;
@@ -148,11 +150,12 @@ public class ProxyService {
     }
 
     /**
-     * Propagates configured headers from the original request.
+     * Resolves which configured headers should be propagated.
      */
-    void propagateHeaders(HttpRequest<Buffer> request, Map<String, String> headers) {
+    Map<String, String> resolvePropagatedHeaders(Map<String, String> headers) {
+        Map<String, String> resolved = new java.util.HashMap<>();
         if (headers == null) {
-            return;
+            return resolved;
         }
 
         List<String> propagateList = config.proxy().propagateHeaders();
@@ -166,7 +169,7 @@ public class ProxyService {
                         .orElse(null);
             }
             if (value != null) {
-                request.putHeader(headerName, value);
+                resolved.put(headerName, value);
             }
         }
 
@@ -176,7 +179,7 @@ public class ProxyService {
             contentType = headers.get("content-type");
         }
         if (contentType != null) {
-            request.putHeader("Content-Type", contentType);
+            resolved.put("Content-Type", contentType);
         }
 
         // Propagate Accept header
@@ -185,29 +188,32 @@ public class ProxyService {
             accept = headers.get("accept");
         }
         if (accept != null) {
-            request.putHeader("Accept", accept);
+            resolved.put("Accept", accept);
         }
+
+        return resolved;
     }
 
     /**
-     * Adds authentication context information as headers.
+     * Resolves authentication context information to headers.
      */
-    void addAuthContextHeaders(HttpRequest<Buffer> request, AuthContext authContext) {
+    Map<String, String> resolveAuthContextHeaders(AuthContext authContext) {
+        Map<String, String> resolved = new java.util.HashMap<>();
         if (authContext == null || !authContext.isAuthenticated()) {
-            return;
+            return resolved;
         }
 
         Map<String, String> addHeaders = config.proxy().addHeaders();
         if (addHeaders == null || addHeaders.isEmpty()) {
             // Use default headers
-            request.putHeader("X-Auth-User-Id", authContext.userId());
+            resolved.put("X-Auth-User-Id", authContext.userId());
             if (authContext.email() != null) {
-                request.putHeader("X-Auth-User-Email", authContext.email());
+                resolved.put("X-Auth-User-Email", authContext.email());
             }
             if (authContext.roles() != null && !authContext.roles().isEmpty()) {
-                request.putHeader("X-Auth-User-Roles", String.join(",", authContext.roles()));
+                resolved.put("X-Auth-User-Roles", String.join(",", authContext.roles()));
             }
-            return;
+            return resolved;
         }
 
         // Process configured headers with placeholders
@@ -215,9 +221,10 @@ public class ProxyService {
             String headerName = entry.getKey();
             String headerValue = resolvePlaceholders(entry.getValue(), authContext);
             if (headerValue != null && !headerValue.isEmpty()) {
-                request.putHeader(headerName, headerValue);
+                resolved.put(headerName, headerValue);
             }
         }
+        return resolved;
     }
 
     /**
