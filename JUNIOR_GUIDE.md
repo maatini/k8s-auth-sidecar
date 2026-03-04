@@ -160,7 +160,7 @@ Der Sidecar blockt das sofort an der Vordertür ab! Du erhältst `HTTP 401 Unaut
 
 - **Sehr stabil**: Komplettes Refactoring (reaktiv + streaming + Memory-Optimierung) extrem performant. Null Objekt-Allokationen bei Fehler-Fallbacks.
 - **Aktiv in Entwicklung**: Core-Funktionen (Auth-Filter, Proxy, OPA, Path-Matcher) inkl. serverseitigen Caffeine-Caches (Session & Profiling) sind produktionsreif.
-- **Testing**: Über **150 automatisierte Tests** (Unit- & Integrationstests) verifizieren JWTs, Pools, Security Kontexte und das OPA Routing.
+- **Testing**: Über **90 automatisierte Tests** (Unit- & Integrationstests) verifizieren JWTs, Pools, Security Kontexte und das OPA Routing.
 - **Technologie**: Java 21 + Quarkus 3.31, Vert.x, Maven, Docker (JVM + Native mit intelligentem Builder-Skipping), Kustomize, GitHub Actions CI/CD mit Trivy Scans und SBOM-Generierung.
 - **Dokumentation**: Sehr stark! README + `docs/ARCHITECTURE.md` + dieser Junior Guide.
 - **Fazit**: Der Sidecar ist bereit für ernsthafte Einsätze und skaliert logisch und fehlerfrei im Kubernetes Cluster.

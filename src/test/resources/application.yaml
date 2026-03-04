@@ -14,10 +14,6 @@ quarkus:
     tls:
       verification: none
 
-  rest-client:
-    "space.maatini.sidecar.client.RolesServiceClient":
-      url: http://localhost:8082
-
   # Disable tracing for tests
   otel:
     enabled: false
@@ -33,12 +29,9 @@ sidecar:
   
   authz:
     enabled: true
-    roles-service:
-      enabled: false  # Disabled for unit tests
   
   opa:
     enabled: true
-    mode: embedded
     embedded:
       wasm-path: classpath:policies/authz.wasm
   

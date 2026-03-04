@@ -8,8 +8,7 @@ import java.util.Set;
 
 /**
  * Immutable authentication context containing user information extracted from
- * JWT token
- * and enriched with roles/permissions from external services.
+ * JWT token.
  */
 public record AuthContext(
         String userId,
@@ -23,8 +22,8 @@ public record AuthContext(
         Map<String, Object> claims,
         long issuedAt,
         long expiresAt,
-        String tokenId,
-        String tenant) {
+        String tokenId) {
+
     /**
      * Creates an empty/anonymous auth context.
      */
@@ -41,7 +40,6 @@ public record AuthContext(
                 Collections.emptyMap(),
                 0,
                 0,
-                null,
                 null);
     }
 
@@ -122,39 +120,10 @@ public record AuthContext(
      */
     public AuthContext withRolesAndPermissions(Set<String> roles, Set<String> permissions) {
         return new AuthContext(
-                userId,
-                email,
-                name,
-                preferredUsername,
-                issuer,
-                audience,
+                userId, email, name, preferredUsername, issuer, audience,
                 roles != null ? Set.copyOf(roles) : Collections.emptySet(),
                 permissions != null ? Set.copyOf(permissions) : Collections.emptySet(),
-                claims,
-                issuedAt,
-                expiresAt,
-                tokenId,
-                tenant);
-    }
-
-    /**
-     * Returns a copy of this context with a new tenant.
-     */
-    public AuthContext withTenant(String tenant) {
-        return new AuthContext(
-                userId,
-                email,
-                name,
-                preferredUsername,
-                issuer,
-                audience,
-                roles,
-                permissions,
-                claims,
-                issuedAt,
-                expiresAt,
-                tokenId,
-                tenant);
+                claims, issuedAt, expiresAt, tokenId);
     }
 
     /**
@@ -173,7 +142,6 @@ public record AuthContext(
         private long issuedAt;
         private long expiresAt;
         private String tokenId;
-        private String tenant;
 
         public Builder userId(String userId) {
             this.userId = userId;
@@ -235,26 +203,10 @@ public record AuthContext(
             return this;
         }
 
-        public Builder tenant(String tenant) {
-            this.tenant = tenant;
-            return this;
-        }
-
         public AuthContext build() {
             return new AuthContext(
-                    userId,
-                    email,
-                    name,
-                    preferredUsername,
-                    issuer,
-                    audience,
-                    roles,
-                    permissions,
-                    claims,
-                    issuedAt,
-                    expiresAt,
-                    tokenId,
-                    tenant);
+                    userId, email, name, preferredUsername, issuer, audience,
+                    roles, permissions, claims, issuedAt, expiresAt, tokenId);
         }
     }
 }

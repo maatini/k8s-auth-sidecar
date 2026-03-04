@@ -23,7 +23,6 @@ public class LivenessCheck implements HealthCheck {
     public HealthCheckResponse call() {
         HealthCheckResponseBuilder builder = HealthCheckResponse.named("sidecar-liveness")
                 .withData("auth.enabled", config.auth().enabled())
-                .withData("authz.enabled", config.authz().enabled())
                 .withData("opa.enabled", config.opa().enabled());
 
         return builder.up().build();

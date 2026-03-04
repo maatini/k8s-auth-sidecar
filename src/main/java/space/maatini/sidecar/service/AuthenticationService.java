@@ -9,15 +9,13 @@ import org.jboss.logging.Logger;
 import space.maatini.sidecar.config.SidecarConfig;
 import space.maatini.sidecar.model.AuthContext;
 
-import space.maatini.sidecar.util.IssuerUtils;
-
 import java.util.*;
 import java.util.stream.Collectors;
 
 /**
  * Service for extracting authentication context from JWT tokens.
- * Handles claim extraction and normalization for both Keycloak and Entra ID
- * tokens.
+ * Handles claim extraction and normalization for OIDC tokens (optimized for
+ * Keycloak).
  */
 @ApplicationScoped
 public class AuthenticationService {
@@ -36,21 +34,11 @@ public class AuthenticationService {
     private static final String CLAIM_REALM_ACCESS = "realm_access";
     private static final String CLAIM_RESOURCE_ACCESS = "resource_access";
 
-    // Entra ID-specific claims
-    private static final String CLAIM_ROLES = "roles";
-    private static final String CLAIM_GROUPS = "groups";
-    private static final String CLAIM_OID = "oid";
-    private static final String CLAIM_TID = "tid";
-    private static final String CLAIM_UPN = "upn";
-
     @Inject
     SidecarConfig config;
 
     /**
      * Extracts authentication context from a SecurityIdentity.
-     *
-     * @param identity The security identity from Quarkus OIDC
-     * @return The extracted authentication context
      */
     public AuthContext extractAuthContext(SecurityIdentity identity) {
         if (identity == null || identity.isAnonymous()) {
@@ -77,10 +65,6 @@ public class AuthenticationService {
 
     /**
      * Extracts authentication context from a JWT token with caching.
-     * Use jti claim if available, otherwise fallback to raw token as cache key.
-     *
-     * @param jwt The parsed JWT token
-     * @return The extracted authentication context
      */
     @CacheResult(cacheName = "jwt-cache")
     public AuthContext getCachedAuthContext(JsonWebToken jwt) {
@@ -90,32 +74,23 @@ public class AuthenticationService {
 
     /**
      * Extracts authentication context from a JWT token.
-     *
-     * @param jwt The parsed JWT token
-     * @return The extracted authentication context
      */
     public AuthContext extractFromJwt(JsonWebToken jwt) {
         if (jwt == null) {
             return AuthContext.anonymous();
         }
 
-        String issuer = jwt.getIssuer();
-        boolean isEntraToken = IssuerUtils.isEntraIssuer(issuer);
-
-        String userId = extractUserId(jwt, isEntraToken);
+        String userId = jwt.getSubject();
         String email = extractClaim(jwt, CLAIM_EMAIL, String.class);
         String name = extractClaim(jwt, CLAIM_NAME, String.class);
-        String preferredUsername = extractPreferredUsername(jwt, isEntraToken);
+        String preferredUsername = extractClaim(jwt, CLAIM_PREFERRED_USERNAME, String.class);
 
-        Set<String> tokenRoles = extractRoles(jwt, isEntraToken);
+        Set<String> tokenRoles = extractRoles(jwt);
         List<String> audience = extractAudience(jwt);
 
         long issuedAt = extractLongClaim(jwt, CLAIM_IAT);
         long expiresAt = extractLongClaim(jwt, CLAIM_EXP);
         String tokenId = extractClaim(jwt, CLAIM_JTI, String.class);
-        String tenant = isEntraToken
-                ? extractClaim(jwt, CLAIM_TID, String.class)
-                : IssuerUtils.extractTenantFromIssuer(issuer);
 
         Map<String, Object> claims = extractAllClaims(jwt);
 
@@ -124,68 +99,28 @@ public class AuthenticationService {
                 .email(email)
                 .name(name)
                 .preferredUsername(preferredUsername)
-                .issuer(issuer)
+                .issuer(jwt.getIssuer())
                 .audience(audience)
                 .roles(tokenRoles)
-                .permissions(Collections.emptySet()) // Filled later by authorization service
+                .permissions(Collections.emptySet())
                 .claims(claims)
                 .issuedAt(issuedAt)
                 .expiresAt(expiresAt)
                 .tokenId(tokenId)
-                .tenant(tenant)
                 .build();
 
-        LOG.debugf("Extracted auth context for user: %s, roles: %s, tenant: %s",
-                userId, tokenRoles, tenant);
+        LOG.debugf("Extracted auth context for user: %s, roles: %s", userId, tokenRoles);
 
         return context;
     }
 
     /**
-     * Extracts the user ID from the token.
-     * For Entra ID, uses 'oid' claim; for Keycloak, uses 'sub' claim.
+     * Extracts roles from the Keycloak token.
      */
-    private String extractUserId(JsonWebToken jwt, boolean isEntraToken) {
-        if (isEntraToken) {
-            // Entra ID uses 'oid' as the immutable user identifier
-            String oid = extractClaim(jwt, CLAIM_OID, String.class);
-            if (oid != null) {
-                return oid;
-            }
-        }
-        // Fall back to 'sub' claim
-        return jwt.getSubject();
-    }
-
-    /**
-     * Extracts the preferred username from the token.
-     */
-    private String extractPreferredUsername(JsonWebToken jwt, boolean isEntraToken) {
-        String username = extractClaim(jwt, CLAIM_PREFERRED_USERNAME, String.class);
-        if (username == null && isEntraToken) {
-            username = extractClaim(jwt, CLAIM_UPN, String.class);
-        }
-        return username;
-    }
-
-    /**
-     * Extracts roles from the token based on the identity provider.
-     */
-    private Set<String> extractRoles(JsonWebToken jwt, boolean isEntraToken) {
+    private Set<String> extractRoles(JsonWebToken jwt) {
         Set<String> roles = new HashSet<>();
-
-        if (isEntraToken) {
-            // Entra ID: roles are in 'roles' claim
-            roles.addAll(extractClaimAsStringSet(jwt, CLAIM_ROLES));
-            // Also check 'groups' claim
-            roles.addAll(extractClaimAsStringSet(jwt, CLAIM_GROUPS));
-        } else {
-            // Keycloak: roles are in 'realm_access.roles' and
-            // 'resource_access.{client}.roles'
-            roles.addAll(extractKeycloakRealmRoles(jwt));
-            roles.addAll(extractKeycloakResourceRoles(jwt));
-        }
-
+        roles.addAll(extractKeycloakRealmRoles(jwt));
+        roles.addAll(extractKeycloakResourceRoles(jwt));
         return roles;
     }
 
@@ -288,6 +223,7 @@ public class AuthenticationService {
     /**
      * Extracts a typed claim from the token.
      */
+    @SuppressWarnings("unchecked")
     private <T> T extractClaim(JsonWebToken jwt, String claimName, Class<T> type) {
         try {
             return (T) jwt.getClaim(claimName);
@@ -313,28 +249,5 @@ public class AuthenticationService {
             return ((Number) value).longValue();
         }
         return 0;
-    }
-
-    /**
-     * Extracts a claim as a set of strings.
-     */
-    private Set<String> extractClaimAsStringSet(JsonWebToken jwt, String claimName) {
-        Object value;
-        try {
-            value = jwt.getClaim(claimName);
-        } catch (Exception e) {
-            LOG.debugf("Failed to extract string set claim '%s': %s", claimName, e.getMessage());
-            return Collections.emptySet();
-        }
-
-        if (value instanceof Collection) {
-            return ((Collection<?>) value).stream()
-                    .filter(String.class::isInstance)
-                    .map(String.class::cast)
-                    .collect(Collectors.toSet());
-        } else if (value instanceof String) {
-            return Set.of((String) value);
-        }
-        return Collections.emptySet();
     }
 }

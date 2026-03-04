@@ -17,12 +17,10 @@ import jakarta.ws.rs.core.UriInfo;
 import org.jboss.logging.Logger;
 import org.jboss.resteasy.reactive.server.ServerRequestFilter;
 import space.maatini.sidecar.config.SidecarConfig;
-import space.maatini.sidecar.model.AuthContext;
 import space.maatini.sidecar.model.PolicyDecision;
 import space.maatini.sidecar.service.AuthenticationService;
 import space.maatini.sidecar.service.PolicyService;
 import space.maatini.sidecar.service.ProxyService;
-import space.maatini.sidecar.service.RolesService;
 import space.maatini.sidecar.util.PathMatcher;
 import space.maatini.sidecar.util.RequestUtils;
 
@@ -34,7 +32,7 @@ import java.util.concurrent.TimeUnit;
 /**
  * Main request filter that intercepts all incoming requests and performs:
  * 1. Authentication (via Quarkus OIDC)
- * 2. Authorization (via OPA policies)
+ * 2. Authorization (via embedded OPA policies)
  * 3. Proxying to the backend container
  */
 @ApplicationScoped
@@ -52,9 +50,6 @@ public class AuthProxyFilter {
 
     @Inject
     AuthenticationService authenticationService;
-
-    @Inject
-    RolesService rolesService;
 
     @Inject
     PolicyService policyService;
@@ -106,22 +101,18 @@ public class AuthProxyFilter {
         String path = requestContext.getUriInfo().getPath();
         String method = requestContext.getMethod();
 
-        // Ensure request has an ID for tracing
         ensureRequestId(requestContext);
 
-        // Skip auth for public paths
         if (isPublicPath(path)) {
             LOG.debugf("Skipping auth for public path: %s", path);
             return Uni.createFrom().nullItem();
         }
 
-        // Skip auth for internal Quarkus paths
         if (PathMatcher.isInternalPath(path)) {
             LOG.debugf("Skipping auth for internal path: %s", path);
             return Uni.createFrom().nullItem();
         }
 
-        // Check if auth is enabled
         if (!config.auth().enabled()) {
             LOG.debug("Authentication is disabled");
             return Uni.createFrom().nullItem();
@@ -144,35 +135,26 @@ public class AuthProxyFilter {
             authSuccessCounter.increment();
             LOG.debugf("Authenticated user: %s", authContext.userId());
 
-            // Store auth context for later use
             requestContext.setProperty(AUTH_CONTEXT_PROPERTY, authContext);
 
-            // Enrich with roles and evaluate policy reactively
+            // Evaluate policy directly (no roles enrichment step)
+            if (!config.authz().enabled()) {
+                return Uni.createFrom().item((Response) null);
+            }
+
             Map<String, String> headers = RequestUtils.extractHeaders(requestContext);
             Map<String, String> queryParams = RequestUtils.extractQueryParams(requestContext.getUriInfo());
 
-            // REACTIVE FIX – Gemini 3 Flash P0.2
-            return rolesService.enrichWithRoles(authContext)
-                    .flatMap(enriched -> {
-                        if (!config.authz().enabled()) {
-                            return Uni.createFrom().item(enriched);
+            return policyService.evaluate(authContext, method, path, headers, queryParams)
+                    .map(decision -> {
+                        if (!decision.allowed()) {
+                            throw new AuthorizationDeniedException(decision);
                         }
-                        return policyService.evaluate(enriched, method, path, headers, queryParams)
-                                .map(decision -> {
-                                    if (!decision.allowed()) {
-                                        throw new AuthorizationDeniedException(decision);
-                                    }
-                                    return enriched;
-                                });
-                    })
-                    .onItem().invoke(enrichedContext -> {
                         authzAllowCounter.increment();
                         LOG.debugf("Authorization allowed for user %s on %s %s",
-                                enrichedContext.userId(), method, path);
-                        // Update stored context with enriched version
-                        requestContext.setProperty(AUTH_CONTEXT_PROPERTY, enrichedContext);
-                    })
-                    .map(ignored -> (Response) null); // Continuing the filter chain
+                                authContext.userId(), method, path);
+                        return (Response) null; // Continue filter chain
+                    });
         }).onFailure().recoverWithItem(error -> {
             AuthorizationDeniedException authzEx = findCause(error, AuthorizationDeniedException.class);
             if (authzEx != null) {
@@ -194,10 +176,6 @@ public class AuthProxyFilter {
         });
     }
 
-    /**
-     * Exception used to short-circuit the reactive pipeline on authorization
-     * denial.
-     */
     private static class AuthorizationDeniedException extends RuntimeException {
         final PolicyDecision decision;
 
@@ -213,21 +191,14 @@ public class AuthProxyFilter {
         }
     }
 
-    /**
-     * Ensures the request has a unique ID for tracing.
-     */
     private void ensureRequestId(ContainerRequestContext requestContext) {
         String requestId = requestContext.getHeaderString(REQUEST_ID_HEADER);
         if (requestId == null || requestId.isEmpty()) {
             requestId = UUID.randomUUID().toString();
-            // Note: We can't add headers to the incoming request, but we can track it
             requestContext.setProperty(REQUEST_ID_HEADER, requestId);
         }
     }
 
-    /**
-     * Checks if a path is public and doesn't require authentication.
-     */
     private boolean isPublicPath(String path) {
         return PathMatcher.matchesAny(path, config.auth().publicPaths());
     }
@@ -257,9 +228,6 @@ public class AuthProxyFilter {
                 .build();
     }
 
-    /**
-     * Walks the exception cause chain to find an exception of the given type.
-     */
     @SuppressWarnings("unchecked")
     private static <T extends Throwable> T findCause(Throwable t, Class<T> type) {
         Throwable current = t;
@@ -272,9 +240,6 @@ public class AuthProxyFilter {
         return null;
     }
 
-    /**
-     * Error response structure.
-     */
     public record ErrorResponse(
             String code,
             String message,

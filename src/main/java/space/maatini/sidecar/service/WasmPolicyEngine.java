@@ -37,7 +37,7 @@ public class WasmPolicyEngine {
 
     @PostConstruct
     void init() {
-        if (config.opa().enabled() && "embedded".equals(config.opa().mode())) {
+        if (config.opa().enabled()) {
             loadWasmModule();
             startHotReloadWatcher();
         }
@@ -51,6 +51,10 @@ public class WasmPolicyEngine {
         }
     }
 
+    public boolean isModuleLoaded() {
+        return wasmPolicyRef.get() != null;
+    }
+
     public Uni<PolicyDecision> evaluateEmbeddedWasm(PolicyInput input) {
         OpaPolicy policy = wasmPolicyRef.get();
         if (policy == null) {
@@ -62,9 +66,9 @@ public class WasmPolicyEngine {
             try {
                 String inputJson = objectMapper.writeValueAsString(input);
                 String resultJson = policy.evaluate(inputJson);
+                LOG.debugf("WASM evaluation result: %s", resultJson);
 
                 JsonNode resultNode = objectMapper.readTree(resultJson);
-                // WASM liefert ein Array, das erste Element enthält das Result
                 if (resultNode.isArray() && resultNode.size() > 0) {
                     JsonNode resultObj = resultNode.get(0).get("result");
                     return PolicyService.parsePolicyResult(resultObj);
@@ -92,20 +96,44 @@ public class WasmPolicyEngine {
                 }
                 try (InputStream is = Thread.currentThread().getContextClassLoader().getResourceAsStream(cpPath)) {
                     if (is == null) {
+                        LOG.errorf("Resource not found in classpath: %s", cpPath);
                         throw new IOException("Resource not found in classpath: " + cpPath);
                     }
                     wasmBytes = is.readAllBytes();
                 }
             } else {
-                wasmBytes = Files.readAllBytes(Paths.get(wasmPath));
+                Path path = Paths.get(wasmPath);
+                if (!Files.exists(path)) {
+                    LOG.errorf("WASM file not found: %s", wasmPath);
+                    throw new IOException("WASM file not found: " + wasmPath);
+                }
+                wasmBytes = Files.readAllBytes(path);
             }
 
             OpaPolicy newPolicy = OpaPolicy.builder().withPolicy(wasmBytes).build();
             wasmPolicyRef.set(newPolicy);
-            LOG.infof("Successfully loaded OPA WASM module from %s", wasmPath);
+            LOG.infof("Successfully loaded OPA WASM module from %s (%d bytes)", wasmPath, wasmBytes.length);
         } catch (Exception e) {
-            LOG.errorf(e, "Failed to load OPA WASM module from %s. Requests will be denied.", wasmPath);
+            LOG.errorf(e, "Failed to load OPA WASM module from %s: %s", wasmPath, e.getMessage());
         }
+    }
+
+    public Path resolvePath(String path) {
+        if (path.startsWith("classpath:")) {
+            String cpPath = path.substring("classpath:".length());
+            if (cpPath.startsWith("/")) {
+                cpPath = cpPath.substring(1);
+            }
+            var url = Thread.currentThread().getContextClassLoader().getResource(cpPath);
+            if (url == null)
+                return null;
+            try {
+                return Paths.get(url.toURI());
+            } catch (Exception e) {
+                return null;
+            }
+        }
+        return Paths.get(path);
     }
 
     /**
@@ -183,9 +211,12 @@ public class WasmPolicyEngine {
             }
 
             ProcessBuilder pb = new ProcessBuilder(
-                    "opa", "build", "-t", "wasm", "-e",
-                    config.opa().defaultPackage() + "/" + config.opa().defaultRule(),
-                    "-o", outPath, policyDir.toAbsolutePath().toString());
+                    "sh", "-c",
+                    String.format(
+                            "opa build -t wasm -e %s/%s -o bundle.tar.gz %s && tar -xzOf bundle.tar.gz /policy.wasm > %s && rm bundle.tar.gz",
+                            config.opa().defaultPackage(), config.opa().defaultRule(),
+                            policyDir.toAbsolutePath(), outPath));
+            pb.directory(policyDir.toFile());
             pb.redirectErrorStream(true);
             Process p = pb.start();
             int exitCode = p.waitFor();

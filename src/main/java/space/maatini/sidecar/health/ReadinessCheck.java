@@ -1,8 +1,6 @@
 package space.maatini.sidecar.health;
 
-import io.smallrye.mutiny.Uni;
 import io.vertx.mutiny.core.Vertx;
-import io.vertx.mutiny.core.buffer.Buffer;
 import io.vertx.mutiny.ext.web.client.WebClient;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
@@ -19,8 +17,7 @@ import java.time.Duration;
 
 /**
  * Readiness health check for the sidecar.
- * Verifies that all required dependencies (backend, roles service, OPA) are
- * reachable.
+ * Verifies that the backend service is reachable.
  */
 @Readiness
 @ApplicationScoped
@@ -67,22 +64,8 @@ public class ReadinessCheck implements HealthCheck {
             allHealthy = false;
         }
 
-        // Check OPA connectivity (if external)
-        if (config.opa().enabled() && "external".equals(config.opa().mode())) {
-            try {
-                boolean opaHealthy = checkOpa();
-                builder.withData("opa.connected", opaHealthy);
-                if (!opaHealthy) {
-                    allHealthy = false;
-                }
-            } catch (Exception e) {
-                builder.withData("opa.connected", false);
-                builder.withData("opa.error", e.getMessage());
-                allHealthy = false;
-            }
-        } else {
-            builder.withData("opa.mode", config.opa().mode());
-        }
+        // OPA is always embedded – no connectivity check needed
+        builder.withData("opa.embedded", config.opa().enabled());
 
         if (allHealthy) {
             return builder.up().build();
@@ -107,7 +90,6 @@ public class ReadinessCheck implements HealthCheck {
             return response.statusCode() >= 200 && response.statusCode() < 500;
         } catch (Exception e) {
             LOG.debugf("Backend health check failed: %s", e.getMessage());
-            // Try a simple TCP connection check
             try {
                 var socket = vertx.createNetClient()
                         .connect(port, host)
@@ -117,25 +99,6 @@ public class ReadinessCheck implements HealthCheck {
             } catch (Exception ex) {
                 return false;
             }
-        }
-    }
-
-    /**
-     * Checks if the external OPA server is reachable.
-     */
-    private boolean checkOpa() {
-        String opaUrl = config.opa().external().url();
-
-        try {
-            var response = webClient.getAbs(opaUrl + "/health")
-                    .timeout(2000)
-                    .send()
-                    .await().atMost(Duration.ofSeconds(3));
-
-            return response.statusCode() == 200;
-        } catch (Exception e) {
-            LOG.debugf("OPA health check failed: %s", e.getMessage());
-            return false;
         }
     }
 }

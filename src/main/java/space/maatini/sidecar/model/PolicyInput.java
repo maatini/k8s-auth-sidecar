@@ -5,13 +5,15 @@ import java.util.Set;
 
 /**
  * Input model for OPA policy evaluation.
- * This structure is passed to the policy engine for authorization decisions.
+ * This structure is passed to the embedded WASM policy engine for authorization
+ * decisions.
  */
 public record PolicyInput(
         RequestInfo request,
         UserInfo user,
         ResourceInfo resource,
         Map<String, Object> context) {
+
     /**
      * Creates a PolicyInput from AuthContext and request information.
      */
@@ -28,11 +30,9 @@ public record PolicyInput(
                         authContext.userId(),
                         authContext.email(),
                         authContext.roles(),
-                        authContext.permissions(),
-                        authContext.tenant()),
+                        authContext.permissions()),
                 ResourceInfo.fromPath(path),
-                Map.of(
-                        "source", "rr-sidecar"));
+                Map.of("source", "k8s-auth-sidecar"));
     }
 
     /**
@@ -43,9 +43,7 @@ public record PolicyInput(
             String path,
             Map<String, String> headers,
             Map<String, String> queryParams) {
-        /**
-         * Returns the path segments as an array.
-         */
+
         public String[] pathSegments() {
             if (path == null || path.isEmpty()) {
                 return new String[0];
@@ -62,8 +60,7 @@ public record PolicyInput(
             String id,
             String email,
             Set<String> roles,
-            Set<String> permissions,
-            String tenant) {
+            Set<String> permissions) {
     }
 
     /**
@@ -73,10 +70,7 @@ public record PolicyInput(
             String type,
             String id,
             String action) {
-        /**
-         * Extracts resource information from a REST API path.
-         * Assumes paths like /api/v1/{resource}/{id} or /api/v1/{resource}
-         */
+
         public static ResourceInfo fromPath(String path) {
             if (path == null || path.isEmpty()) {
                 return new ResourceInfo(null, null, null);
@@ -86,8 +80,6 @@ public record PolicyInput(
             String type = null;
             String id = null;
 
-            // Find resource type and ID from path
-            // Skip empty segments and version segments (v1, v2, etc.)
             int resourceIndex = -1;
             for (int i = 0; i < segments.length; i++) {
                 String segment = segments[i];
@@ -98,7 +90,6 @@ public record PolicyInput(
                     type = segment;
                     resourceIndex = i;
                 } else if (i == resourceIndex + 1 && !segment.isEmpty()) {
-                    // Assume the next segment after resource type is the ID
                     id = segment;
                     break;
                 }

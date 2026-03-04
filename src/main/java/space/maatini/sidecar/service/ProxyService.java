@@ -18,9 +18,6 @@ import jakarta.annotation.PreDestroy;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.jboss.logging.Logger;
-import org.eclipse.microprofile.faulttolerance.CircuitBreaker;
-import org.eclipse.microprofile.faulttolerance.Fallback;
-import org.eclipse.microprofile.faulttolerance.Retry;
 import space.maatini.sidecar.config.SidecarConfig;
 import space.maatini.sidecar.model.AuthContext;
 
@@ -64,7 +61,6 @@ public class ProxyService {
 
         this.webClient = WebClient.create(vertx, options);
 
-        // Initialize metrics
         this.requestCounter = Counter.builder("sidecar.proxy.requests")
                 .description("Total number of proxied requests")
                 .register(meterRegistry);
@@ -87,18 +83,7 @@ public class ProxyService {
 
     /**
      * Proxies a request to the backend service.
-     *
-     * @param method      The HTTP method
-     * @param path        The request path
-     * @param headers     The request headers
-     * @param queryParams The query parameters
-     * @param body        The request body (may be null)
-     * @param authContext The authentication context
-     * @return A Uni containing the proxy response
      */
-    @Retry(maxRetries = 2, delay = 200, retryOn = Exception.class)
-    @CircuitBreaker(requestVolumeThreshold = 20, failureRatio = 0.5, delay = 5000)
-    @Fallback(fallbackMethod = "fallbackProxy")
     public Uni<ProxyResponse> proxy(
             String method,
             String path,
@@ -137,7 +122,6 @@ public class ProxyService {
 
         // Send request with or without body
         Uni<HttpResponse<Buffer>> responseUni;
-        // STREAMING FIX – Gemini 3 Flash P0.1
         if (clientRequest != null && (method.equalsIgnoreCase("POST") || method.equalsIgnoreCase("PUT")
                 || method.equalsIgnoreCase("PATCH"))) {
             io.vertx.mutiny.core.http.HttpServerRequest mutinyReq = io.vertx.mutiny.core.http.HttpServerRequest
@@ -157,18 +141,11 @@ public class ProxyService {
 
                     return toProxyResponse(response);
                 })
-                .onFailure().invoke(error -> {
+                .onFailure().recoverWithItem(error -> {
                     errorCounter.increment();
-                    LOG.errorf("Proxy request failed: %s", error.getMessage());
+                    LOG.errorf("Proxy request failed for %s %s: %s", method, path, error.getMessage());
+                    return ProxyResponse.error(503, "Service Unavailable: Backend system cannot be reached.");
                 });
-    }
-
-    public Uni<ProxyResponse> fallbackProxy(String method, String path, Map<String, String> headers,
-            Map<String, String> queryParams, io.vertx.core.http.HttpServerRequest clientRequest,
-            AuthContext authContext, Throwable t) {
-        LOG.errorf("Fallback triggered for proxy on %s %s: %s", method, path, t.getMessage());
-        return Uni.createFrom()
-                .item(ProxyResponse.error(503, "Service Unavailable: Backend system cannot be reached."));
     }
 
     /**
@@ -183,7 +160,6 @@ public class ProxyService {
         for (String headerName : propagateList) {
             String value = headers.get(headerName);
             if (value == null) {
-                // Try case-insensitive lookup
                 value = headers.entrySet().stream()
                         .filter(e -> e.getKey().equalsIgnoreCase(headerName) && e.getValue() != null)
                         .map(Map.Entry::getValue)
@@ -232,9 +208,6 @@ public class ProxyService {
             if (authContext.roles() != null && !authContext.roles().isEmpty()) {
                 request.putHeader("X-Auth-User-Roles", String.join(",", authContext.roles()));
             }
-            if (authContext.tenant() != null) {
-                request.putHeader("X-Auth-Tenant", authContext.tenant());
-            }
             return;
         }
 
@@ -250,7 +223,7 @@ public class ProxyService {
 
     /**
      * Resolves placeholders in header values.
-     * Supports: ${user.id}, ${user.email}, ${user.roles}, ${user.tenant}
+     * Supports: ${user.id}, ${user.email}, ${user.roles}, ${user.name}
      */
     String resolvePlaceholders(String template, AuthContext authContext) {
         if (template == null) {
@@ -262,7 +235,6 @@ public class ProxyService {
         result = result.replace("${user.email}", authContext.email() != null ? authContext.email() : "");
         result = result.replace("${user.roles}",
                 authContext.roles() != null ? String.join(",", authContext.roles()) : "");
-        result = result.replace("${user.tenant}", authContext.tenant() != null ? authContext.tenant() : "");
         result = result.replace("${user.name}", authContext.name() != null ? authContext.name() : "");
 
         return result;
@@ -294,9 +266,7 @@ public class ProxyService {
             String statusMessage,
             Map<String, String> headers,
             Buffer body) {
-        /**
-         * Creates an error response.
-         */
+
         public static ProxyResponse error(int statusCode, String message) {
             String sanitizedMessage = message != null ? message.replace("\"", "\\\"") : "Internal error";
             String jsonRaw = "{\"error\":\"" + sanitizedMessage + "\"}";
@@ -307,16 +277,10 @@ public class ProxyService {
                     Buffer.buffer(jsonRaw));
         }
 
-        /**
-         * Returns true if this is a successful response (2xx status).
-         */
         public boolean isSuccess() {
             return statusCode >= 200 && statusCode < 300;
         }
 
-        /**
-         * Returns the body as a string.
-         */
         public String bodyAsString() {
             return body != null ? body.toString() : "";
         }

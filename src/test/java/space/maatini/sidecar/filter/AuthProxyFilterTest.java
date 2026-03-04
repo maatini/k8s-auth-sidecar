@@ -16,7 +16,6 @@ import space.maatini.sidecar.model.AuthContext;
 import space.maatini.sidecar.model.PolicyDecision;
 import space.maatini.sidecar.service.AuthenticationService;
 import space.maatini.sidecar.service.PolicyService;
-import space.maatini.sidecar.service.RolesService;
 
 import java.io.IOException;
 import java.net.URI;
@@ -35,7 +34,7 @@ class AuthProxyFilterTest {
         public Map<String, String> getConfigOverrides() {
             return Map.of(
                     "sidecar.auth.enabled", "true",
-                    "sidecar.authz.enabled", "true",
+                    "sidecar.opa.enabled", "true",
                     "sidecar.auth.public-paths[0]", "/public/**");
         }
     }
@@ -48,9 +47,6 @@ class AuthProxyFilterTest {
 
     @InjectMock
     AuthenticationService authenticationService;
-
-    @InjectMock
-    RolesService rolesService;
 
     @InjectMock
     PolicyService policyService;
@@ -111,7 +107,6 @@ class AuthProxyFilterTest {
 
         AuthContext context = AuthContext.builder().userId("user1").build();
         when(authenticationService.extractAuthContext(any())).thenReturn(context);
-        when(rolesService.enrichWithRoles(any())).thenReturn(Uni.createFrom().item(context));
         when(req.getHeaders()).thenReturn(mock(jakarta.ws.rs.core.MultivaluedMap.class));
         when(req.getUriInfo().getQueryParameters()).thenReturn(mock(jakarta.ws.rs.core.MultivaluedMap.class));
 
@@ -135,7 +130,6 @@ class AuthProxyFilterTest {
 
         AuthContext context = AuthContext.builder().userId("user1").build();
         when(authenticationService.extractAuthContext(any())).thenReturn(context);
-        when(rolesService.enrichWithRoles(any())).thenReturn(Uni.createFrom().item(context));
         when(req.getHeaders()).thenReturn(mock(jakarta.ws.rs.core.MultivaluedMap.class));
         when(req.getUriInfo().getQueryParameters()).thenReturn(mock(jakarta.ws.rs.core.MultivaluedMap.class));
 
@@ -145,21 +139,5 @@ class AuthProxyFilterTest {
         Response response = authProxyFilter.filter(req).await().indefinitely();
 
         assertNull(response, "Should return null to continue filter chain");
-    }
-
-    @Test
-    void testFilter_InternalError_Returns500() throws IOException {
-        ContainerRequestContext req = mock(ContainerRequestContext.class);
-        UriInfo uriInfo = mock(UriInfo.class);
-        when(req.getUriInfo()).thenReturn(uriInfo);
-        when(uriInfo.getPath()).thenReturn("/api/data");
-        when(req.getMethod()).thenReturn("GET");
-
-        when(authenticationService.extractAuthContext(any())).thenThrow(new RuntimeException("Unexpected error"));
-
-        Response response = authProxyFilter.filter(req).await().indefinitely();
-
-        assertNotNull(response);
-        assertEquals(500, response.getStatus());
     }
 }

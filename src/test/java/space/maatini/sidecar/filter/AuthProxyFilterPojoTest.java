@@ -1,8 +1,7 @@
 package space.maatini.sidecar.filter;
 
-import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
-import io.micrometer.core.instrument.Timer;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.quarkus.security.identity.SecurityIdentity;
 import io.smallrye.mutiny.Uni;
 import jakarta.ws.rs.container.ContainerRequestContext;
@@ -17,10 +16,9 @@ import space.maatini.sidecar.model.PolicyDecision;
 import space.maatini.sidecar.service.AuthenticationService;
 import space.maatini.sidecar.service.PolicyService;
 import space.maatini.sidecar.service.ProxyService;
-import space.maatini.sidecar.service.RolesService;
 
 import java.lang.reflect.Field;
-import java.net.URI;
+import java.util.Collections;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -31,47 +29,39 @@ class AuthProxyFilterPojoTest {
 
     private AuthProxyFilter filter;
     private SidecarConfig config;
+    private SecurityIdentity securityIdentity;
     private AuthenticationService authService;
-    private RolesService rolesService;
     private PolicyService policyService;
-    private ContainerRequestContext requestContext;
-    private UriInfo uriInfo;
+    private ProxyService proxyService;
+    private MeterRegistry meterRegistry;
 
     @BeforeEach
     void setup() throws Exception {
         filter = new AuthProxyFilter();
-
         config = mock(SidecarConfig.class);
+        securityIdentity = mock(SecurityIdentity.class);
         authService = mock(AuthenticationService.class);
-        rolesService = mock(RolesService.class);
         policyService = mock(PolicyService.class);
-        MeterRegistry registry = mock(MeterRegistry.class);
-        Counter mockCounter = mock(Counter.class);
-        Timer mockTimer = mock(Timer.class);
+        proxyService = mock(ProxyService.class);
+        meterRegistry = new SimpleMeterRegistry();
 
         setField(filter, "config", config);
+        setField(filter, "securityIdentity", securityIdentity);
         setField(filter, "authenticationService", authService);
-        setField(filter, "rolesService", rolesService);
         setField(filter, "policyService", policyService);
-        setField(filter, "meterRegistry", registry);
+        setField(filter, "proxyService", proxyService);
+        setField(filter, "meterRegistry", meterRegistry);
 
-        setField(filter, "authSuccessCounter", mockCounter);
-        setField(filter, "authFailureCounter", mockCounter);
-        setField(filter, "authzAllowCounter", mockCounter);
-        setField(filter, "authzDenyCounter", mockCounter);
-        setField(filter, "authTimer", mockTimer);
-
-        requestContext = mock(ContainerRequestContext.class);
-        uriInfo = mock(UriInfo.class);
-        when(requestContext.getUriInfo()).thenReturn(uriInfo);
-        when(uriInfo.getQueryParameters()).thenReturn(new MultivaluedHashMap<>());
-        when(requestContext.getMethod()).thenReturn("GET");
-        when(requestContext.getHeaders()).thenReturn(new MultivaluedHashMap<>());
-
+        // Common config
         SidecarConfig.AuthConfig authConfig = mock(SidecarConfig.AuthConfig.class);
+        SidecarConfig.AuthzConfig authzConfig = mock(SidecarConfig.AuthzConfig.class);
         when(config.auth()).thenReturn(authConfig);
+        when(config.authz()).thenReturn(authzConfig);
         when(authConfig.enabled()).thenReturn(true);
-        when(authConfig.publicPaths()).thenReturn(List.of("/public/*"));
+        when(authzConfig.enabled()).thenReturn(true);
+        when(authConfig.publicPaths()).thenReturn(Collections.emptyList());
+
+        filter.init();
     }
 
     private void setField(Object target, String name, Object value) throws Exception {
@@ -82,90 +72,81 @@ class AuthProxyFilterPojoTest {
 
     @Test
     void testFilter_InternalPath() {
+        ContainerRequestContext context = mock(ContainerRequestContext.class);
+        UriInfo uriInfo = mock(UriInfo.class);
+        when(context.getUriInfo()).thenReturn(uriInfo);
         when(uriInfo.getPath()).thenReturn("/q/health");
-        Response response = filter.filter(requestContext).await().indefinitely();
-        assertNull(response); // returns Uni.createFrom().nullItem() for skipped auth
+
+        Response res = filter.filter(context).await().indefinitely();
+        assertNull(res);
+        verify(authService, never()).extractAuthContext(any(SecurityIdentity.class));
     }
 
     @Test
-    void testFilter_PublicPath_NoRequestId() {
-        when(uriInfo.getPath()).thenReturn("/public/info");
-        when(requestContext.getHeaderString("X-Request-ID")).thenReturn(null);
-        Response response = filter.filter(requestContext).await().indefinitely();
-        assertNull(response);
-        verify(requestContext).setProperty(eq("X-Request-ID"), anyString()); // ensures uuid was generated
+    void testFilter_PublicPath() {
+        when(config.auth().publicPaths()).thenReturn(List.of("/health"));
+        ContainerRequestContext context = mock(ContainerRequestContext.class);
+        UriInfo uriInfo = mock(UriInfo.class);
+        when(context.getUriInfo()).thenReturn(uriInfo);
+        when(uriInfo.getPath()).thenReturn("/health");
+
+        Response res = filter.filter(context).await().indefinitely();
+        assertNull(res);
+        verify(authService, never()).extractAuthContext(any(SecurityIdentity.class));
     }
 
     @Test
-    void testFilter_AuthzDisabled() {
-        when(uriInfo.getPath()).thenReturn("/api/secured");
-        when(requestContext.getHeaderString("X-Request-ID")).thenReturn("req-123");
+    void testFilter_AuthFailure() {
+        ContainerRequestContext context = mock(ContainerRequestContext.class);
+        UriInfo uriInfo = mock(UriInfo.class);
+        when(context.getUriInfo()).thenReturn(uriInfo);
+        when(uriInfo.getPath()).thenReturn("/api/data");
+        when(context.getMethod()).thenReturn("GET");
 
-        SidecarConfig.AuthzConfig authzConfig = mock(SidecarConfig.AuthzConfig.class);
-        when(config.authz()).thenReturn(authzConfig);
-        when(authzConfig.enabled()).thenReturn(false); // AuthZ explicitly disabled
+        when(authService.extractAuthContext(eq(securityIdentity))).thenReturn(AuthContext.anonymous());
 
-        AuthContext ctx = AuthContext.builder().userId("u1").build();
-        when(authService.extractAuthContext(any())).thenReturn(ctx);
-        when(rolesService.enrichWithRoles(ctx)).thenReturn(Uni.createFrom().item(ctx));
-
-        Response response = filter.filter(requestContext).await().indefinitely();
-        assertNull(response);
+        Response res = filter.filter(context).await().indefinitely();
+        assertNotNull(res);
+        assertEquals(401, res.getStatus());
     }
 
     @Test
-    void testFilter_AuthzDenied_ForbiddenResponse() {
-        when(uriInfo.getPath()).thenReturn("/api/secured");
-        when(requestContext.getHeaderString("X-Request-ID")).thenReturn("req-123");
+    void testFilter_Success() {
+        ContainerRequestContext context = mock(ContainerRequestContext.class);
+        UriInfo uriInfo = mock(UriInfo.class);
+        when(context.getUriInfo()).thenReturn(uriInfo);
+        when(uriInfo.getPath()).thenReturn("/api/data");
+        when(uriInfo.getQueryParameters()).thenReturn(new MultivaluedHashMap<>());
+        when(context.getMethod()).thenReturn("GET");
+        when(context.getHeaders()).thenReturn(new MultivaluedHashMap<>());
 
-        SidecarConfig.AuthzConfig authzConfig = mock(SidecarConfig.AuthzConfig.class);
-        when(config.authz()).thenReturn(authzConfig);
-        when(authzConfig.enabled()).thenReturn(true);
-
-        AuthContext ctx = AuthContext.builder().userId("u1").build();
-        when(authService.extractAuthContext(any())).thenReturn(ctx);
-        when(rolesService.enrichWithRoles(ctx)).thenReturn(Uni.createFrom().item(ctx));
-
-        // Mock the Uri building for extractQueryParams
-        try {
-            when(uriInfo.getRequestUri()).thenReturn(new URI("http://host/api/secured"));
-        } catch (Exception ignored) {
-        }
-
+        AuthContext authCtx = AuthContext.builder().userId("u123").email("u@u").build();
+        when(authService.extractAuthContext(eq(securityIdentity))).thenReturn(authCtx);
         when(policyService.evaluate(any(), any(), any(), any(), any()))
-                .thenReturn(Uni.createFrom().item(PolicyDecision.deny("Not allowed", List.of("vio1"))));
+                .thenReturn(Uni.createFrom().item(PolicyDecision.allow()));
 
-        Response response = filter.filter(requestContext).await().indefinitely();
-        assertNotNull(response);
-        assertEquals(403, response.getStatus());
-
-        AuthProxyFilter.ErrorResponse err = (AuthProxyFilter.ErrorResponse) response.getEntity();
-        assertEquals("forbidden", err.code());
-        assertEquals("Not allowed", err.message());
-        assertEquals(List.of("vio1"), err.details());
+        Response res = filter.filter(context).await().indefinitely();
+        assertNull(res, "Success should return null to continue the filter chain");
+        verify(context).setProperty("auth.context", authCtx);
     }
 
     @Test
-    void testFilter_UnexpectedError_InternalServerResponse() {
-        when(uriInfo.getPath()).thenReturn("/api/secured");
-        when(requestContext.getHeaderString("X-Request-ID")).thenReturn("req-123");
+    void testFilter_Forbidden() {
+        ContainerRequestContext context = mock(ContainerRequestContext.class);
+        UriInfo uriInfo = mock(UriInfo.class);
+        when(context.getUriInfo()).thenReturn(uriInfo);
+        when(uriInfo.getPath()).thenReturn("/api/data");
+        when(uriInfo.getQueryParameters()).thenReturn(new MultivaluedHashMap<>());
+        when(context.getMethod()).thenReturn("GET");
+        when(context.getHeaders()).thenReturn(new MultivaluedHashMap<>());
 
-        SidecarConfig.AuthzConfig authzConfig = mock(SidecarConfig.AuthzConfig.class);
-        when(config.authz()).thenReturn(authzConfig);
-        when(authzConfig.enabled()).thenReturn(true);
+        AuthContext authCtx = AuthContext.builder().userId("u123").email("u@u").build();
+        when(authService.extractAuthContext(eq(securityIdentity))).thenReturn(authCtx);
+        when(policyService.evaluate(any(), any(), any(), any(), any()))
+                .thenReturn(Uni.createFrom().item(PolicyDecision.deny("Denied by test")));
 
-        AuthContext ctx = AuthContext.builder().userId("u1").build();
-        when(authService.extractAuthContext(any())).thenReturn(ctx);
-
-        // Inject an unexpected failure
-        when(rolesService.enrichWithRoles(ctx))
-                .thenReturn(Uni.createFrom().failure(new IllegalStateException("Kaboom")));
-
-        Response response = filter.filter(requestContext).await().indefinitely();
-        assertNotNull(response);
-        assertEquals(500, response.getStatus());
-        AuthProxyFilter.ErrorResponse err = (AuthProxyFilter.ErrorResponse) response.getEntity();
-        assertEquals("error", err.code());
-        assertEquals("Internal server error", err.message());
+        Response res = filter.filter(context).await().indefinitely();
+        assertNotNull(res);
+        assertEquals(403, res.getStatus());
     }
 }

@@ -68,20 +68,9 @@
             <groupId>io.quarkus</groupId>
             <artifactId>quarkus-oidc</artifactId>
         </dependency>
-        <dependency>
-            <groupId>io.quarkus</groupId>
-            <artifactId>quarkus-oidc-client</artifactId>
-        </dependency>
+
         
-        <!-- REST Client for external service calls -->
-        <dependency>
-            <groupId>io.quarkus</groupId>
-            <artifactId>quarkus-rest-client</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>io.quarkus</groupId>
-            <artifactId>quarkus-rest-client-jackson</artifactId>
-        </dependency>
+
         
         <!-- Vert.x Web Client for proxying -->
         <dependency>
@@ -100,18 +89,7 @@
             <artifactId>quarkus-cache</artifactId>
         </dependency>
         
-        <!-- Resilience / Fault Tolerance -->
-        <dependency>
-            <groupId>io.quarkus</groupId>
-            <artifactId>quarkus-smallrye-fault-tolerance</artifactId>
-        </dependency>
-        
-        <!-- Rate Limiting -->
-        <dependency>
-            <groupId>com.bucket4j</groupId>
-            <artifactId>bucket4j-core</artifactId>
-            <version>8.10.1</version>
-        </dependency>
+
         
         <!-- Health Checks -->
         <dependency>
@@ -323,11 +301,13 @@
                                     if command -v opa >/dev/null 2>&amp;1; then
                                         mkdir -p ${project.build.directory}/classes/policies &amp;&amp;
                                         opa build -t wasm -e authz/allow \
-                                            -o ${project.build.directory}/classes/policies/authz.wasm \
+                                            -o ${project.build.directory}/classes/policies/bundle.tar.gz \
                                             ${project.basedir}/src/main/resources/policies/ &amp;&amp;
-                                        echo "[OPA] WASM compiled successfully"
+                                        tar -xzOf ${project.build.directory}/classes/policies/bundle.tar.gz /policy.wasm > ${project.build.directory}/classes/policies/authz.wasm &amp;&amp;
+                                        rm ${project.build.directory}/classes/policies/bundle.tar.gz &amp;&amp;
+                                        echo "[OPA] WASM compiled and policy.wasm extracted successfully"
                                     else
-                                        echo "[OPA] opa CLI not found – using pre-compiled WASM from src/main/resources/policies/authz.wasm"
+                                        echo "[OPA] opa CLI not found – using pre-compiled WASM if available"
                                     fi
                                 </argument>
                             </arguments>

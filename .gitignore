@@ -49,3 +49,4 @@ generated/
 
 .devbox/
 .agent/skills/.agent
+tmp_ext/
