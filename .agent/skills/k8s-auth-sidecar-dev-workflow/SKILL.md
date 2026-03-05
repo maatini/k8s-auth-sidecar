@@ -1,18 +1,40 @@
 ---
 name: k8s-auth-sidecar-dev-workflow
-description: Entwickle, teste und debugge den k8s-auth-sidecar (Quarkus + WireMock + Docker-Compose). Verwende diesen Skill bei allen lokalen Dev-Aufgaben, Tests oder Mock-Setup.
+description: Lokale Entwicklung, Testing und Debugging des k8s-auth-sidecar (Quarkus + WireMock + Devbox + Coverage + Mutation Testing)
 ---
 
-# k8s-auth-sidecar Development Workflow
+**Wann diesen Skill verwenden?**  
+- Immer bei lokaler Entwicklung (`quarkus:dev`)  
+- Bei Änderungen an Filtern, Services, Policies oder Config  
+- Beim Schreiben oder Debuggen von Tests (POJO + Integration)  
+- Vor jedem Commit / PR  
 
-**Immer anwenden bei:**
-- `quarkus:dev`, Docker-Compose-Dev, WireMock-Mocks, JWT-Generierung
-- Änderungen an Config, Filters, Clients oder Policies
+**60-Sekunden-Dev-Setup (Copy & Paste)**
+```bash
+devbox shell
+docker compose -f docker-compose.dev.yml up -d          # WireMock OIDC + Roles
+mvn compile quarkus:dev                               # Sidecar starten
+export TOKEN=$(curl -s -X POST http://localhost:8090/realms/master/protocol/openid-connect/token | jq -r .access_token)
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/test
+```
 
-**Schritt-für-Schritt-Anweisung:**
-1. Starte immer zuerst `docker compose -f docker-compose.dev.yml up -d`
-2. Verwende `mvn compile quarkus:dev -Dquarkus.http.port=8080`
-3. Generiere Test-Token mit dem bereitgestellten curl-Befehl gegen WireMock-Keycloak
-4. Teste mit `curl -H "Authorization: Bearer $TOKEN" ...`
-5. Bei Policy-Änderungen: `mvn compile` (kompiliert Rego → WASM automatisch)
-6. Coverage-Ziel: ≥ 69 % (JaCoCo)
+**Wichtige Befehle**
+- `devbox run test` → alle Tests  
+- `devbox run test:coverage` → JaCoCo-Report (`target/jacoco-report`)  
+- `mvn pitest:mutationCoverage` → PIT (nur POJO + ExtTests)  
+- `mvn compile` → WASM neu bauen (`.rego` → `.wasm`)  
+
+**Test-Strategie & Ziele (2026-03-05)**
+- POJO-Tests (`*PojoTest`): >85 % Mutation Score  
+- ExtTests + QuarkusTests: >80 % Branch Coverage  
+- Gesamt: >140 Tests, 0 Failures  
+
+**Pitfalls**
+- Immer zuerst WireMock starten!  
+- In `%dev` ist `AUTH_ENABLED=false` – für echte Auth `AUTH_ENABLED=true` setzen  
+- Coverage nur mit Docker (Testcontainers) vollständig  
+
+**Verwandte Skills**  
+- pit-mutation-testing-coverage  
+- policy-testing-validation  
+- quarkus-sidecar-proxy-pattern
