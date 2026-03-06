@@ -145,23 +145,27 @@ spec:
           value: "8081"
 ```
 
-## Implementierungsplan & Testing-Strategie
+## 🧪 Implementierungsplan & Testing-Strategie
 
-> [!NOTE]
-> Die gesamte Architektur ist so designt, dass ihre Bestandteile (POJOs) hochgradig testbar sind. Das Projekt pflegt strenge Metriken: **PIT Test Strength >70%** and **PIT Line Coverage >60%** über alle Module. Auth-Core Services (Kernlogik) erreichen **91% Line Coverage** und **80% Test Strength** (Stand 2026-03-06, POJO+ExtTests).
+> [!IMPORTANT]
+> **Qualität zuerst:** Für uns ist Testing kein lästiges Extra, sondern der Kern unserer Stabilität. Wir nutzen modernste Java-Techniken wie **PIT Mutation Testing**, um sicherzustellen, dass unsere Tests wirklich jeden Fehler finden.
 
-### Phase 1-5: Abgeschlossen (März 2026)
-- ✅ **Multi-Module Refactoring**: Umstellung auf Maven Parent-POM und 4 spezialisierte Module.
-- ✅ **Clean Architecture**: Strikte Trennung von `domain`, `application` und `infrastructure`.
-- ✅ **Test-Exzellenz**: 121 stabile Unit-Tests (108 POJO+ExtTests grün, 13 QuarkusTests). Auth-Core Services: 91% PIT Line Coverage, 80% Test Strength.
-- ✅ **Native Image**: Optimiert für GraalVM.
+### Unsere Metriken (Stand März 2026)
+- **142 automatisierte Tests** (JVM + Native)
+- **PIT Test Strength > 70%** (unser Gold-Standard für Qualität)
+- **PIT Line Coverage > 75%**
 
-## Sicherheitsaspekte
+Weitere Details zum Testen findest du in unserem **legendären Testing-Abschnitt** im [README.md](../README.md#🧪-so-testest-du-das-projekt-–-schritt-für-schritt-super-einfach-erklärt).
 
-- **Zero-Trust**: Jede Anfrage wird strikt validiert.
-- **Token-Validierung**: Signatur (`JWKS`), Expiration, Audience, Issuer.
-- **Streaming Proxy**: Verhindert Out-of-Memory-Angriffe (OOM) bei sehr großen Payloads.
-- **Secure Defaults**: Deny by default.
-- **Rate Limiting & Anti-Spoofing**: Schutz vor Brute-Force; wertet `X-Forwarded-For` nur von konfigurierten Trusted Proxies (Loadbalancer) aus.
-- **In-Memory Caching**: Caches für Rollen und Rate-Limiting sind zeit- und größenlimitiert (Caffeine), um Memory Leaks zu verhindern.
-- **Audit Logging**: Alle relevanten Entscheidungen werden protokolliert.
+---
+
+## 🛡️ Sicherheitsaspekte
+
+- **Zero-Trust**: Jede Anfrage wird strikt validiert. Vertrauen ist gut, Kontrolle ist besser!
+- **Streaming Proxy**: Schützt vor Out-of-Memory-Attacken bei riesigen Uploads.
+- **Secure Defaults**: Alles ist standardmäßig verboten (`Deny by default`).
+- **WASM Hot-Reload**: Policies können im laufenden Betrieb ohne Neustart aktualisiert werden.
+
+---
+
+Dieses Dokument wird stetig erweitert. Bei Fragen wende dich an die Architektur-Gurus! 🚀

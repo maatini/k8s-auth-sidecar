@@ -102,57 +102,67 @@ Danach nur noch:
 
 ---
 
-## 🧪 Schritt-für-Schritt: Den Sidecar lokal testen
+## 🧪 So testest du das Projekt – Schritt für Schritt (super einfach erklärt)
 
-Lass uns in 4 schnellen Schritten sehen, wie der Sidecar aus der Perspektive eines Clients reagiert. Stell sicher, dass du wie im Schritt zuvor den Entwicklungsmodus (`mvn quarkus:dev`) und WireMock via Docker Compose am Laufen hast.
+Keine Angst vor den 142 Tests! Wir zeigen dir jetzt, wie du sie alle ausführst und vor allem: **Was sie bedeuten.**
 
-### 1. Token holen
-Wir sagen dem WireMock-Server: *"Gib mir einen Ausweis für den Test-User!"*
-```bash
-export TOKEN=$(curl -s -X POST http://localhost:8090/realms/master/protocol/openid-connect/token | jq -r .access_token)
-```
+#### 1. Lokale Entwicklung (am schnellsten)
+Wenn du gerade am Code bastelst, willst du sofort sehen, ob es noch klappt.
+- **Befehl:** `mvn quarkus:dev`
+- **Was du siehst:** Quarkus startet. Wenn du im Browser `http://localhost:8080/q/dev` aufrufst, siehst du das "Dashboard".
+- **Junior-Tipp:** Drück mal `r`. Das startet alle Tests im Hintergrund neu. Wenn alles grün ist, hast du nichts kaputt gemacht!
 
-### 2. Szenario A: Der "Gute" Request (Erlaubt / 200 OK)
-Wir rufen einen Endpunkt auf. Unser Test-User bekommt vom gemockten Roles-Service standardmäßig die Rollen `admin` und `developer`. Wenn deine `.rego`-Policy Admin-Rechte verlangt, wird das hier klappen.
-```bash
-curl -i -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/admin/dashboard
-```
-**Was passiert?**
-1. Sidecar sieht: Token gültig ✅
-2. Sidecar fragt Roles-Service: User hat Rolle `admin` ✅
-3. Sidecar fragt OPA-Engine: Regel sagt "admin darf das" ✅
-4. Sidecar schickt es ans Backend weiter. Das Backend antwortet mit `200 OK`.
+#### 2. Unit- & POJO-Tests (ohne Quarkus-Start)
+POJO steht für "Plain Old Java Object". Das sind Tests, die extrem schnell sind, weil sie kein schweres Framework brauchen.
+- **Befehl:** `mvn test -Dtest=*PojoTest`
+- **Was du siehst:** Ein grüner Balken in Millisekunden.
+- **Was passiert jetzt?** Wir prüfen nur die Logik-Klassen (z.B. den `PathMatcher`), ohne dass ein Server gestartet wird.
+- **Junior-Tipp:** Schreib diese Tests zuerst! Sie helfen dir, die Logik deiner Klasse zu verstehen, bevor du dich mit Kubernetes-Kram rumschlägst.
 
-### 3. Szenario B: Der "Böse" Request (Abgelehnt / 403 Forbidden)
-Nehmen wir an, in deinen OPA-Regeln (`.rego`) steht explizit: *Niemand darf auf `/api/geheim` zugreifen, außer der Superadmin.* Da unser Test-User nur `admin` ist, schlägt dies fehl.
-```bash
-curl -i -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/geheim
-```
-**Was passiert?**
-1. Token gültig ✅
-2. Rollen abgefragt ✅
-3. OPA-Engine sagt: Regel verbietet Zugriff ❌
-4. **Ergebnis:** Du bekommst sofort ein `HTTP 403 Forbidden` zurück. Die eigentliche App (`localhost:8081`) kriegt von diesem Request **absolut nichts mit**!
+#### 3. Vollständige Integrationstests (mit WireMock)
+Jetzt wird es ernst. Wir prüfen, ob der Sidecar wirklich mit Keycloak (unserem Login-Server) sprechen kann.
+- **Voraussetzung:** Starte die Mocks mit `docker compose -f docker-compose.dev.yml up -d`.
+- **Befehl:** `mvn verify`
+- **Warum das wichtig ist:** Wir simulieren hier echte Requests. Wenn dieser Test besteht, ist deine App fast bereit für die Cloud!
 
-### 4. Szenario C: Ohne gültigen "Ausweis" (Unautorisiert / 401 Unauthorized)
-Was passiert, wenn ein Hacker versucht, ohne Ticket durch den Türsteher zu kommen?
-```bash
-curl -i http://localhost:8080/api/irgendwas
-# oder auch mit ungültigem Token:
-curl -i -H "Authorization: Bearer FALSCHER_TOKEN_123" http://localhost:8080/api/irgendwas
-```
-**Was passiert?**
-Der Sidecar blockt das sofort an der Vordertür ab! Du erhältst `HTTP 401 Unauthorized` und die Prüfung wird direkt abgebrochen.
+#### 4. Policy-Tests (opa test)
+Unsere Sicherheitsregeln (in Rego geschrieben) müssen auch getestet werden.
+- **Befehl:** `opa test opa-wasm/src/main/resources/policies/ -v`
+- **Erklärung:** Hier schauen wir: "Darf der User 'Bob' wirklich nicht auf '/admin'?"
+- **Junior-Tipp:** Wenn du eine neue Regel schreibst, schreib IMMER auch einen Test dazu in die gleiche Ordner-Struktur.
+
+#### 5. Docker-Image bauen & testen
+Bevor wir etwas nach Kubernetes schieben, verpacken wir es in einen Container.
+- **Befehl:** `docker build -t sidecar-test:1.0 .`
+- **Qualitätscheck:** Wir nutzen im Hintergrund Tools wie **Trivy**, um zu schauen, ob unser Image Sicherheitslücken hat.
+- **Junior-Tipp:** Native Images (`Dockerfile.native`) bauen länger (bis zu 5 Min!), sind aber im Cluster viel kleiner und schneller.
+
+#### 6. Kubernetes-Deployment testen (kustomize)
+Bevor du `kubectl apply` tippst, schau dir an, was passieren würde.
+- **Befehl:** `kubectl kustomize k8s/overlays/development`
+- **Was passiert jetzt?** Kustomize baut alle deine "Puzzleteile" (YAML-Dateien) zu einer großen Datei zusammen.
+- **Junior-Tipp:** Prüf hier besonders, ob die `PROXY_TARGET_PORT` auf deine App zeigt!
+
+#### 7. Mutation Testing (PIT) – Qualitäts-Check
+Das ist das "Nächste Level". PIT verändert deinen Code absichtlich ("Mutanten"), um zu sehen, ob deine Tests das merken.
+- **Befehl:** `mvn org.pitest:pitest-maven:mutationCoverage`
+- **Ergebnis:** Du findest einen Report in `target/pit-reports/`.
+- **Junior-Tipp:** Wenn ein Mutant "überlebt" (Survived), heißt das: Dein Test deckt diesen speziellen Fall noch nicht ab. Probier mal, den Fehler absichtlich einzubauen – dein Test sollte dann fehlschlagen!
+
+#### 8. Was bedeuten die Test-Zahlen? (kurze Erklärung für Juniors)
+Wenn wir von **80% Test Strength** sprechen, meinen wir: Von allen künstlichen Fehlern, die wir eingebaut haben, haben deine Tests 80% gefunden. Das ist für ein Junior-Projekt ein **exzellenter Wert**!
 
 ---
 
 ## 🔐 Sicherheit & Best Practices (kurz & wichtig)
 
-- Immer Secrets über Kubernetes Secrets einbinden
-- In Produktion `QUARKUS_HTTP_CORS_ORIGINS` einschränken
-- Regeln nach „Least Privilege“ schreiben (so wenig Rechte wie möglich)
-- Audit-Logging aktivieren → du siehst später genau, wer was wollte
-- Vertrauenswürdige IP-Adressen für Proxies (Load Balancer/Ingress) konfigurieren, um IP-Spoofing zu verhindern
+Sicherheit klingt langweilig? Nicht hier! Mit dem Sidecar bist du von Anfang an ein Profi:
+- **Least Privilege**: Gib einem User immer nur so viel Rechte, wie er wirklich braucht.
+- **Don't hardcode**: Nutze niemals Passwörter im Code. Dafür gibt es `application.properties` und Kubernetes Secrets.
+- **Watch the Logs**: Schau dir mit `kubectl logs` an, was dein Sidecar macht. Er sagt dir genau, warum ein Request abgelehnt wurde.
+
+> [!IMPORTANT]
+> **Einfachheit ist Trumpf:** Wenn du merkst, dass deine Rego-Regeln zu kompliziert werden, sprich sie nochmal mit einem Senior durch. Meistens gibt es einen einfacheren Weg!
 
 ---
 
@@ -167,20 +177,15 @@ Der Sidecar blockt das sofort an der Vordertür ab! Du erhältst `HTTP 401 Unaut
 
 ---
 
-## 🎯 Warum ist das genial für Junior-Entwickler?
+## 🎯 Warum ist das genial für dich?
 
-Du lernst auf einmal:
-- Kubernetes Sidecar-Pattern
-- Moderne AuthN/AuthZ (OIDC + OPA)
-- Reaktive, nicht-blockierende Filter in Quarkus
-- Hot-Reload von Policies
--   Kubernetes Sidecar-Pattern
--   Moderne AuthN/AuthZ (OIDC + OPA)
--   Reaktive, nicht-blockierende Filter in Quarkus
--   Hot-Reload von Policies
--   Observability (Metrics + Health) & Memory Management (Caffeine Cache)
+Du lernst hier nicht nur Java, sondern die gesamte **Cloud-Native Welt**:
+1.  **Container** (Docker)
+2.  **Orchestrierung** (Kubernetes)
+3.  **Modernes Security-Design** (Zero-Trust, OIDC, OPA)
+4.  **Hochmoderner Java-Stack** (Quarkus, Mutiny, GraalVM)
 
-Und deine Haupt-App bleibt so einfach wie `return "Hello World";` – die ganze Sicherheit macht der Sidecar!
+Du baust nicht nur eine App, sondern ein sicheres System!
 
 ---
 
