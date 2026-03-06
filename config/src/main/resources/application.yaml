@@ -132,7 +132,7 @@ sidecar:
       - /q/metrics
       - /q/openapi
       - /q/swagger-ui
-      - /api/public/**
+      - /api/public/*
 
     token:
       header-name: Authorization
@@ -185,7 +185,7 @@ sidecar:
         json: false
       category:
         "io.quarkus.oidc":
-          level: WARN
+          level: DEBUG
         "io.quarkus.config":
           level: WARN
         "io.micrometer":
