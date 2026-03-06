@@ -1,13 +1,5 @@
 # =====================================================
-# K8s-Auth-Sidecar Multi-Stage Dockerfile
-# =====================================================
-# Stage 1: Build with Maven
-# Stage 2: Native Image Build (optional)
-# Stage 3: Runtime Image
-# =====================================================
-
-# =====================================================
-# Stage 1: Build
+# K8s-Auth-Sidecar Multi-Stage Dockerfile (Multi-Module)
 # =====================================================
 FROM eclipse-temurin:21-jdk-alpine AS build
 
@@ -19,35 +11,24 @@ RUN apk add --no-cache maven
 
 WORKDIR /app
 
-# Copy pom.xml first for better layer caching
+# Copy poms first for better layer caching
 COPY pom.xml .
+COPY auth-core/pom.xml auth-core/
+COPY proxy/pom.xml proxy/
+COPY opa-wasm/pom.xml opa-wasm/
+COPY config/pom.xml config/
 
 # Download dependencies (use BuildKit cache mount for speed)
 RUN mvn dependency:go-offline -B
 
-# Copy source code
-COPY src ./src
+# Copy source code for all modules
+COPY auth-core/src auth-core/src
+COPY proxy/src proxy/src
+COPY opa-wasm/src opa-wasm/src
+COPY config/src config/src
 
-# Build the application (use BuildKit cache mount for speed)
-RUN mvn package -DskipTests -Dquarkus.package.type=uber-jar
-
-# =====================================================
-# Stage 2: Native Image Build (Optional)
-# Uncomment to build native image
-# =====================================================
-# FROM ghcr.io/graalvm/native-image-community:21 AS native-build
-# 
-# WORKDIR /app
-# 
-# COPY --from=build /app/target/*-runner.jar /app/
-# COPY --from=build /app/src/main/resources /app/resources
-# 
-# RUN native-image \
-#     -jar /app/*-runner.jar \
-#     -H:+ReportExceptionStackTraces \
-#     --no-fallback \
-#     --static \
-#     -o /app/k8s-auth-sidecar
+# Build the proxy application (which includes other modules)
+RUN mvn package -DskipTests -Dquarkus.package.type=uber-jar -pl proxy -am
 
 # =====================================================
 # Stage 3: Runtime (JVM Mode)
@@ -67,10 +48,10 @@ LABEL org.opencontainers.image.source="https://github.com/maatini/k8s-auth-sidec
 # Create non-root user for security
 RUN addgroup -S sidecar && adduser -S sidecar -G sidecar
 
-# CVE FIX – P0.8: Patch Alpine packages (gnutls, libpng, etc.)
+# CVE FIX – Patch Alpine packages
 RUN apk upgrade --no-cache
 
-# HOT-RELOAD FIX – P0.5: Install OPA CLI for in-container policy recompilation
+# HOT-RELOAD FIX – Install OPA CLI for in-container policy recompilation
 ARG OPA_VERSION=1.14.0
 ARG TARGETARCH
 RUN wget -q -O /usr/local/bin/opa \
@@ -79,11 +60,11 @@ RUN wget -q -O /usr/local/bin/opa \
 
 WORKDIR /app
 
-# Copy the uber-jar from build stage
-COPY --from=build /app/target/*-runner.jar /app/k8s-auth-sidecar.jar
+# Copy the uber-jar from build stage (located in proxy module target)
+COPY --from=build /app/proxy/target/*-runner.jar /app/k8s-auth-sidecar.jar
 
 # Copy policies
-COPY --from=build /app/src/main/resources/policies /policies
+COPY --from=build /app/opa-wasm/src/main/resources/policies /policies
 
 # Set ownership
 RUN chown -R sidecar:sidecar /app /policies
@@ -94,7 +75,7 @@ USER sidecar
 # Expose the sidecar port
 EXPOSE 8080
 
-# Health check
+# Health check (standard Quarkus path)
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
     CMD wget --no-verbose --tries=1 --spider http://localhost:8080/q/health/live || exit 1
 
@@ -118,15 +99,3 @@ ENV QUARKUS_HTTP_PORT=8080 \
 
 # Run the application
 ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar /app/k8s-auth-sidecar.jar"]
-
-# =====================================================
-# Stage 3 Alternative: Native Runtime
-# =====================================================
-# FROM gcr.io/distroless/static-debian12 AS native-runtime
-# 
-# COPY --from=native-build /app/k8s-auth-sidecar /app/k8s-auth-sidecar
-# COPY --from=build /app/src/main/resources/policies /policies
-# 
-# EXPOSE 8080
-# 
-# ENTRYPOINT ["/app/k8s-auth-sidecar"]

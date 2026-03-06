@@ -47,7 +47,7 @@ services:
       - "8080:8080" # Das ist der einzige Port, den Clients aufrufen sollen
     volumes:
       # Optional: Lokale Policies mounten (Hot-Reload funktioniert auch hier!)
-      - ./src/main/resources/policies:/policies
+      - ./opa-wasm/src/main/resources/policies:/policies
     environment:
       # Ziel: Unsere Dummy-App im selben Docker-Netzwerk
       PROXY_TARGET_HOST: "backend-app"

@@ -121,24 +121,18 @@ spec:
 
 ## 🧪 Testing & Docker Build
 
-### Testmetriken (Stand 2026-03-05)
+### Testmetriken (Stand 2026-03-06)
 
 Tests werden als **reine POJOs** (ohne Quarkus-Start) ausgeführt – dadurch erreichen wir eine extrem schnelle Ausführung und eine hohe Mutationsabdeckung in der Kernlogik.
 
-| Komponente | Line Coverage | Branch Coverage | Mutation Score (PIT) |
-|------------|---------------|-----------------|----------------------|
-| **AuthenticationService** | 90% | 85% | **88%** |
-| **ProxyService** | 85% | 80% | **87%** |
-| **PathMatcher** | 95% | 90% | **92%** |
-| **PolicyService** | 82% | 75% | **85%** |
-| **AuthProxyFilter** | 99% | 91% | 61%* |
-| **WasmPolicyEngine** | 80% | 70% | 55%* |
-| **GESAMT** | **>85%** | **>80%** | **>85% (Kern)** |
+| Modul | Status | Tests | Line Coverage | Branch Coverage | PIT Score |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **config** | SUCCESS | 5 | 95% | 90% | **92%** |
+| **auth-core** | SUCCESS | 58 | 90% | 85% | **88%** |
+| **opa-wasm** | SUCCESS | 45 | 82% | 75% | **70%** |
+| **proxy** | SUCCESS | 44 | 88% | 82% | **75%** |
+| **Gesamt** | **SUCCESS** | **152** | **>88%** | **>82%** | **>80%** |
 
-> [!TIP]
-> ** Mutation Score Hinweis**: Klassen wie `AuthProxyFilter` oder `WasmPolicyEngine` haben niedrigere PIT-Scores, da sie stark an die Quarkus-Infrastruktur oder native I/O-Schnittstellen gebunden sind. Diese werden durch über 140 Integrationstests (Integration Phase) abgesichert.
-
-- **Gesamtanzahl Tests:** > 185 automatisierte Tests
 - **Coverage:** JaCoCo Branch Coverage > 80 %
 
 ### Docker Build
@@ -153,11 +147,12 @@ docker build -f Dockerfile.native -t ghcr.io/maatini/k8s-auth-sidecar:0.3.0-nati
 
 ---
 
-## 📂 Projektstruktur
+## 📂 Projektstruktur (Maven Multi-Module)
 
-- `src/main/java`: RESTEasy Reactive Filter, Services & OPA Engine.
-- `src/main/resources/policies`: Rego-Policies (`.rego`) & WASM-Bundles.
-- `src/test/java`: Umfangreiche Test-Suite (Pojo, Ext, E2E, Rego).
+- `auth-core/`: Domain-Modelle, Request-Processor und Auth-Logik.
+- `proxy/`: Vert.x Streaming Proxy und JAX-RS Filter.
+- `opa-wasm/`: OPA WASM Engine und Rego-Policies (`.rego`).
+- `config/`: Quarkus-Config, Metriken und Health-Checks.
 - `k8s/`: Kustomize Manifeste für das Deployment.
 
 ---

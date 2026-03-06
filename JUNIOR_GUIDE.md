@@ -174,9 +174,34 @@ Du lernst auf einmal:
 - Moderne AuthN/AuthZ (OIDC + OPA)
 - Reaktive, nicht-blockierende Filter in Quarkus
 - Hot-Reload von Policies
-- Observability (Metrics + Health) & Memory Management (Caffeine Cache)
+-   Kubernetes Sidecar-Pattern
+-   Moderne AuthN/AuthZ (OIDC + OPA)
+-   Reaktive, nicht-blockierende Filter in Quarkus
+-   Hot-Reload von Policies
+-   Observability (Metrics + Health) & Memory Management (Caffeine Cache)
 
 Und deine Haupt-App bleibt so einfach wie `return "Hello World";` – die ganze Sicherheit macht der Sidecar!
+
+---
+
+## 🚀 Die „Antigravity Migration“ – Von Monolith zu Multi-Module
+
+Im März 2026 wurde das Projekt durch eine umfassende Refaktorisierung (die „Antigravity Migration“) auf ein neues Level gehoben. Warum haben wir das gemacht?
+
+**Das Problem vorher:**
+Alles lag in einem großen Topf (`src/main/java`). Wenn man etwas an der OPA-Engine geändert hat, musste man aufpassen, nicht versehentlich den Proxy oder die Config zu zerschießen. Das nennt man „starke Kopplung“.
+
+**Die Lösung (Multi-Module):**
+Das Projekt wurde in 4 spezialisierte Module aufgeteilt:
+1.  **`auth-core`**: Das Gehirn. Hier liegen die Regeln, wer ein User ist und wie Anfragen verarbeitet werden.
+2.  **`proxy`**: Der Muskel. Er kümmert sich nur um das effiziente Weiterleiten von Daten.
+3.  **`opa-wasm`**: Der Bibliothekar. Er verwaltet die Sicherheitsregeln (Policies).
+4.  **`config`**: Die Zentrale. Hier wird alles eingestellt und überwacht.
+
+**Was du daraus lernst:**
+-   **Modularität**: Wenn du ein Modul änderst, bleiben die anderen stabil.
+-   **Dependency Inversion**: Wir arbeiten mit Interfaces. Der Proxy weiß z.B. nur, *dass* es einen `AuthContext` gibt, aber nicht, wie er technisch aus dem JWT extrahiert wurde.
+-   **Clean Architecture**: Jedes Modul hat seine eigenen Ebenen (`domain`, `application`, `infrastructure`). Das macht den Code extrem übersichtlich.
 
 ---
 
