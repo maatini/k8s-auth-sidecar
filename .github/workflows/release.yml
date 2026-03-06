@@ -49,7 +49,7 @@ jobs:
       # Automatically generate standard OCI labels and tags for the JVM image
       - name: Docker Meta (JVM)
         id: meta-jvm
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: ghcr.io/maatini/k8s-auth-sidecar
           tags: |
@@ -60,7 +60,7 @@ jobs:
       # Automatically generate standard OCI labels and tags for the Native image
       - name: Docker Meta (Native)
         id: meta-native
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: ghcr.io/maatini/k8s-auth-sidecar
           tags: |
