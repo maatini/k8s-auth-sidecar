@@ -73,4 +73,34 @@ class AuditLogFilterPojoTest {
 
         verify(res).getStatus();
     }
+
+    @Test
+    void testFilterRequest_Enabled() {
+        ContainerRequestContext req = mock(ContainerRequestContext.class);
+        filter.filterRequest(req);
+        verify(req).setProperty(eq("audit.start_time"), anyLong());
+    }
+
+    @Test
+    void testFilterRequest_Disabled() {
+        SidecarConfig.AuditConfig audit = mock(SidecarConfig.AuditConfig.class);
+        when(config.audit()).thenReturn(audit);
+        when(audit.enabled()).thenReturn(false);
+
+        ContainerRequestContext req = mock(ContainerRequestContext.class);
+        filter.filterRequest(req);
+        verify(req, never()).setProperty(anyString(), any());
+    }
+
+    @Test
+    void testFilterResponse_Disabled() {
+        SidecarConfig.AuditConfig audit = mock(SidecarConfig.AuditConfig.class);
+        when(config.audit()).thenReturn(audit);
+        when(audit.enabled()).thenReturn(false);
+
+        ContainerRequestContext req = mock(ContainerRequestContext.class);
+        ContainerResponseContext res = mock(ContainerResponseContext.class);
+        filter.filterResponse(req, res);
+        verify(req, never()).getProperty(anyString());
+    }
 }

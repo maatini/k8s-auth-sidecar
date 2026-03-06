@@ -1,6 +1,8 @@
 package space.maatini.sidecar.infrastructure.health;
 
+import io.vertx.mutiny.core.buffer.Buffer;
 import io.vertx.mutiny.ext.web.client.WebClient;
+import io.smallrye.mutiny.Uni;
 import org.eclipse.microprofile.health.HealthCheckResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -53,17 +55,100 @@ class HealthCheckPojoTest {
     }
 
     @Test
-    void testLivenessCheck() {
+    void testLivenessCheck_AuthDisabled() {
+        SidecarConfig.AuthConfig auth = mock(SidecarConfig.AuthConfig.class);
+        when(config.auth()).thenReturn(auth);
+        when(auth.enabled()).thenReturn(false);
+
         HealthCheckResponse response = livenessCheck.call();
-        assertEquals("sidecar-liveness", response.getName());
         assertEquals(HealthCheckResponse.Status.UP, response.getStatus());
+        assertEquals(false, response.getData().get().get("auth.enabled"));
     }
 
     @Test
-    void testReadinessCheck_Exception() {
-        // webClient mock will throw NPE because get() returns null by default in mock
+    void testReadinessCheck_HttpSuccess() throws Exception {
+        io.vertx.mutiny.ext.web.client.HttpRequest<Buffer> request = mock(
+                io.vertx.mutiny.ext.web.client.HttpRequest.class);
+        io.vertx.mutiny.ext.web.client.HttpResponse<Buffer> httpResponse = mock(
+                io.vertx.mutiny.ext.web.client.HttpResponse.class);
+        WebClient client = mock(WebClient.class);
+
+        Field webClientField = ReadinessCheck.class.getDeclaredField("webClient");
+        webClientField.setAccessible(true);
+        webClientField.set(readinessCheck, client);
+
+        when(client.get(anyInt(), anyString(), anyString())).thenReturn(request);
+        when(request.timeout(anyLong())).thenReturn(request);
+        when(request.send()).thenReturn(io.smallrye.mutiny.Uni.createFrom().item(httpResponse));
+        when(httpResponse.statusCode()).thenReturn(200);
+
         HealthCheckResponse response = readinessCheck.call();
-        assertEquals("sidecar-readiness", response.getName());
+        assertEquals(HealthCheckResponse.Status.UP, response.getStatus());
+        assertEquals(true, response.getData().get().get("backend.connected"));
+    }
+
+    @Test
+    void testReadinessCheck_HttpError_500() throws Exception {
+        io.vertx.mutiny.ext.web.client.HttpRequest<Buffer> request = mock(
+                io.vertx.mutiny.ext.web.client.HttpRequest.class);
+        io.vertx.mutiny.ext.web.client.HttpResponse<Buffer> httpResponse = mock(
+                io.vertx.mutiny.ext.web.client.HttpResponse.class);
+        WebClient client = mock(WebClient.class);
+
+        Field webClientField = ReadinessCheck.class.getDeclaredField("webClient");
+        webClientField.setAccessible(true);
+        webClientField.set(readinessCheck, client);
+
+        when(client.get(anyInt(), anyString(), anyString())).thenReturn(request);
+        when(request.timeout(anyLong())).thenReturn(request);
+        when(request.send()).thenReturn(io.smallrye.mutiny.Uni.createFrom().item(httpResponse));
+        when(httpResponse.statusCode()).thenReturn(500);
+
+        // Socket fallback mock
+        io.vertx.mutiny.core.Vertx vertx = mock(io.vertx.mutiny.core.Vertx.class);
+        io.vertx.mutiny.core.net.NetClient netClient = mock(io.vertx.mutiny.core.net.NetClient.class);
+        Field vertxField = ReadinessCheck.class.getDeclaredField("vertx");
+        vertxField.setAccessible(true);
+        vertxField.set(readinessCheck, vertx);
+        when(vertx.createNetClient()).thenReturn(netClient);
+        when(netClient.connect(anyInt(), anyString()))
+                .thenReturn(io.smallrye.mutiny.Uni.createFrom().failure(new RuntimeException("Socket fail")));
+
+        HealthCheckResponse response = readinessCheck.call();
         assertEquals(HealthCheckResponse.Status.DOWN, response.getStatus());
+        assertEquals(false, response.getData().get().get("backend.connected"));
+    }
+
+    @Test
+    void testReadinessCheck_SocketFallback_Success() throws Exception {
+        io.vertx.mutiny.ext.web.client.HttpRequest<Buffer> request = mock(
+                io.vertx.mutiny.ext.web.client.HttpRequest.class);
+        WebClient client = mock(WebClient.class);
+
+        Field webClientField = ReadinessCheck.class.getDeclaredField("webClient");
+        webClientField.setAccessible(true);
+        webClientField.set(readinessCheck, client);
+
+        when(client.get(anyInt(), anyString(), anyString())).thenReturn(request);
+        when(request.timeout(anyLong())).thenReturn(request);
+        // HTTP fails
+        when(request.send()).thenReturn(io.smallrye.mutiny.Uni.createFrom().failure(new RuntimeException("HTTP fail")));
+
+        // Socket fallback
+        io.vertx.mutiny.core.Vertx vertx = mock(io.vertx.mutiny.core.Vertx.class);
+        io.vertx.mutiny.core.net.NetClient netClient = mock(io.vertx.mutiny.core.net.NetClient.class);
+        io.vertx.mutiny.core.net.NetSocket netSocket = mock(io.vertx.mutiny.core.net.NetSocket.class);
+
+        Field vertxField = ReadinessCheck.class.getDeclaredField("vertx");
+        vertxField.setAccessible(true);
+        vertxField.set(readinessCheck, vertx);
+
+        when(vertx.createNetClient()).thenReturn(netClient);
+        when(netClient.connect(anyInt(), anyString())).thenReturn(io.smallrye.mutiny.Uni.createFrom().item(netSocket));
+
+        HealthCheckResponse response = readinessCheck.call();
+        assertEquals(HealthCheckResponse.Status.UP, response.getStatus());
+        assertEquals(true, response.getData().get().get("backend.connected"));
+        verify(netSocket).close();
     }
 }

@@ -17,6 +17,9 @@ import space.maatini.sidecar.domain.model.ProxyResponse;
 
 import java.lang.reflect.Field;
 import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -115,6 +118,101 @@ class HttpProxyServicePojoTest {
         assertTrue(res.bodyAsString().contains("Service Unavailable"));
 
         verify(errorCounter).increment();
+    }
+
+    @Test
+    void testProxy_HeaderPropagation() {
+        when(request.send()).thenReturn(Uni.createFrom().item(response));
+        when(response.statusCode()).thenReturn(200);
+        when(response.headers()).thenReturn(io.vertx.mutiny.core.MultiMap.caseInsensitiveMultiMap());
+
+        SidecarConfig.ProxyConfig proxyConfig = config.proxy();
+        when(proxyConfig.propagateHeaders()).thenReturn(List.of("X-Test-Propagate"));
+
+        Map<String, String> incomingHeaders = Map.of("X-Test-Propagate", "test-value", "X-Hidden", "secret");
+
+        proxyService.proxy("GET", "/test", incomingHeaders, null, null, AuthContext.anonymous())
+                .await().indefinitely();
+
+        verify(request).putHeader("X-Test-Propagate", "test-value");
+        verify(request, never()).putHeader(eq("X-Hidden"), anyString());
+    }
+
+    @Test
+    void testProxy_AuthContextPlaceholders() {
+        when(request.send()).thenReturn(Uni.createFrom().item(response));
+        when(response.statusCode()).thenReturn(200);
+        when(response.headers()).thenReturn(io.vertx.mutiny.core.MultiMap.caseInsensitiveMultiMap());
+
+        SidecarConfig.ProxyConfig proxyConfig = config.proxy();
+        when(proxyConfig.addHeaders()).thenReturn(Map.of("X-User-Email", "${user.email}"));
+
+        AuthContext authContext = AuthContext.builder()
+                .userId("u123")
+                .email("u123@example.com")
+                .build();
+
+        proxyService.proxy("GET", "/test", null, null, null, authContext)
+                .await().indefinitely();
+
+        verify(request).putHeader("X-User-Email", "u123@example.com");
+    }
+
+    @Test
+    void testProxy_PostStreaming() {
+        when(request.sendStream(any(io.vertx.mutiny.core.streams.ReadStream.class)))
+                .thenReturn(Uni.createFrom().item(response));
+        when(response.statusCode()).thenReturn(201);
+        when(response.headers()).thenReturn(io.vertx.mutiny.core.MultiMap.caseInsensitiveMultiMap());
+
+        io.vertx.core.http.HttpServerRequest mockClientReq = mock(io.vertx.core.http.HttpServerRequest.class);
+
+        ProxyResponse res = proxyService.proxy("POST", "/upload", null, null, mockClientReq, AuthContext.anonymous())
+                .await().indefinitely();
+
+        assertEquals(201, res.statusCode());
+        verify(request).sendStream(any(io.vertx.mutiny.core.streams.ReadStream.class));
+    }
+
+    @Test
+    void testBuildTargetUrl() {
+        assertEquals("http://localhost:8081/api/v1", proxyService.buildTargetUrl("/api/v1"));
+    }
+
+    @Test
+    void testResolveAuthContextHeaders_Default() throws Exception {
+        when(config.proxy().addHeaders()).thenReturn(Collections.emptyMap());
+        AuthContext auth = AuthContext.builder()
+                .userId("u1")
+                .email("u1@maatini.space")
+                .roles(Set.of("admin"))
+                .build();
+
+        java.lang.reflect.Method m = HttpProxyService.class.getDeclaredMethod("resolveAuthContextHeaders",
+                AuthContext.class);
+        m.setAccessible(true);
+        Map<String, String> res = (Map<String, String>) m.invoke(proxyService, auth);
+
+        assertEquals("u1", res.get("X-Auth-User-Id"));
+        assertEquals("u1@maatini.space", res.get("X-Auth-User-Email"));
+        assertEquals("admin", res.get("X-Auth-User-Roles"));
+    }
+
+    @Test
+    void testResolvePropagatedHeaders_Special() throws Exception {
+        when(config.proxy().propagateHeaders()).thenReturn(List.of("X-Correl"));
+        Map<String, String> incoming = Map.of(
+                "x-correl", "v1", // case insensitive
+                "content-type", "application/json",
+                "accept", "text/plain");
+
+        java.lang.reflect.Method m = HttpProxyService.class.getDeclaredMethod("resolvePropagatedHeaders", Map.class);
+        m.setAccessible(true);
+        Map<String, String> res = (Map<String, String>) m.invoke(proxyService, incoming);
+
+        assertEquals("v1", res.get("X-Correl"));
+        assertEquals("application/json", res.get("Content-Type"));
+        assertEquals("text/plain", res.get("Accept"));
     }
 
     @Test

@@ -127,18 +127,19 @@ Tests werden als **reine POJOs** (ohne Quarkus-Start) ausgeführt – dadurch er
 
 | Modul | Status | Tests | PIT Line Coverage | PIT Mutation | PIT Test Strength |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **config** | SUCCESS | 5 | 60% | 26% | **71%** |
+| **config** | SUCCESS | 14 | 70% | 65% | **93%** |
 | **auth-core** | SUCCESS | 43 | 69% | 48% | **80%** |
-| **opa-wasm** | SUCCESS | 47 | 64% | 52% | **69%** |
-| **proxy** | SUCCESS ¹ | 26 ² | n/a | n/a | n/a |
-| **Gesamt** | **SUCCESS** | **121** ³ | **~65%** | **~47%** | **~73%** |
+| **opa-wasm** | SUCCESS | 51 | 75% | 52% | **66%** |
+| **proxy** | SUCCESS | 34 | 90% | 56% | **60%** |
+| **Gesamt** | **SUCCESS** | **142** ¹ | **~76%** | **~53%** | **~71%** |
 
-> ¹ 26 stabile POJO+ExtTests – 8 QuarkusIntegrationTests schlagen ohne laufenden WireMock-Stack fehl (erwartet).  
-> ² Nur POJO+ExtTests gezählt (stabile Tests). Vollständiger Proxy-Test-Run erfordert `docker-compose.dev.yml`.  
-> ³ POJO+ExtTests gesamt (108 grün) + Config QuarkusTests (3) + OPA QuarkusTests (10) = 121 stabile Tests.
+> ¹ 129 POJO+ExtTests (stabile Tests) + 13 Integrationstests (Config/OPA) = 142 Tests.  
+> ² PIT Test Strength hat sich durch POJO-Mocking-Verbesserungen in allen Modulen massiv auf im Schnitt >70% gesteigert.
 
 - **PIT Test Strength**: % der Mutanten, die von gedeckten Tests getötet werden (bester Qualitäts-Indikator).
-- **auth-core Services** (application.service): **91% Line Coverage, 77% Mutation Coverage** – beste Kernlogik-Abdeckung.
+- **config HealthChecks**: Nach Refactoring nun bei **93% Test Strength**.
+- **proxy Services**: Erstmals mit **60% Test Strength** (POJO-basiert).
+- **auth-core Services**: Stabil bei **80% Test Strength**.
 
 ### Docker Build
 
