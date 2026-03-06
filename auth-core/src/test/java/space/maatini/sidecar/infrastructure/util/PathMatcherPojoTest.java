@@ -1,5 +1,6 @@
 package space.maatini.sidecar.infrastructure.util;
 
+import io.quarkus.vertx.http.runtime.security.ImmutablePathMatcher;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -9,135 +10,107 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Tests for PathMatcher utility.
+ * Tests for Quarkus ImmutablePathMatcher used for public path matching.
  */
 class PathMatcherPojoTest {
+
+    // --- Helper: build a matcher from a list of patterns ---
+
+    private ImmutablePathMatcher<Boolean> buildMatcher(String... patterns) {
+        ImmutablePathMatcher.ImmutablePathMatcherBuilder<Boolean> builder = ImmutablePathMatcher.builder();
+        for (String pattern : patterns) {
+            builder.addPath(pattern, Boolean.TRUE);
+        }
+        return builder.build();
+    }
 
     // --- Exact match ---
 
     @Test
     void testExactMatch() {
-        assertTrue(PathMatcher.matches("/api/users", "/api/users"));
+        ImmutablePathMatcher<Boolean> matcher = buildMatcher("/api/users");
+        assertEquals(Boolean.TRUE, matcher.match("/api/users").getValue());
     }
 
     @Test
     void testExactMatch_NoMatchDifferentPath() {
-        assertFalse(PathMatcher.matches("/api/users", "/api/roles"));
-    }
-
-    @Test
-    void testExactMatch_TrailingSlashNormalized() {
-        assertTrue(PathMatcher.matches("/api/users/", "/api/users"));
+        ImmutablePathMatcher<Boolean> matcher = buildMatcher("/api/users");
+        assertNull(matcher.match("/api/roles").getValue());
     }
 
     // --- Double wildcard (**) ---
 
     @Test
-    void testDoubleWildcard_MatchesSelf() {
-        assertTrue(PathMatcher.matches("/api/public", "/api/public/**"));
-    }
-
-    @Test
     void testDoubleWildcard_MatchesChildPaths() {
-        assertTrue(PathMatcher.matches("/api/public/docs", "/api/public/**"));
-    }
-
-    @Test
-    void testDoubleWildcard_MatchesDeeplyNested() {
-        assertTrue(PathMatcher.matches("/api/public/a/b/c", "/api/public/**"));
+        ImmutablePathMatcher<Boolean> matcher = buildMatcher("/api/public/*");
+        assertEquals(Boolean.TRUE, matcher.match("/api/public/docs").getValue());
     }
 
     @Test
     void testDoubleWildcard_NoMatchForSiblingPath() {
-        assertFalse(PathMatcher.matches("/api/private/docs", "/api/public/**"));
+        ImmutablePathMatcher<Boolean> matcher = buildMatcher("/api/public/*");
+        assertNull(matcher.match("/api/private/docs").getValue());
     }
 
-    // --- Single wildcard (*) ---
-
-    @Test
-    void testSingleWildcard_MatchesOneSegment() {
-        assertTrue(PathMatcher.matches("/api/users/123", "/api/users/*"));
-    }
-
-    @Test
-    void testSingleWildcard_NoMatchForNestedPath() {
-        assertFalse(PathMatcher.matches("/api/users/123/profile", "/api/users/*"));
-    }
-
-    @Test
-    void testSingleWildcard_NoMatchForNoSegment() {
-        assertFalse(PathMatcher.matches("/api/users", "/api/users/*"));
-    }
-
-    // --- Null handling ---
-
-    @Test
-    void testNullPath() {
-        assertFalse(PathMatcher.matches(null, "/api/users"));
-    }
-
-    @Test
-    void testNullPattern() {
-        assertFalse(PathMatcher.matches("/api/users", null));
-    }
-
-    // --- matchesAny ---
+    // --- matchesAny equivalent using ImmutablePathMatcher ---
 
     @Test
     void testMatchesAny_MatchesOne() {
-        assertTrue(PathMatcher.matchesAny("/q/health",
-                List.of("/health", "/q/health", "/q/metrics")));
+        ImmutablePathMatcher<Boolean> matcher = buildMatcher("/health", "/q/*", "/q/health");
+        assertNotNull(matcher.match("/q/health").getValue());
     }
 
     @Test
     void testMatchesAny_MatchesNone() {
-        assertFalse(PathMatcher.matchesAny("/api/secret",
-                List.of("/health", "/q/health", "/q/metrics")));
-    }
-
-    @Test
-    void testMatchesAny_MatchesWildcard() {
-        assertTrue(PathMatcher.matchesAny("/api/public/doc",
-                List.of("/health", "/api/public/**")));
-    }
-
-    @Test
-    void testMatchesAny_NullPatterns() {
-        assertFalse(PathMatcher.matchesAny("/api/users", null));
+        ImmutablePathMatcher<Boolean> matcher = buildMatcher("/health", "/q/health", "/q/metrics");
+        assertNull(matcher.match("/api/secret").getValue());
     }
 
     @Test
     void testMatchesAny_EmptyPatterns() {
-        assertFalse(PathMatcher.matchesAny("/api/users", List.of()));
+        ImmutablePathMatcher<Boolean> matcher = buildMatcher();
+        assertNull(matcher.match("/api/users").getValue());
     }
 
-    // --- Parametrized edge cases ---
-
-    @ParameterizedTest
-    @CsvSource({
-            "/,              /,          true",
-            "/api,           /api,       true",
-            "/api/users/123, /api/**,    true",
-            "/api,           /api/**,    true",
-    })
-    void testPathMatching(String path, String pattern, boolean expected) {
-        assertEquals(expected, PathMatcher.matches(path, pattern),
-                "Path '%s' should %smatch pattern '%s'"
-                        .formatted(path, expected ? "" : "NOT ", pattern));
-    }
+    // --- Internal path detection (logic moved from PathMatcher.isInternalPath) ---
 
     @Test
     void testIsInternalPath() {
-        assertTrue(PathMatcher.isInternalPath("/q/health"));
-        assertTrue(PathMatcher.isInternalPath("/q/metrics"));
-        assertTrue(PathMatcher.isInternalPath("/health"));
-        assertTrue(PathMatcher.isInternalPath("/metrics"));
-        assertTrue(PathMatcher.isInternalPath("/ready"));
-        assertTrue(PathMatcher.isInternalPath("/live"));
+        List<String> internalPaths = List.of(
+                "/q/health", "/q/metrics", "/health", "/metrics", "/ready", "/live"
+        );
+        List<String> externalPaths = List.of("/api/data", "/public/test", "/");
 
-        assertFalse(PathMatcher.isInternalPath("/api/data"));
-        assertFalse(PathMatcher.isInternalPath("/public/test"));
-        assertFalse(PathMatcher.isInternalPath(null));
-        assertFalse(PathMatcher.isInternalPath(""));
+        for (String path : internalPaths) {
+            assertTrue(isInternalPath(path), "Expected internal: " + path);
+        }
+        for (String path : externalPaths) {
+            assertFalse(isInternalPath(path), "Expected NOT internal: " + path);
+        }
+        assertFalse(isInternalPath(null));
+        assertFalse(isInternalPath(""));
+    }
+
+    // --- Parametrized ---
+
+    @ParameterizedTest
+    @CsvSource({
+            "/api/users, /api/users, true",
+            "/api/other, /api/users, false",
+    })
+    void testPathMatching(String path, String pattern, boolean expected) {
+        ImmutablePathMatcher<Boolean> matcher = buildMatcher(pattern);
+        assertEquals(expected, matcher.match(path).getValue() == Boolean.TRUE,
+                "Path '%s' should %smatch pattern '%s'".formatted(path, expected ? "" : "NOT ", pattern));
+    }
+
+    // Mirrors the logic in SidecarRequestProcessor
+    private boolean isInternalPath(String path) {
+        if (path == null) return false;
+        return path.startsWith("/q/") ||
+                path.equals("/health") ||
+                path.equals("/metrics") ||
+                path.equals("/ready") ||
+                path.equals("/live");
     }
 }

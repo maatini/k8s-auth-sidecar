@@ -50,7 +50,11 @@ class SidecarRequestProcessorPojoTest {
         when(authConfig.enabled()).thenReturn(true);
         when(authzConfig.enabled()).thenReturn(true);
         when(authConfig.publicPaths()).thenReturn(Collections.emptyList());
+
+        // Trigger @PostConstruct manually (not called by JUnit in POJO tests)
+        processor.init();
     }
+
  
     @Test
     void testProcess_InternalPath() {

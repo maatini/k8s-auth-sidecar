@@ -3,10 +3,10 @@ package space.maatini.sidecar.application.service;
 import io.quarkus.security.identity.SecurityIdentity;
 import io.smallrye.mutiny.Uni;
 import org.eclipse.microprofile.jwt.JsonWebToken;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import space.maatini.sidecar.domain.model.AuthContext;
 
-import java.lang.reflect.Method;
 import java.security.Principal;
 import java.util.List;
 import java.util.Map;
@@ -15,138 +15,166 @@ import java.util.Set;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+/**
+ * Extended tests for AuthenticationService and sub-components.
+ * Replaces reflection-based tests with direct calls to public interfaces.
+ */
 public class AuthenticationServiceExtTest {
+
+    private AuthenticationService service;
+    private KeycloakRoleExtractorImpl roleExtractor;
+    private JwtClaimExtractorImpl claimExtractor;
+    private AuthContextMapperImpl authContextMapper;
+
+    @BeforeEach
+    void setup() {
+        claimExtractor = new JwtClaimExtractorImpl();
+
+        roleExtractor = new KeycloakRoleExtractorImpl();
+        roleExtractor.claimExtractor = claimExtractor;
+
+        authContextMapper = new AuthContextMapperImpl();
+        authContextMapper.claimExtractor = claimExtractor;
+
+        service = new AuthenticationService();
+        service.roleExtractor = roleExtractor;
+        service.authContextMapper = authContextMapper;
+    }
+
+    // --- AuthenticationService lifecycle tests ---
 
     @Test
     void testExtractAuthContext_NullIdentity() {
-        AuthenticationService service = new AuthenticationService();
         Uni<AuthContext> uni = service.extractAuthContext(null);
-        AuthContext authContext = uni.await().indefinitely();
-        assertFalse(authContext.isAuthenticated());
-        assertEquals("anonymous", authContext.userId());
+        AuthContext ctx = uni.await().indefinitely();
+        assertFalse(ctx.isAuthenticated());
+        assertEquals("anonymous", ctx.userId());
     }
 
     @Test
     void testExtractAuthContext_AnonymousIdentity() {
-        AuthenticationService service = new AuthenticationService();
         SecurityIdentity identity = mock(SecurityIdentity.class);
         when(identity.isAnonymous()).thenReturn(true);
-
-        Uni<AuthContext> uni = service.extractAuthContext(identity);
-        AuthContext authContext = uni.await().indefinitely();
-        assertFalse(authContext.isAuthenticated());
-        assertEquals("anonymous", authContext.userId());
+        AuthContext ctx = service.extractAuthContext(identity).await().indefinitely();
+        assertFalse(ctx.isAuthenticated());
+        assertEquals("anonymous", ctx.userId());
     }
 
     @Test
     void testExtractAuthContext_NotJsonWebToken() {
-        AuthenticationService service = new AuthenticationService();
         SecurityIdentity identity = mock(SecurityIdentity.class);
         when(identity.isAnonymous()).thenReturn(false);
         Principal principal = mock(Principal.class);
         when(identity.getPrincipal()).thenReturn(principal);
-
-        Uni<AuthContext> uni = service.extractAuthContext(identity);
-        AuthContext authContext = uni.await().indefinitely();
-        assertFalse(authContext.isAuthenticated());
+        AuthContext ctx = service.extractAuthContext(identity).await().indefinitely();
+        assertFalse(ctx.isAuthenticated());
     }
 
     @Test
     void testExtractAuthContext_ExceptionFallback() {
-        AuthenticationService service = new AuthenticationService();
         SecurityIdentity identity = mock(SecurityIdentity.class);
         when(identity.isAnonymous()).thenReturn(false);
-        // Throw an exception when getPrincipal is called to test the catch block
         when(identity.getPrincipal()).thenThrow(new RuntimeException("Test exception"));
-
-        Uni<AuthContext> uni = service.extractAuthContext(identity);
-        AuthContext authContext = uni.await().indefinitely();
-        assertFalse(authContext.isAuthenticated());
+        AuthContext ctx = service.extractAuthContext(identity).await().indefinitely();
+        assertFalse(ctx.isAuthenticated());
     }
 
+    // --- KeycloakRoleExtractorImpl tests (formerly private methods in AuthenticationService) ---
+
     @Test
-    void testExtractGroupsClaim_ThrowsException() throws Exception {
-        AuthenticationService service = new AuthenticationService();
-        Method m = AuthenticationService.class.getDeclaredMethod("extractGroupsClaim", JsonWebToken.class);
-        m.setAccessible(true);
-
+    void testExtractGroups_ThrowsException() {
         JsonWebToken jwt = mock(JsonWebToken.class);
-        when(jwt.getGroups()).thenThrow(new RuntimeException("No groups for you"));
-
-        Set<String> groups = (Set<String>) m.invoke(service, jwt);
+        when(jwt.getGroups()).thenThrow(new RuntimeException("No groups"));
+        Set<String> groups = roleExtractor.extractGroups(jwt);
         assertTrue(groups.isEmpty());
     }
 
     @Test
-    @SuppressWarnings("unchecked")
-    void testExtractGroupsClaim_NullGroups() throws Exception {
-        AuthenticationService service = new AuthenticationService();
-        Method m = AuthenticationService.class.getDeclaredMethod("extractGroupsClaim", JsonWebToken.class);
-        m.setAccessible(true);
-
+    void testExtractGroups_NullGroups() {
         JsonWebToken jwt = mock(JsonWebToken.class);
         when(jwt.getGroups()).thenReturn(null);
-
-        Set<String> nullGroups = (Set<String>) m.invoke(service, jwt);
-        assertTrue(nullGroups.isEmpty());
+        Set<String> groups = roleExtractor.extractGroups(jwt);
+        assertTrue(groups.isEmpty());
     }
 
     @Test
-    @SuppressWarnings("unchecked")
-    void testExtractKeycloakRealmRoles_NotACollection() throws Exception {
-        AuthenticationService service = new AuthenticationService();
-        Method m = AuthenticationService.class.getDeclaredMethod("extractKeycloakRealmRoles", JsonWebToken.class);
-        m.setAccessible(true);
-
+    void testExtractRealmRoles_NotACollection() {
         JsonWebToken jwt = mock(JsonWebToken.class);
-        java.util.Map<String, Object> realmAccess = java.util.Map.of("roles", "not-a-list");
+        Map<String, Object> realmAccess = Map.of("roles", "not-a-list");
         when(jwt.getClaim("realm_access")).thenReturn(realmAccess);
-
-        Set<String> roles = (Set<String>) m.invoke(service, jwt);
+        Set<String> roles = roleExtractor.extractRealmRoles(jwt);
         assertTrue(roles.isEmpty());
     }
 
     @Test
-    @SuppressWarnings("unchecked")
-    void testExtractKeycloakResourceRoles_EdgeCases() throws Exception {
-        AuthenticationService service = new AuthenticationService();
-        Method m = AuthenticationService.class.getDeclaredMethod("extractKeycloakResourceRoles", JsonWebToken.class);
-        m.setAccessible(true);
-
+    void testExtractRealmRoles_NullRoles() {
         JsonWebToken jwt = mock(JsonWebToken.class);
-        java.util.Map<String, Object> resourceAccess = new java.util.HashMap<>();
-
-        // 1. entry.getValue() is NOT a map
-        resourceAccess.put("client1", "not-a-map");
-
-        // 2. Map WITHOUT "roles"
-        resourceAccess.put("client2", java.util.Map.of("other-key", "value"));
-
-        // 3. Map with "roles" but rolesObj is NOT a Collection
-        resourceAccess.put("client3", java.util.Map.of("roles", "not-a-collection"));
-
-        when(jwt.getClaim("resource_access")).thenReturn(resourceAccess);
-
-        Set<String> roles = (Set<String>) m.invoke(service, jwt);
+        Map<String, Object> realmAccess = new java.util.HashMap<>();
+        realmAccess.put("roles", null);
+        when(jwt.getClaim("realm_access")).thenReturn(realmAccess);
+        Set<String> roles = roleExtractor.extractRealmRoles(jwt);
         assertTrue(roles.isEmpty());
     }
 
     @Test
-    void testExtractLongClaim_NumberValue() throws Exception {
-        AuthenticationService service = new AuthenticationService();
-        Method m = AuthenticationService.class.getDeclaredMethod("extractLongClaim", JsonWebToken.class, String.class);
-        m.setAccessible(true);
+    void testExtractResourceRoles_EdgeCases() {
+        JsonWebToken jwt = mock(JsonWebToken.class);
+        Map<String, Object> resourceAccess = new java.util.HashMap<>();
+        resourceAccess.put("client1", "not-a-map");
+        resourceAccess.put("client2", Map.of("other-key", "value"));
+        resourceAccess.put("client3", Map.of("roles", "not-a-collection"));
+        when(jwt.getClaim("resource_access")).thenReturn(resourceAccess);
+        Set<String> roles = roleExtractor.extractResourceRoles(jwt);
+        assertTrue(roles.isEmpty());
+    }
 
+    @Test
+    void testExtractResourceRoles_Single() {
+        JsonWebToken jwt = mock(JsonWebToken.class);
+        Map<String, Object> clientAccess = new java.util.HashMap<>();
+        clientAccess.put("roles", List.of("r1"));
+        Map<String, Object> resourceAccess = new java.util.HashMap<>();
+        resourceAccess.put("my-client", clientAccess);
+        when(jwt.getClaim("resource_access")).thenReturn(resourceAccess);
+        Set<String> roles = roleExtractor.extractResourceRoles(jwt);
+        assertTrue(roles.contains("my-client:r1"));
+    }
+
+    // --- JwtClaimExtractorImpl tests (formerly private methods in AuthenticationService) ---
+
+    @Test
+    void testExtractLongClaim_NumberValue() {
         JsonWebToken jwt = mock(JsonWebToken.class);
         when(jwt.getClaim("amount")).thenReturn(Integer.valueOf(42));
-
-        long result = (Long) m.invoke(service, jwt, "amount");
+        long result = claimExtractor.extractLongClaim(jwt, "amount");
         assertEquals(42L, result);
     }
 
+    // --- AuthContextMapperImpl audience tests ---
+
+    @Test
+    void testAudience_Set() {
+        JsonWebToken jwt = mock(JsonWebToken.class);
+        when(jwt.getSubject()).thenReturn("u1");
+        when(jwt.getAudience()).thenReturn(Set.of("aud1", "aud2"));
+        AuthContext ctx = authContextMapper.mapToAuthContext(jwt, Set.of());
+        assertEquals(2, ctx.audience().size());
+        assertTrue(ctx.audience().contains("aud1"));
+    }
+
+    @Test
+    void testAudience_Null() {
+        JsonWebToken jwt = mock(JsonWebToken.class);
+        when(jwt.getSubject()).thenReturn("u1");
+        when(jwt.getAudience()).thenReturn(null);
+        AuthContext ctx = authContextMapper.mapToAuthContext(jwt, Set.of());
+        assertTrue(ctx.audience().isEmpty());
+    }
+
+    // --- Full integration through AuthenticationService.extractFromJwt ---
+
     @Test
     void testExtractFromJwt_FullData() {
-        AuthenticationService service = new AuthenticationService();
         JsonWebToken jwt = mock(JsonWebToken.class);
 
         when(jwt.getSubject()).thenReturn("user-999");
@@ -157,20 +185,9 @@ public class AuthenticationServiceExtTest {
         when(jwt.getClaim("iat")).thenReturn(1700000000L);
         when(jwt.getClaim("exp")).thenReturn(1700003600L);
         when(jwt.getClaim("jti")).thenReturn("token-id-123");
-
-        // Groups
-        Set<String> groups = Set.of("group-a", "group-b");
-        when(jwt.getGroups()).thenReturn(groups);
-
-        // Realm Roles
-        Map<String, Object> realmAccess = Map.of("roles", List.of("power-user"));
-        when(jwt.getClaim("realm_access")).thenReturn(realmAccess);
-
-        // Resource Roles
-        Map<String, Object> resourceAccess = Map.of("app1", Map.of("roles", List.of("admin")));
-        when(jwt.getClaim("resource_access")).thenReturn(resourceAccess);
-
-        // All claims
+        when(jwt.getGroups()).thenReturn(Set.of("group-a", "group-b"));
+        when(jwt.getClaim("realm_access")).thenReturn(Map.of("roles", List.of("power-user")));
+        when(jwt.getClaim("resource_access")).thenReturn(Map.of("app1", Map.of("roles", List.of("admin"))));
         when(jwt.getClaimNames()).thenReturn(Set.of("sub", "iss", "custom"));
         when(jwt.getClaim("custom")).thenReturn("custom-val");
 
@@ -182,75 +199,9 @@ public class AuthenticationServiceExtTest {
         assertEquals(1700000000L, context.issuedAt());
         assertEquals(1700003600L, context.expiresAt());
         assertEquals("token-id-123", context.tokenId());
-
         assertTrue(context.roles().contains("group-a"));
-        assertTrue(context.roles().contains("group-b"));
         assertTrue(context.roles().contains("power-user"));
         assertTrue(context.roles().contains("app1:admin"));
-
         assertEquals("custom-val", context.claims().get("custom"));
-    }
-
-    @Test
-    void testExtractKeycloakRealmRoles_NullRoles() throws Exception {
-        AuthenticationService service = new AuthenticationService();
-        Method m = AuthenticationService.class.getDeclaredMethod("extractKeycloakRealmRoles", JsonWebToken.class);
-        m.setAccessible(true);
-
-        JsonWebToken jwt = mock(JsonWebToken.class);
-        java.util.Map<String, Object> realmAccess = new java.util.HashMap<>();
-        realmAccess.put("roles", null);
-        when(jwt.getClaim("realm_access")).thenReturn(realmAccess);
-
-        @SuppressWarnings("unchecked")
-        Set<String> roles = (Set<String>) m.invoke(service, jwt);
-        assertTrue(roles.isEmpty());
-    }
-
-    @Test
-    void testExtractAudience_List() throws Exception {
-        AuthenticationService service = new AuthenticationService();
-        Method m = AuthenticationService.class.getDeclaredMethod("extractAudience", JsonWebToken.class);
-        m.setAccessible(true);
-
-        JsonWebToken jwt = mock(JsonWebToken.class);
-        when(jwt.getAudience()).thenReturn(java.util.Set.of("aud1", "aud2"));
-
-        @SuppressWarnings("unchecked")
-        java.util.List<String> aud = (java.util.List<String>) m.invoke(service, jwt);
-        assertEquals(2, aud.size());
-        assertTrue(aud.contains("aud1"));
-    }
-
-    @Test
-    void testExtractAudience_Null() throws Exception {
-        AuthenticationService service = new AuthenticationService();
-        Method m = AuthenticationService.class.getDeclaredMethod("extractAudience", JsonWebToken.class);
-        m.setAccessible(true);
-
-        JsonWebToken jwt = mock(JsonWebToken.class);
-        when(jwt.getAudience()).thenReturn(null);
-
-        @SuppressWarnings("unchecked")
-        java.util.List<String> aud = (java.util.List<String>) m.invoke(service, jwt);
-        assertTrue(aud.isEmpty());
-    }
-
-    @Test
-    void testExtractKeycloakResourceRoles_Single() throws Exception {
-        AuthenticationService service = new AuthenticationService();
-        Method m = AuthenticationService.class.getDeclaredMethod("extractKeycloakResourceRoles", JsonWebToken.class);
-        m.setAccessible(true);
-
-        JsonWebToken jwt = mock(JsonWebToken.class);
-        java.util.Map<String, Object> resourceAccess = new java.util.HashMap<>();
-        java.util.Map<String, Object> clientAccess = new java.util.HashMap<>();
-        clientAccess.put("roles", List.of("r1"));
-        resourceAccess.put("my-client", clientAccess);
-        when(jwt.getClaim("resource_access")).thenReturn(resourceAccess);
-
-        @SuppressWarnings("unchecked")
-        Set<String> roles = (Set<String>) m.invoke(service, jwt);
-        assertTrue(roles.contains("my-client:r1"));
     }
 }

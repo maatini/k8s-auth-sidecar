@@ -4,10 +4,8 @@ import io.quarkus.security.identity.SecurityIdentity;
 import org.eclipse.microprofile.jwt.JsonWebToken;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import space.maatini.sidecar.infrastructure.config.SidecarConfig;
 import space.maatini.sidecar.domain.model.AuthContext;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -18,13 +16,20 @@ import static org.mockito.Mockito.*;
 class AuthenticationServicePojoTest {
 
     private AuthenticationService authenticationService;
-    private SidecarConfig config;
 
     @BeforeEach
     void setup() {
+        JwtClaimExtractorImpl claimExtractor = new JwtClaimExtractorImpl();
+
+        KeycloakRoleExtractorImpl roleExtractor = new KeycloakRoleExtractorImpl();
+        roleExtractor.claimExtractor = claimExtractor;
+
+        AuthContextMapperImpl authContextMapper = new AuthContextMapperImpl();
+        authContextMapper.claimExtractor = claimExtractor;
+
         authenticationService = new AuthenticationService();
-        config = mock(SidecarConfig.class);
-        authenticationService.config = config;
+        authenticationService.roleExtractor = roleExtractor;
+        authenticationService.authContextMapper = authContextMapper;
     }
 
     @Test
@@ -64,7 +69,6 @@ class AuthenticationServicePojoTest {
         when(jwt.getClaim("preferred_username")).thenReturn("jdoe");
         when(jwt.getClaim("name")).thenReturn("John Doe");
 
-        // Keycloak roles
         Map<String, Object> realmAccess = Map.of("roles", List.of("admin", "user"));
         when(jwt.getClaim("realm_access")).thenReturn(realmAccess);
 
@@ -98,7 +102,6 @@ class AuthenticationServicePojoTest {
         JsonWebToken jwt = mock(JsonWebToken.class);
         when(jwt.getClaimNames()).thenThrow(new RuntimeException("Boom"));
 
-        // Sollte nicht crashen
         AuthContext context = authenticationService.extractFromJwt(jwt);
         assertNotNull(context.claims());
         assertTrue(context.claims().isEmpty());
@@ -108,22 +111,18 @@ class AuthenticationServicePojoTest {
     void testExtractFromJwt_MalformedResourceAccess() {
         JsonWebToken jwt = mock(JsonWebToken.class);
         when(jwt.getSubject()).thenReturn("user-456");
-
-        // Resource access mit fehlerhafter Struktur (keine Map / String statt Object)
         when(jwt.getClaim("resource_access")).thenReturn("Not a Map");
 
         AuthContext context = authenticationService.extractFromJwt(jwt);
 
         assertEquals("user-456", context.userId());
-        assertTrue(context.roles().isEmpty()); // Soll ohne Crash abgefangen werden
+        assertTrue(context.roles().isEmpty());
     }
 
     @Test
     void testExtractFromJwt_MalformedRealmAccess() {
         JsonWebToken jwt = mock(JsonWebToken.class);
         when(jwt.getSubject()).thenReturn("user-456");
-
-        // Realm access missing roles list
         when(jwt.getClaim("realm_access")).thenReturn(Map.of("wrong_key", "value"));
 
         AuthContext context = authenticationService.extractFromJwt(jwt);
@@ -134,16 +133,10 @@ class AuthenticationServicePojoTest {
     void testExtractAudience_SingleString() {
         JsonWebToken jwt = mock(JsonWebToken.class);
         when(jwt.getSubject()).thenReturn("u1");
-
         when(jwt.getClaimNames()).thenReturn(Set.of("aud"));
-        // Manche IdP liefern Audience als String, nicht als Liste
         when(jwt.getClaim("aud")).thenReturn("my-audience");
 
         AuthContext context = authenticationService.extractFromJwt(jwt);
-        // The implementation probably falls back to Collections.emptyList() or does not
-        // cast properly if it's a raw String
-        // Let's check what the extractAudience fallback is locally, or just assert it
-        // doesn't crash:
         assertNotNull(context.audience());
     }
 }
