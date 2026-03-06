@@ -125,15 +125,20 @@ spec:
 
 Tests werden als **reine POJOs** (ohne Quarkus-Start) ausgeführt – dadurch erreichen wir eine extrem schnelle Ausführung und eine hohe Mutationsabdeckung in der Kernlogik.
 
-| Modul | Status | Tests | Line Coverage | Branch Coverage | PIT Score |
+| Modul | Status | Tests | PIT Line Coverage | PIT Mutation | PIT Test Strength |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **config** | SUCCESS | 5 | 95% | 90% | **92%** |
-| **auth-core** | SUCCESS | 44 | 90% | 85% | **88%** |
-| **opa-wasm** | SUCCESS | 47 | 82% | 75% | **70%** |
-| **proxy** | SUCCESS | 47 | 88% | 82% | **75%** |
-| **Gesamt** | **SUCCESS** | **143** | **>88%** | **>82%** | **>80%** |
+| **config** | SUCCESS | 5 | 60% | 26% | **71%** |
+| **auth-core** | SUCCESS | 43 | 69% | 48% | **80%** |
+| **opa-wasm** | SUCCESS | 47 | 64% | 52% | **69%** |
+| **proxy** | SUCCESS ¹ | 26 ² | n/a | n/a | n/a |
+| **Gesamt** | **SUCCESS** | **121** ³ | **~65%** | **~47%** | **~73%** |
 
-- **Coverage:** JaCoCo Branch Coverage > 80 %
+> ¹ 26 stabile POJO+ExtTests – 8 QuarkusIntegrationTests schlagen ohne laufenden WireMock-Stack fehl (erwartet).  
+> ² Nur POJO+ExtTests gezählt (stabile Tests). Vollständiger Proxy-Test-Run erfordert `docker-compose.dev.yml`.  
+> ³ POJO+ExtTests gesamt (108 grün) + Config QuarkusTests (3) + OPA QuarkusTests (10) = 121 stabile Tests.
+
+- **PIT Test Strength**: % der Mutanten, die von gedeckten Tests getötet werden (bester Qualitäts-Indikator).
+- **auth-core Services** (application.service): **91% Line Coverage, 77% Mutation Coverage** – beste Kernlogik-Abdeckung.
 
 ### Docker Build
 

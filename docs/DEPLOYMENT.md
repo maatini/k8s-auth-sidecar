@@ -104,7 +104,7 @@ kubectl exec -n k8s-auth-sidecar-demo deploy/my-application -c k8s-auth-sidecar 
   wget -qO- http://localhost:8080/q/health
 ```
 
-> **🛡️ Security Release Note:** Bevor der Container-Tag `1.0.0` freigegeben ist, wurde er durch eine automatische Suite aus 143 automatisierten Tests und gezielten PIT Mutation-Tests (POJO-based) abgesichert. Jeder Release bewältigt eine Branch-Coverage >80%.
+> **🛡️ Security Release Note:** Bevor der Container-Tag `1.0.0` freigegeben ist, wurde er durch eine automatische Suite aus **121 stabilen Tests** (108 POJO+ExtTests + 13 QuarkusTests) und gezielten PIT Mutation-Tests (POJO-basiert) abgesichert. Auth-Core Services erreichen **80% PIT Test Strength** und **91% Line Coverage**.
 
 ## Schritt 6: Sidecar zu bestehender App hinzufügen
 

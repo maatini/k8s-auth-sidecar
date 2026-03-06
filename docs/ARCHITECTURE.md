@@ -148,12 +148,12 @@ spec:
 ## Implementierungsplan & Testing-Strategie
 
 > [!NOTE]
-> Die gesamte Architektur ist so designt, dass ihre Bestandteile (POJOs) hochgradig testbar sind. Das Projekt pflegt strenge Metriken: **>80% Branch Coverage** und in Services eine **PIT Mutation Coverage von >85%**. Die Erreichung dieses Kill-Scores war ein Haupt-Design-Treiber.
+> Die gesamte Architektur ist so designt, dass ihre Bestandteile (POJOs) hochgradig testbar sind. Das Projekt pflegt strenge Metriken: **PIT Test Strength >70%** and **PIT Line Coverage >60%** über alle Module. Auth-Core Services (Kernlogik) erreichen **91% Line Coverage** und **80% Test Strength** (Stand 2026-03-06, POJO+ExtTests).
 
 ### Phase 1-5: Abgeschlossen (März 2026)
 - ✅ **Multi-Module Refactoring**: Umstellung auf Maven Parent-POM und 4 spezialisierte Module.
 - ✅ **Clean Architecture**: Strikte Trennung von `domain`, `application` und `infrastructure`.
-- ✅ **Test-Exzellenz**: Erhöhung der Testabdeckung auf 143 Unit-Tests und hohe Mutations-Scores.
+- ✅ **Test-Exzellenz**: 121 stabile Unit-Tests (108 POJO+ExtTests grün, 13 QuarkusTests). Auth-Core Services: 91% PIT Line Coverage, 80% Test Strength.
 - ✅ **Native Image**: Optimiert für GraalVM.
 
 ## Sicherheitsaspekte

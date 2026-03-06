@@ -24,10 +24,12 @@ curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/test
 - `mvn pitest:mutationCoverage` → PIT (nur POJO + ExtTests)  
 - `mvn compile` → WASM neu bauen (`.rego` → `.wasm`)  
 
-**Test-Strategie & Ziele (2026-03-06)**
-- POJO-Tests (`*PojoTest`): >85 % Mutation Score  
-- ExtTests + QuarkusTests: >80 % Branch Coverage  
-- Gesamt: >143 Tests, 0 Failures  
+**Test-Ergebnisse & Ziele (2026-03-06, gemessen)**
+- POJO+ExtTests: **108 Tests, 0 Failures** ✅  
+- QuarkusTests (config + opa-wasm): 13 Tests, 0 Failures ✅  
+- proxy QuarkusTests: 8 Failures (benötigen WireMock-Stack) ⚠️  
+- PIT Test Strength auth-core Services: **80%** (Ziel: >75%)  
+- Gesamt stabile Tests: **121** (108 POJO+Ext + 13 Quarkus)  
 
 **Pitfalls**
 - Immer zuerst WireMock starten!  
