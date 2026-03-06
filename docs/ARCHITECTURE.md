@@ -12,38 +12,28 @@ Der **k8s-auth-sidecar** (Request Router Sidecar) ist ein Quarkus-basierter Micr
 
 ![Request Flow](images/request_flow.png)
 
-## Komponenten
+## Module & Komponenten (Maven Multi-Module)
 
-### 1. Request Interceptor (`RequestInterceptorFilter`)
-- Fängt alle eingehenden HTTP-Anfragen ab
-- Extrahiert den Bearer-Token aus dem `Authorization`-Header
-- Leitet an den AuthN-Filter weiter
+### 1. Modul: `proxy`
+- **Request Router (`ProxyResource`)**: Catch-all JAX-RS Resource.
+- **Streaming Proxy (`HttpProxyService`)**: Leitet Anfragen **via non-blocking Streaming** an den Main-Container weiter.
+- **Entry Filter (`AuthProxyFilter`)**: Erster Kontaktpunkt, delegiert an den Processor.
 
-### 2. Authentication Filter (`AuthenticationFilter`)
-- Validiert JWT-Tokens gegen konfigurierte Identity Provider
-- Unterstützt Multi-Tenant OIDC:
-  - **Keycloak**: `/.well-known/openid-configuration`
-  - **Microsoft Entra ID**: `/.well-known/openid-configuration`
-- Prüft:
-  - Token-Signatur (via JWKS)
-  - Token-Expiration
-  - Audience-Claim
-  - Issuer-Claim
+### 2. Modul: `auth-core`
+- **Request Processor (`SidecarRequestProcessor`)**: Orchestriert AuthN, Enrichment und AuthZ.
+- **Authentication Service (`AuthenticationService`)**: Validiert JWTs und extrahiert den `AuthContext`.
+- **Roles Service (`RolesService`)**: Enriched den Context über den `RolesClient`.
 
-### 3. Authorization Filter (`AuthorizationFilter`)
-- Extrahiert User-ID aus Token-Claims
-- Ruft Rollen/Rechte vom externen Microservice ab
-- Evaluiert Policies mit eingebetteter OPA-Engine
+### 3. Modul: `opa-wasm`
+- **Policy Engine (`WasmPolicyEngine`)**: Eingebettete OPA-Engine (WASM) für In-Memory Evaluation.
+- **Policy Service (`PolicyService`)**: Abstraktionsschicht für die Autorisierungs-Logik.
+- **Rego Policies**: Lokale `.rego` Dateien und vorkompilierte `.wasm` Bundles.
 
-### 4. Policy Engine (OPA WASM Integration)
-- Eingebettete OPA-Engine (WASM via Chicory) für blitzschnelle In-Memory Policy-Evaluation
-- Rego-Policies kompiliert zu WASM für flexible Zugriffskontrolle
-- Hot-Reload von Policies (In-Memory Neuladen bei Datei-Änderung)
+### 4. Modul: `config`
+- **Zentrale Konfiguration**: `SidecarConfig` (Quarkus Config).
+- **Observability**: Health-Checks (`Liveness`, `Readiness`) und Micrometer Metriken.
 
-### 5. Proxy Service (`ProxyService`)
-- Leitet autorisierte Anfragen **via non-blocking Streaming** an den Main-Container weiter (kein komplettes Laden in den RAM).
-- Fügt Security-Headers hinzu und propagiert Auth-Claims (z. B. `X-Auth-User-Roles`).
-- Die gesamte HTTP-Filter-Pipeline ist vollständig reaktiv implementiert (`Mutiny Uni`), was höchste Parallelität bei minimalem Ressourcenverbrauch garantiert.
+Die gesamte HTTP-Pipeline ist vollständig reaktiv implementiert (`Mutiny Uni`), was höchste Parallelität bei minimalem Ressourcenverbrauch garantiert.
 
 ## Architektur für lokale Entwicklung (Dev-Profil & Mocking)
 
@@ -155,37 +145,16 @@ spec:
           value: "8081"
 ```
 
-## Implementierungsplan
+## Implementierungsplan & Testing-Strategie
 
-### Phase 1: Grundgerüst (Tag 1-2)
-1. ✅ Quarkus-Projekt initialisieren
-2. ✅ Basis-Projektstruktur erstellen
-3. ✅ Request Interceptor implementieren
-4. ✅ Proxy-Service für Request-Forwarding
+> [!NOTE]
+> Die gesamte Architektur ist so designt, dass ihre Bestandteile (POJOs) hochgradig testbar sind. Das Projekt pflegt strenge Metriken: **>80% Branch Coverage** und in Services eine **PIT Mutation Coverage von >85%**. Die Erreichung dieses Kill-Scores war ein Haupt-Design-Treiber.
 
-### Phase 2: Authentifizierung (Tag 3-4)
-1. ✅ OIDC-Integration für Keycloak
-2. ✅ Multi-Tenant Support für Entra ID
-3. ✅ JWT-Validierung und Claim-Extraktion
-4. ✅ Token-Caching
-
-### Phase 3: Autorisierung (Tag 5-6)
-1. ✅ Roles-Service Client
-2. ✅ OPA-Integration
-3. ✅ Policy-Konfiguration
-4. ✅ Decision-Caching
-
-### Phase 4: Observability (Tag 7)
-1. ✅ Prometheus Metrics
-2. ✅ Structured JSON Logging
-3. ✅ Health Checks
-4. ✅ Tracing (optional)
-
-### Phase 5: Deployment (Tag 8)
-1. ✅ Dockerfile (Native Image)
-2. ✅ Kubernetes Manifests
-3. ✅ Helm Chart (optional)
-4. ✅ Dokumentation
+### Phase 1-5: Abgeschlossen (März 2026)
+- ✅ **Multi-Module Refactoring**: Umstellung auf Maven Parent-POM und 4 spezialisierte Module.
+- ✅ **Clean Architecture**: Strikte Trennung von `domain`, `application` und `infrastructure`.
+- ✅ **Test-Exzellenz**: Erhöhung der Testabdeckung auf 143 Unit-Tests und hohe Mutations-Scores.
+- ✅ **Native Image**: Optimiert für GraalVM.
 
 ## Sicherheitsaspekte
 

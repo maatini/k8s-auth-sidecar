@@ -1,17 +1,34 @@
 ---
 name: opa-authz-engineer-for-sidecar
-description: Schreibe, teste und hot-reloade OPA/Rego-Policies für den k8s-auth-sidecar (embedded WASM + ConfigMap). Verwende bei allen AuthZ-Regeln, Input-JSON-Struktur oder Policy-Updates.
+description: Rego-Policies schreiben, testen und hot-reloaden (embedded WASM)
 ---
-# OPA AuthZ Engineer für k8s-auth-sidecar
 
-**Input-JSON immer:**
+**Input-JSON (immer so!)**
+```json
 {
-  "user": { "id": "...", "roles": ["..."] },
-  "request": { "method": "GET|POST|...", "path": "/api/..." }
+  "user": { "id": "...", "roles": ["admin"], "permissions": ["read"] },
+  "request": { "method": "GET", "path": "/api/admin/123" }
 }
+```
 
-**Regeln:**
-- Verwende `allow` / `deny` mit `package authz`
-- Hot-Reload wird automatisch über Kubernetes Volume-Events erkannt
-- Policies liegen in `/policies/*.rego` (im Container)
-- Teste immer mit `opa test` und im embedded Modus
+**Wichtige Regeln**
+- `default allow := false`  
+- `allow if { "admin" in input.user.roles }`  
+- Public-Paths: `/health`, `/api/public/**`, `/q/*`  
+
+**Test-Befehle**
+```bash
+opa test src/main/resources/policies -v
+mvn compile          # WASM neu bauen
+```
+
+**Hot-Reload**
+- ConfigMap ändern → Kubernetes Volume-Event → Watcher erkennt → `recompileWasm` + `loadWasmModule`  
+
+**Pitfalls**
+- `startwith` statt `startswith` (Tippfehler!)  
+- Immer `import future.keywords.if`  
+- Sensitive-Pfade mit `permissions` prüfen  
+
+**Verwandte Skills**  
+- policy-testing-validation

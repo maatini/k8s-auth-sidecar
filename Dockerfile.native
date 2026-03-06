@@ -33,7 +33,7 @@ RUN microdnf install -y curl tar gzip && microdnf clean all && \
 # This Dockerfile still performs the build independently if no binary is provided,
 # ensuring the build is self-contained when run purely with `docker build`.
 RUN --mount=type=cache,target=/root/.m2 mvn package -Pnative -DskipTests \
-    -Dquarkus.native.additional-build-args="-H:+ReportExceptionStackTraces" || true
+    -Dquarkus.native.additional-build-args="-H:+ReportExceptionStackTraces"
 
 # =====================================================
 # Stage 2: Runtime
@@ -58,16 +58,10 @@ USER root
 # Copy OPA CLI from build stage
 COPY --from=build /usr/local/bin/opa /usr/local/bin/opa
 
-# Copy the native executable with proper ownership
-# If a pre-built binary exists in the host context (target/), copy it.
-# Otherwise, fall back to the binary generated in the build stage.
+# Copy policies
 COPY --chown=1001:1001 src/main/resources/policies /policies
-COPY --chown=1001:1001 target/*-runner /app/k8s-auth-sidecar 
-# Ensure the copy doesn't fail if the target string contains no files but was built inside the container.
-# If copying from 'target/' failed because the host didn't supply the runner, 
-# Docker Buildx allows copying from the build stage via a conditional script, 
-# but in Quarkus native builds, relying purely on the build stage is safer if no host binary exists.
-# Realistically, for pure CI optimization:
+
+# Copy the native executable from the build stage with proper ownership
 COPY --chown=1001:1001 --from=build /app/target/*-runner /app/k8s-auth-sidecar
 
 # Switch back to non-root user (1001 is the default quarkus user in micro-image)

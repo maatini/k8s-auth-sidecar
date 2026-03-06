@@ -1,0 +1,233 @@
+# K8s-Auth-Sidecar Configuration
+# ========================
+
+quarkus:
+  application:
+    name: k8s-auth-sidecar
+    version: 1.0.0
+
+  # HTTP Server Configuration
+  http:
+    port: 8080
+    cors:
+      enabled: true
+      origins: ${QUARKUS_HTTP_CORS_ORIGINS:*}
+      methods: GET,POST,PUT,DELETE,PATCH,OPTIONS
+      headers: "*"
+      access-control-max-age: 24H
+
+  # OIDC Configuration for JWT Validation (generic, optimized for Keycloak)
+  oidc:
+    auth-server-url: ${OIDC_AUTH_SERVER_URL:https://keycloak.example.com/realms/myrealm}
+    client-id: ${OIDC_CLIENT_ID:k8s-auth-sidecar}
+    credentials:
+      secret: ${OIDC_CLIENT_SECRET:}
+
+    token:
+      issuer: ${OIDC_TOKEN_ISSUER:}
+      audience: ${OIDC_TOKEN_AUDIENCE:}
+      principal-claim: ${OIDC_PRINCIPAL_CLAIM:sub}
+
+    jwks:
+      resolve-early: true
+      cache-size: 10
+      cache-time-to-live: 10m
+
+  # Caching Configuration
+  cache:
+    caffeine:
+      "policy-decision-cache":
+        initial-capacity: 500
+        maximum-size: 5000
+        expire-after-write: 1m
+      "jwt-cache":
+        initial-capacity: 500
+        maximum-size: 10000
+        expire-after-write: 10m
+      "roles-cache":
+        initial-capacity: 100
+        maximum-size: 1000
+        expire-after-write: 10m
+
+  # REST Client Configuration for Roles Enrichment
+  rest-client:
+    "roles-api":
+      url: ${sidecar.roles.url}
+      connect-timeout: 2000
+      read-timeout: 5000
+
+  # Health and Metrics
+  smallrye-health:
+    ui:
+      enabled: true
+
+  micrometer:
+    export:
+      prometheus:
+        enabled: true
+    binder:
+      http-server:
+        enabled: true
+      jvm: true
+      system: true
+
+  # Logging Configuration
+  log:
+    level: ${QUARKUS_LOG_LEVEL:INFO}
+    category:
+      "space.maatini.sidecar":
+        level: ${SIDECAR_LOG_LEVEL:DEBUG}
+    console:
+      json:
+        enabled: ${QUARKUS_LOG_JSON:true}
+      format: "%d{yyyy-MM-dd HH:mm:ss,SSS} %-5p [%c{3.}] (%t) %s%e%n"
+
+  # OpenTelemetry
+  otel:
+    enabled: ${OTEL_ENABLED:false}
+    exporter:
+      otlp:
+        endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4317}
+    service:
+      name: k8s-auth-sidecar
+
+  # Native Image Configuration
+  native:
+    additional-build-args: -H:+ReportExceptionStackTraces
+
+# ===================
+# Sidecar Configuration
+# ===================
+
+sidecar:
+  # Proxy Configuration
+  proxy:
+    target:
+      host: ${PROXY_TARGET_HOST:localhost}
+      port: ${PROXY_TARGET_PORT:8081}
+      scheme: ${PROXY_TARGET_SCHEME:http}
+    timeout:
+      connect: 5000
+      read: 30000
+    pool-size: 100
+
+    propagate-headers:
+      - X-Request-ID
+      - X-Correlation-ID
+      - X-Forwarded-For
+      - X-Forwarded-Proto
+
+    add-headers: {}
+
+  # Authentication Configuration
+  auth:
+    enabled: ${AUTH_ENABLED:true}
+
+    public-paths:
+      - /health
+      - /health/live
+      - /health/ready
+      - /metrics
+      - /q/health
+      - /q/metrics
+      - /q/openapi
+      - /q/swagger-ui
+      - /api/public/**
+
+    token:
+      header-name: Authorization
+      header-prefix: Bearer
+      cookie-name: ${AUTH_TOKEN_COOKIE:access_token}
+      query-param: ${AUTH_TOKEN_QUERY_PARAM:token}
+
+  # Authorization Configuration
+  authz:
+    enabled: ${AUTHZ_ENABLED:true}
+
+  # OPA (Embedded WASM via Chicory)
+  opa:
+    enabled: ${OPA_ENABLED:true}
+    embedded:
+      wasm-path: ${OPA_WASM_PATH:classpath:policies/authz.wasm}
+    default-package: authz
+    default-rule: allow
+
+  # Audit Logging
+  audit:
+    enabled: ${AUDIT_ENABLED:true}
+    log-request-body: false
+    log-response-body: false
+    sensitive-headers:
+      - Authorization
+      - Cookie
+      - X-Api-Key
+
+  # Roles Microservice (Enrichment)
+  roles:
+    enabled: ${ROLES_ENABLED:false}
+    url: ${ROLES_SERVICE_URL:http://localhost:8081}
+    path: ${ROLES_SERVICE_PATH:/api/v1/users/{userId}/roles}
+    timeout: 30s
+    cache-size: 1000
+    cache-ttl: 10m
+
+# ===================
+# Profile-specific Configuration
+# ===================
+
+"%dev":
+  quarkus:
+    http:
+      port: 8080
+    log:
+      level: INFO
+      console:
+        json: false
+      category:
+        "io.quarkus.oidc":
+          level: WARN
+        "io.quarkus.config":
+          level: WARN
+        "io.micrometer":
+          level: WARN
+    oidc:
+      auth-server-url: http://localhost:8090/realms/master
+      token:
+        issuer: any
+        verification:
+      jwks:
+        resolve-early: false
+    cache:
+      enabled: false
+
+  sidecar:
+    auth:
+      enabled: false
+    authz:
+      enabled: true
+    opa:
+      enabled: true
+
+
+"%test":
+  quarkus:
+    log:
+      level: WARN
+  sidecar:
+    auth:
+      enabled: true
+    authz:
+      enabled: false
+    opa:
+      enabled: false
+
+"%prod":
+  quarkus:
+    http:
+      cors:
+        enabled: true
+        origins: ${QUARKUS_HTTP_CORS_ORIGINS:}
+    log:
+      console:
+        json: true
+      level: INFO

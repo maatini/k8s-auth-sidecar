@@ -4,6 +4,7 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
 
 # Security: Least privilege + id-token for signed provenance
 permissions:

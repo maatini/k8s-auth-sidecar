@@ -1,0 +1,144 @@
+package space.maatini.sidecar.infrastructure.filter;
+
+import io.quarkus.security.identity.SecurityIdentity;
+import io.quarkus.test.InjectMock;
+import io.quarkus.test.junit.QuarkusTest;
+import io.quarkus.test.junit.QuarkusTestProfile;
+import io.quarkus.test.junit.TestProfile;
+import io.smallrye.mutiny.Uni;
+import jakarta.inject.Inject;
+import jakarta.ws.rs.container.ContainerRequestContext;
+import jakarta.ws.rs.core.Response;
+import jakarta.ws.rs.core.UriInfo;
+import org.junit.jupiter.api.Test;
+import space.maatini.sidecar.infrastructure.config.SidecarConfig;
+import space.maatini.sidecar.domain.model.AuthContext;
+import space.maatini.sidecar.domain.model.PolicyDecision;
+import space.maatini.sidecar.application.service.AuthenticationService;
+import space.maatini.sidecar.application.service.PolicyService;
+
+import java.io.IOException;
+import java.net.URI;
+import java.util.Map;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
+
+@QuarkusTest
+@TestProfile(AuthProxyFilterTest.Profile.class)
+class AuthProxyFilterTest {
+
+    public static class Profile implements QuarkusTestProfile {
+        @Override
+        public Map<String, String> getConfigOverrides() {
+            return Map.of(
+                    "sidecar.auth.enabled", "true",
+                    "sidecar.opa.enabled", "true",
+                    "sidecar.auth.public-paths[0]", "/public/**");
+        }
+    }
+
+    @Inject
+    AuthProxyFilter authProxyFilter;
+
+    @Inject
+    SidecarConfig config;
+
+    @InjectMock
+    AuthenticationService authenticationService;
+
+    @InjectMock
+    PolicyService policyService;
+
+    @InjectMock
+    SecurityIdentity securityIdentity;
+
+    @Test
+    void testFilter_InternalPath_Skipped() throws IOException {
+        ContainerRequestContext req = mock(ContainerRequestContext.class);
+        UriInfo uriInfo = mock(UriInfo.class);
+        when(req.getUriInfo()).thenReturn(uriInfo);
+        when(uriInfo.getPath()).thenReturn("/q/health");
+
+        Response response = authProxyFilter.filter(req).await().indefinitely();
+
+        assertNull(response, "Should return null to continue filter chain");
+        verify(authenticationService, never()).extractAuthContext(any());
+    }
+
+    @Test
+    void testFilter_PublicPath_Skipped() throws IOException {
+        ContainerRequestContext req = mock(ContainerRequestContext.class);
+        UriInfo uriInfo = mock(UriInfo.class);
+        when(req.getUriInfo()).thenReturn(uriInfo);
+        when(uriInfo.getPath()).thenReturn("/api/public/test");
+
+        Response response = authProxyFilter.filter(req).await().indefinitely();
+
+        assertNull(response, "Should return null to continue filter chain");
+        verify(authenticationService, never()).extractAuthContext(any());
+    }
+
+    @Test
+    void testFilter_Unauthenticated_Aborted() throws IOException {
+        ContainerRequestContext req = mock(ContainerRequestContext.class);
+        UriInfo uriInfo = mock(UriInfo.class);
+        when(req.getUriInfo()).thenReturn(uriInfo);
+        when(uriInfo.getPath()).thenReturn("/api/data");
+        when(req.getMethod()).thenReturn("GET");
+
+        when(authenticationService.extractAuthContext(any()))
+                .thenReturn(Uni.createFrom().item(AuthContext.anonymous()));
+
+        Response response = authProxyFilter.filter(req).await().indefinitely();
+
+        assertNotNull(response);
+        assertEquals(401, response.getStatus());
+    }
+
+    @Test
+    void testFilter_AuthorizationDenied_Aborted() throws IOException {
+        ContainerRequestContext req = mock(ContainerRequestContext.class);
+        UriInfo uriInfo = mock(UriInfo.class);
+        when(req.getUriInfo()).thenReturn(uriInfo);
+        when(uriInfo.getPath()).thenReturn("/api/admin");
+        when(req.getMethod()).thenReturn("DELETE");
+        when(uriInfo.getRequestUri()).thenReturn(URI.create("http://localhost/api/admin"));
+
+        AuthContext context = AuthContext.builder().userId("user1").build();
+        when(authenticationService.extractAuthContext(any())).thenReturn(Uni.createFrom().item(context));
+        when(req.getHeaders()).thenReturn(mock(jakarta.ws.rs.core.MultivaluedMap.class));
+        when(req.getUriInfo().getQueryParameters()).thenReturn(mock(jakarta.ws.rs.core.MultivaluedMap.class));
+
+        PolicyDecision denial = PolicyDecision.deny("Not an admin");
+        when(policyService.evaluate(any(), any(), any(), any(), any())).thenReturn(Uni.createFrom().item(denial));
+
+        Response response = authProxyFilter.filter(req).await().indefinitely();
+
+        assertNotNull(response);
+        assertEquals(403, response.getStatus());
+    }
+
+    @Test
+    void testFilter_Authorized_Passes() throws IOException {
+        ContainerRequestContext req = mock(ContainerRequestContext.class);
+        UriInfo uriInfo = mock(UriInfo.class);
+        when(req.getUriInfo()).thenReturn(uriInfo);
+        when(uriInfo.getPath()).thenReturn("/api/data");
+        when(req.getMethod()).thenReturn("GET");
+        when(uriInfo.getRequestUri()).thenReturn(URI.create("http://localhost/api/data"));
+
+        AuthContext context = AuthContext.builder().userId("user1").build();
+        when(authenticationService.extractAuthContext(any())).thenReturn(Uni.createFrom().item(context));
+        when(req.getHeaders()).thenReturn(mock(jakarta.ws.rs.core.MultivaluedMap.class));
+        when(req.getUriInfo().getQueryParameters()).thenReturn(mock(jakarta.ws.rs.core.MultivaluedMap.class));
+
+        when(policyService.evaluate(any(), any(), any(), any(), any()))
+                .thenReturn(Uni.createFrom().item(PolicyDecision.allow()));
+
+        Response response = authProxyFilter.filter(req).await().indefinitely();
+
+        assertNull(response, "Should return null to continue filter chain");
+    }
+}
