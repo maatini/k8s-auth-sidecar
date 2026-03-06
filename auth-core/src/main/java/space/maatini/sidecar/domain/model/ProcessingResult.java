@@ -1,0 +1,53 @@
+package space.maatini.sidecar.domain.model;
+ 
+import io.quarkus.runtime.annotations.RegisterForReflection;
+ 
+ 
+ 
+/**
+ * Sealed Interface für alle Pipeline-Ergebnisse.
+ */
+@RegisterForReflection(registerFullHierarchy = true)
+public sealed interface ProcessingResult {
+ 
+    record Skip() implements ProcessingResult {
+    }
+ 
+    record Proceed(AuthContext authContext) implements ProcessingResult {
+    }
+ 
+    record Forbidden(PolicyDecision decision) implements ProcessingResult {
+    }
+ 
+    record Unauthorized(String message) implements ProcessingResult {
+    }
+ 
+    record Error(String message) implements ProcessingResult {
+    }
+ 
+    static Skip skip() {
+        return new Skip();
+    }
+ 
+    static Proceed proceed(AuthContext ctx) {
+        return new Proceed(ctx);
+    }
+ 
+    static Forbidden forbidden(PolicyDecision d) {
+        return new Forbidden(d);
+    }
+ 
+    static Unauthorized unauthorized(String message) {
+        return new Unauthorized(message);
+    }
+ 
+    static Error error(String message) {
+        return new Error(message);
+    }
+ 
+    default boolean isProceed() {
+        return this instanceof Proceed;
+    }
+ 
+ 
+}

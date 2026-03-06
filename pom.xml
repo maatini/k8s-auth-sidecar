@@ -3,15 +3,22 @@
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
-
+ 
     <groupId>space.maatini</groupId>
     <artifactId>k8s-auth-sidecar</artifactId>
     <version>0.3.0</version>
-    <packaging>jar</packaging>
-
-    <name>K8s-Auth-Sidecar - AuthN/AuthZ Sidecar</name>
-    <description>Request Router Sidecar for Authentication and Authorization in Kubernetes</description>
-
+    <packaging>pom</packaging>
+ 
+    <name>K8s-Auth-Sidecar - Parent</name>
+    <description>Root POM for k8s-auth-sidecar multi-module project</description>
+ 
+    <modules>
+        <module>auth-core</module>
+        <module>proxy</module>
+        <module>opa-wasm</module>
+        <module>config</module>
+    </modules>
+ 
     <properties>
         <maven.compiler.release>21</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -24,25 +31,14 @@
         <compiler-plugin.version>3.15.0</compiler-plugin.version>
         <surefire-plugin.version>3.5.4</surefire-plugin.version>
         <failsafe-plugin.version>3.5.4</failsafe-plugin.version>
+        <jandex-plugin.version>3.1.2</jandex-plugin.version>
+        <pitest-maven.version>1.17.4</pitest-maven.version>
+        <cyclonedx-maven.version>2.9.1</cyclonedx-maven.version>
     </properties>
-
-    <repositories>
-        <repository>
-            <id>maven-central</id>
-            <url>https://repo1.maven.org/maven2/</url>
-        </repository>
-    </repositories>
-
+ 
     <dependencyManagement>
         <dependencies>
-            <!-- Override Jackson to fix CVE GHSA-72hv-8253-57qq -->
-            <dependency>
-                <groupId>com.fasterxml.jackson</groupId>
-                <artifactId>jackson-bom</artifactId>
-                <version>2.18.6</version>
-                <type>pom</type>
-                <scope>import</scope>
-            </dependency>
+            <!-- Quarkus BOM -->
             <dependency>
                 <groupId>${quarkus.platform.group-id}</groupId>
                 <artifactId>${quarkus.platform.artifact-id}</artifactId>
@@ -50,285 +46,176 @@
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
+            
+            <!-- Internal Modules -->
+            <dependency>
+                <groupId>${project.groupId}</groupId>
+                <artifactId>auth-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>${project.groupId}</groupId>
+                <artifactId>opa-wasm</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>${project.groupId}</groupId>
+                <artifactId>config</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>${project.groupId}</groupId>
+                <artifactId>proxy</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            
+            <!-- Shared Dependencies -->
+            <dependency>
+                <groupId>com.styra.opa</groupId>
+                <artifactId>opa-java-wasm</artifactId>
+                <version>1.0.2</version>
+            </dependency>
+ 
+            <!-- Test Dependencies -->
+            <dependency>
+                <groupId>org.wiremock</groupId>
+                <artifactId>wiremock</artifactId>
+                <version>3.9.1</version>
+                <scope>test</scope>
+            </dependency>
         </dependencies>
     </dependencyManagement>
-
-    <dependencies>
-        <!-- Quarkus Core -->
-        <dependency>
-            <groupId>io.quarkus</groupId>
-            <artifactId>quarkus-arc</artifactId>
-        </dependency>
-        
-        <!-- RESTEasy Reactive for HTTP handling -->
-        <dependency>
-            <groupId>io.quarkus</groupId>
-            <artifactId>quarkus-rest</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>io.quarkus</groupId>
-            <artifactId>quarkus-rest-jackson</artifactId>
-        </dependency>
-        
-        <!-- OIDC for JWT validation -->
-        <dependency>
-            <groupId>io.quarkus</groupId>
-            <artifactId>quarkus-oidc</artifactId>
-        </dependency>
-
-        
-
-        
-        <!-- Vert.x Web Client for proxying -->
-        <dependency>
-            <groupId>io.quarkus</groupId>
-            <artifactId>quarkus-vertx</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>io.vertx</groupId>
-            <artifactId>vertx-web-client</artifactId>
-        </dependency>
-        
-
-        <!-- Caching -->
-        <dependency>
-            <groupId>io.quarkus</groupId>
-            <artifactId>quarkus-cache</artifactId>
-        </dependency>
-        
-
-        
-        <!-- Health Checks -->
-        <dependency>
-            <groupId>io.quarkus</groupId>
-            <artifactId>quarkus-smallrye-health</artifactId>
-        </dependency>
-        
-        <!-- Metrics with Prometheus -->
-        <dependency>
-            <groupId>io.quarkus</groupId>
-            <artifactId>quarkus-micrometer-registry-prometheus</artifactId>
-        </dependency>
-        
-        <!-- OpenTelemetry for Tracing -->
-        <dependency>
-            <groupId>io.quarkus</groupId>
-            <artifactId>quarkus-opentelemetry</artifactId>
-        </dependency>
-        
-        <!-- Logging -->
-        <dependency>
-            <groupId>io.quarkus</groupId>
-            <artifactId>quarkus-logging-json</artifactId>
-        </dependency>
-        
-        <!-- Configuration -->
-        <dependency>
-            <groupId>io.quarkus</groupId>
-            <artifactId>quarkus-config-yaml</artifactId>
-        </dependency>
-        
-
-        <!-- OPA WASM (Chicory) -->
-        <dependency>
-            <groupId>com.styra.opa</groupId>
-            <artifactId>opa-java-wasm</artifactId>
-            <version>1.0.2</version>
-        </dependency>
-
-        <dependency>
-            <groupId>io.quarkus</groupId>
-            <artifactId>quarkus-rest-client-reactive</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>io.quarkus</groupId>
-            <artifactId>quarkus-rest-client-reactive-jackson</artifactId>
-        </dependency>
-        <!-- Test dependencies -->
-        <dependency>
-            <groupId>io.quarkus</groupId>
-            <artifactId>quarkus-junit5</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>io.rest-assured</groupId>
-            <artifactId>rest-assured</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>io.quarkus</groupId>
-            <artifactId>quarkus-junit5-mockito</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.testcontainers</groupId>
-            <artifactId>testcontainers</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>io.quarkus</groupId>
-            <artifactId>quarkus-jacoco</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.wiremock</groupId>
-            <artifactId>wiremock</artifactId>
-            <version>3.9.1</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>io.quarkus</groupId>
-            <artifactId>quarkus-test-security-jwt</artifactId>
-            <scope>test</scope>
-        </dependency>
-    </dependencies>
-
+ 
     <build>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>${quarkus.platform.group-id}</groupId>
+                    <artifactId>quarkus-maven-plugin</artifactId>
+                    <version>${quarkus.platform.version}</version>
+                    <extensions>true</extensions>
+                    <executions>
+                        <execution>
+                            <goals>
+                                <goal>build</goal>
+                                <goal>generate-code</goal>
+                                <goal>generate-code-tests</goal>
+                            </goals>
+                        </execution>
+                    </executions>
+                </plugin>
+                <plugin>
+                    <artifactId>maven-compiler-plugin</artifactId>
+                    <version>${compiler-plugin.version}</version>
+                    <configuration>
+                        <parameters>true</parameters>
+                    </configuration>
+                </plugin>
+                <plugin>
+                    <artifactId>maven-surefire-plugin</artifactId>
+                    <version>${surefire-plugin.version}</version>
+                    <configuration>
+                        <systemPropertyVariables>
+                            <java.util.logging.manager>org.jboss.logmanager.LogManager</java.util.logging.manager>
+                            <maven.home>${maven.home}</maven.home>
+                        </systemPropertyVariables>
+                    </configuration>
+                </plugin>
+                <plugin>
+                    <artifactId>maven-failsafe-plugin</artifactId>
+                    <version>${failsafe-plugin.version}</version>
+                    <executions>
+                        <execution>
+                            <goals>
+                                <goal>integration-test</goal>
+                                <goal>verify</goal>
+                            </goals>
+                        </execution>
+                    </executions>
+                    <configuration>
+                        <systemPropertyVariables>
+                            <java.util.logging.manager>org.jboss.logmanager.LogManager</java.util.logging.manager>
+                            <maven.home>${maven.home}</maven.home>
+                        </systemPropertyVariables>
+                    </configuration>
+                </plugin>
+                <plugin>
+                    <groupId>org.pitest</groupId>
+                    <artifactId>pitest-maven</artifactId>
+                    <version>${pitest-maven.version}</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.pitest</groupId>
+                            <artifactId>pitest-junit5-plugin</artifactId>
+                            <version>1.2.2</version>
+                        </dependency>
+                    </dependencies>
+                    <configuration>
+                        <jvmArgs>
+                            <jvmArg>-Djava.util.logging.manager=org.jboss.logmanager.LogManager</jvmArg>
+                        </jvmArgs>
+                        <targetClasses>
+                            <param>space.maatini.sidecar.*</param>
+                        </targetClasses>
+                        <targetTests>
+                            <param>space.maatini.sidecar.*PojoTest</param>
+                            <param>space.maatini.sidecar.*ExtTest</param>
+                        </targetTests>
+                        <excludedTestClasses>
+                            <param>space.maatini.sidecar.*IT</param>
+                            <param>space.maatini.sidecar.*E2ETest</param>
+                        </excludedTestClasses>
+                        <mutators>
+                            <mutator>STRONGER</mutator>
+                        </mutators>
+                    </configuration>
+                </plugin>
+                <plugin>
+                    <groupId>org.cyclonedx</groupId>
+                    <artifactId>cyclonedx-maven-plugin</artifactId>
+                    <version>${cyclonedx-maven.version}</version>
+                    <executions>
+                        <execution>
+                            <phase>package</phase>
+                            <goals>
+                                <goal>makeAggregateBom</goal>
+                            </goals>
+                        </execution>
+                    </executions>
+                    <configuration>
+                        <projectType>library</projectType>
+                        <schemaVersion>1.5</schemaVersion>
+                        <includeBomSerialNumber>true</includeBomSerialNumber>
+                        <includeCompileScope>true</includeCompileScope>
+                        <includeProvidedScope>true</includeProvidedScope>
+                        <includeRuntimeScope>true</includeRuntimeScope>
+                        <includeSystemScope>true</includeSystemScope>
+                        <includeTestScope>false</includeTestScope>
+                        <includeLicenseText>false</includeLicenseText>
+                        <outputFormat>json</outputFormat>
+                        <outputName>bom</outputName>
+                    </configuration>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+ 
         <plugins>
             <plugin>
-                <groupId>${quarkus.platform.group-id}</groupId>
-                <artifactId>quarkus-maven-plugin</artifactId>
-                <version>${quarkus.platform.version}</version>
-                <extensions>true</extensions>
-                <executions>
-                    <execution>
-                        <goals>
-                            <goal>build</goal>
-                            <goal>generate-code</goal>
-                            <goal>generate-code-tests</goal>
-                        </goals>
-                    </execution>
-                </executions>
-            </plugin>
-            <plugin>
-                <artifactId>maven-compiler-plugin</artifactId>
-                <version>${compiler-plugin.version}</version>
-                <configuration>
-                    <parameters>true</parameters>
-                </configuration>
-            </plugin>
-            <plugin>
-                <artifactId>maven-surefire-plugin</artifactId>
-                <version>${surefire-plugin.version}</version>
-                <configuration>
-                    <systemPropertyVariables>
-                        <java.util.logging.manager>org.jboss.logmanager.LogManager</java.util.logging.manager>
-                        <maven.home>${maven.home}</maven.home>
-                    </systemPropertyVariables>
-                </configuration>
-            </plugin>
-            <plugin>
-                <artifactId>maven-failsafe-plugin</artifactId>
-                <version>${failsafe-plugin.version}</version>
-                <executions>
-                    <execution>
-                        <goals>
-                            <goal>integration-test</goal>
-                            <goal>verify</goal>
-                        </goals>
-                    </execution>
-                </executions>
-                <configuration>
-                    <systemPropertyVariables>
-                        <java.util.logging.manager>org.jboss.logmanager.LogManager</java.util.logging.manager>
-                        <maven.home>${maven.home}</maven.home>
-                    </systemPropertyVariables>
-                </configuration>
-            </plugin>
-            <plugin>
-                <groupId>org.pitest</groupId>
-                <artifactId>pitest-maven</artifactId>
-                <version>1.17.4</version>
-                <dependencies>
-                    <dependency>
-                        <groupId>org.pitest</groupId>
-                        <artifactId>pitest-junit5-plugin</artifactId>
-                        <version>1.2.2</version>
-                    </dependency>
-                </dependencies>
-                <configuration>
-                    <jvmArgs>
-                        <jvmArg>-Djava.util.logging.manager=org.jboss.logmanager.LogManager</jvmArg>
-                    </jvmArgs>
-                    <targetClasses>
-                        <param>space.maatini.sidecar.*</param>
-                    </targetClasses>
-                    <targetTests>
-                        <param>space.maatini.sidecar.*PojoTest</param>
-                        <param>space.maatini.sidecar.*ExtTest</param>
-                    </targetTests>
-                    <excludedTestClasses>
-                        <param>space.maatini.sidecar.*IT</param>
-                        <param>space.maatini.sidecar.*E2ETest</param>
-                    </excludedTestClasses>
-                    <mutators>
-                        <mutator>STRONGER</mutator>
-                    </mutators>
-                </configuration>
-            </plugin>
-            <plugin>
-                <groupId>org.cyclonedx</groupId>
-                <artifactId>cyclonedx-maven-plugin</artifactId>
-                <version>2.9.1</version>
-                <executions>
-                    <execution>
-                        <phase>package</phase>
-                        <goals>
-                            <goal>makeAggregateBom</goal>
-                        </goals>
-                    </execution>
-                </executions>
-                <configuration>
-                    <projectType>library</projectType>
-                    <schemaVersion>1.5</schemaVersion>
-                    <includeBomSerialNumber>true</includeBomSerialNumber>
-                    <includeCompileScope>true</includeCompileScope>
-                    <includeProvidedScope>true</includeProvidedScope>
-                    <includeRuntimeScope>true</includeRuntimeScope>
-                    <includeSystemScope>true</includeSystemScope>
-                    <includeTestScope>false</includeTestScope>
-                    <includeLicenseText>false</includeLicenseText>
-                    <outputFormat>json</outputFormat>
-                    <outputName>bom</outputName>
-                </configuration>
-            </plugin>
-            
-            <plugin>
-                <groupId>org.codehaus.mojo</groupId>
-                <artifactId>exec-maven-plugin</artifactId>
-                <version>3.5.0</version>
-                <executions>
-                    <execution>
-                        <id>compile-opa-wasm</id>
-                        <phase>generate-resources</phase>
-                        <goals>
-                            <goal>exec</goal>
-                        </goals>
-                        <configuration>
-                            <executable>sh</executable>
-                            <arguments>
-                                <argument>-c</argument>
-                                <argument>
-                                    if command -v opa >/dev/null 2>&amp;1; then
-                                        mkdir -p ${project.build.directory}/classes/policies &amp;&amp;
-                                        opa build -t wasm -e authz/allow \
-                                            -o ${project.build.directory}/classes/policies/bundle.tar.gz \
-                                            ${project.basedir}/src/main/resources/policies/ &amp;&amp;
-                                        tar -xzOf ${project.build.directory}/classes/policies/bundle.tar.gz /policy.wasm > ${project.build.directory}/classes/policies/authz.wasm &amp;&amp;
-                                        rm ${project.build.directory}/classes/policies/bundle.tar.gz &amp;&amp;
-                                        echo "[OPA] WASM compiled and policy.wasm extracted successfully"
-                                    else
-                                        echo "[OPA] opa CLI not found – using pre-compiled WASM if available"
-                                    fi
-                                </argument>
-                            </arguments>
-                        </configuration>
-                    </execution>
-                </executions>
+                 <groupId>io.smallrye</groupId>
+                 <artifactId>jandex-maven-plugin</artifactId>
+                 <version>${jandex-plugin.version}</version>
+                 <executions>
+                     <execution>
+                         <id>make-index</id>
+                         <goals>
+                             <goal>jandex</goal>
+                         </goals>
+                     </execution>
+                 </executions>
             </plugin>
         </plugins>
     </build>
-
+ 
     <profiles>
         <profile>
             <id>native</id>
