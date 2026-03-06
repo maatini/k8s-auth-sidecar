@@ -8,7 +8,7 @@ description: PIT Mutation Testing konfigurieren und interpretieren (POJO-Strateg
 - Vor jedem Release oder großen Refactoring  
 - Wenn Mutation Score unter Zielwert fällt  
 
-**Zielwerte (2026-03-05)**
+**Zielwerte (2026-03-06)**
 - Kernservices (`AuthenticationService`, `ProxyService`, `PathMatcher`, `PolicyService`): **>85 %**  
 - Filter & Engine (`AuthProxyFilter`, `WasmPolicyEngine`, `AuditLogFilter`): **60–75 %** (Quarkus-spezifisch)  
 - Gesamtprojekt: **>80 %** bei POJO-Tests  

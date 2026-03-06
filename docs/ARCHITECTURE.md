@@ -153,7 +153,7 @@ spec:
 ### Phase 1-5: Abgeschlossen (März 2026)
 - ✅ **Multi-Module Refactoring**: Umstellung auf Maven Parent-POM und 4 spezialisierte Module.
 - ✅ **Clean Architecture**: Strikte Trennung von `domain`, `application` und `infrastructure`.
-- ✅ **Test-Exzellenz**: Erhöhung der Testabdeckung auf 152 Unit-Tests und hohe Mutations-Scores.
+- ✅ **Test-Exzellenz**: Erhöhung der Testabdeckung auf 143 Unit-Tests und hohe Mutations-Scores.
 - ✅ **Native Image**: Optimiert für GraalVM.
 
 ## Sicherheitsaspekte

@@ -160,7 +160,7 @@ Der Sidecar blockt das sofort an der Vordertür ab! Du erhältst `HTTP 401 Unaut
 
 - **Sehr stabil**: Komplettes Refactoring (reaktiv + streaming + Memory-Optimierung) extrem performant. Null Objekt-Allokationen bei Fehler-Fallbacks.
 - **Aktiv in Entwicklung**: Core-Funktionen (Auth-Filter, Proxy, OPA, Path-Matcher) inkl. serverseitigen Caffeine-Caches (Session & Profiling) sind produktionsreif.
-- **Testing & Mutation Score**: Über **140 automatisierte Tests** mit über >80% Branch Coverage. Die Kernservices bewältigen **PIT Mutation Tests** mit einem Kill-Score von >85%.
+- **Testing & Mutation Score**: Über **143 automatisierte Tests** mit über >80% Branch Coverage. Die Kernservices bewältigen **PIT Mutation Tests** mit einem Kill-Score von >85%.
   - *Junior-Tipp:* Teste Kernlogik immer ohne Framework (`@QuarkusTest`), also als reines Java-Objekt (POJO). Das ist extrem schnell und deckt kleinste Mutanten auf (z.B. Mockito Spy Maps für Edge-Cases)!
 - **Dokumentation**: Sehr stark! README + `docs/ARCHITECTURE.md` + dieser Junior Guide.
 - **Fazit**: Der Sidecar ist bereit für ernsthafte Einsätze und skaliert logisch und fehlerfrei im Kubernetes Cluster.

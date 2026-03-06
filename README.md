@@ -128,10 +128,10 @@ Tests werden als **reine POJOs** (ohne Quarkus-Start) ausgeführt – dadurch er
 | Modul | Status | Tests | Line Coverage | Branch Coverage | PIT Score |
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | **config** | SUCCESS | 5 | 95% | 90% | **92%** |
-| **auth-core** | SUCCESS | 58 | 90% | 85% | **88%** |
-| **opa-wasm** | SUCCESS | 45 | 82% | 75% | **70%** |
-| **proxy** | SUCCESS | 44 | 88% | 82% | **75%** |
-| **Gesamt** | **SUCCESS** | **152** | **>88%** | **>82%** | **>80%** |
+| **auth-core** | SUCCESS | 44 | 90% | 85% | **88%** |
+| **opa-wasm** | SUCCESS | 47 | 82% | 75% | **70%** |
+| **proxy** | SUCCESS | 47 | 88% | 82% | **75%** |
+| **Gesamt** | **SUCCESS** | **143** | **>88%** | **>82%** | **>80%** |
 
 - **Coverage:** JaCoCo Branch Coverage > 80 %
 
