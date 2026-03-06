@@ -1,7 +1,7 @@
 # =====================================================
 # K8s-Auth-Sidecar Multi-Stage Dockerfile (Multi-Module)
 # =====================================================
-FROM eclipse-temurin:21-jdk-alpine AS build
+FROM eclipse-temurin:25-jdk-alpine AS build
 
 LABEL maintainer="space.maatini"
 LABEL description="K8s-Auth-Sidecar AuthN/AuthZ Microservice Build Stage"
@@ -33,7 +33,7 @@ RUN mvn package -DskipTests -Dquarkus.package.type=uber-jar -pl proxy -am
 # =====================================================
 # Stage 3: Runtime (JVM Mode)
 # =====================================================
-FROM eclipse-temurin:21-jre-alpine AS runtime
+FROM eclipse-temurin:25-jre-alpine AS runtime
 
 # Build Arguments
 ARG VERSION=0.3.0
