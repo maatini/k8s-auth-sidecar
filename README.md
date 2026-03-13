@@ -6,7 +6,7 @@
   [![Quarkus](https://img.shields.io/badge/Quarkus-3.32.2-blue.svg?logo=quarkus)](https://quarkus.io)
   [![Java](https://img.shields.io/badge/Java-21-orange.svg?logo=openjdk)](https://openjdk.org)
   [![License](https://img.shields.io/badge/License-Apache%202.0-green.svg)](LICENSE)
-  [![Tests](https://img.shields.io/badge/Tests-127%20%E2%9C%85%200%20Failures-brightgreen.svg)](#-so-testest-du-das-projekt--schritt-f%C3%BCr-schritt-super-einfach-erkl%C3%A4rt)
+  [![Tests](https://img.shields.io/badge/Tests-142%20%E2%9C%85%200%20Failures-brightgreen.svg)](#-so-testest-du-das-projekt--schritt-f%C3%BCr-schritt-super-einfach-erkl%C3%A4rt)
   [![PIT Strength](https://img.shields.io/badge/PIT%20Strength-82%25-brightgreen.svg)](#7-mutation-testing-pit--qualit%C3%A4ts-check)
   [![Docker](https://img.shields.io/badge/Docker-Ready-blue.svg?logo=docker)](https://www.docker.com/)
   [![Kubernetes](https://img.shields.io/badge/Kubernetes-Ready-blue.svg?logo=kubernetes)](https://kubernetes.io/)

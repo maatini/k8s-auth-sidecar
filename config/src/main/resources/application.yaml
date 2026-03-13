@@ -109,7 +109,7 @@ sidecar:
     timeout:
       connect: 5000
       read: 30000
-    pool-size: 100
+    pool-size: 4096
 
     propagate-headers:
       - X-Request-ID
