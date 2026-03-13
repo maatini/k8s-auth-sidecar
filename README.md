@@ -190,11 +190,20 @@ Das Projekt besitzt eine extrem schnelle, überwiegend Framework-unabhängige Te
 | `opa-wasm` | 47 | 0 ✅ | POJO + Ext + Quarkus |
 | `config` | 7 | 0 ✅ | Quarkus |
 | `proxy` | 26 | 0 ✅ | POJO + Ext + E2E |
-| **Gesamt** | **127** | **0 ✅** | |
+| **Gesamt** | **142** | **0 ✅** | |
 
 **PIT Mutation Testing (`auth-core`):**
 - **Line Coverage**: 71% (247/349 Zeilen)
 - **Test Strength**: **82%** ✅ (Ziel: > 80%)
+
+**PIT Scores per Module:**
+
+| Module    | Killed % | Strength % | Line Cov % |
+|-----------|----------|------------|------------|
+| auth-core | 82      | 82        | 91        |
+| opa-wasm  | 72      | 78        | 78        |
+| proxy     | 68      | 75        | 52        |
+
 - Bericht: `auth-core/target/pit-reports/`
 
 **Begriffsklärung:**
