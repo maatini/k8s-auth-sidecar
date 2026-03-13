@@ -14,7 +14,7 @@ description: Rego-Policies schreiben, testen und hot-reloaden (embedded WASM)
 **Wichtige Regeln**
 - `default allow := false`  
 - `allow if { "admin" in input.user.roles }`  
-- Public-Paths: `/health`, `/api/public/**`, `/q/*`  
+- Public-Paths: `/health`, `/api/public/*`, `/q/*`  
 
 **Test-Befehle**
 ```bash

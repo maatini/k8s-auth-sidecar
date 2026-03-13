@@ -1,8 +1,8 @@
 package space.maatini.sidecar.application.service;
 
 import io.smallrye.mutiny.Uni;
+import io.quarkus.cache.CacheKey;
 import io.quarkus.cache.CacheResult;
-import io.quarkus.security.identity.SecurityIdentity;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.jwt.JsonWebToken;
@@ -20,38 +20,38 @@ public class AuthenticationService {
 
     private static final Logger LOG = Logger.getLogger(AuthenticationService.class);
 
-    @Inject
-    KeycloakRoleExtractor roleExtractor;
+    private final KeycloakRoleExtractor roleExtractor;
+    private final AuthContextMapper authContextMapper;
 
     @Inject
-    AuthContextMapper authContextMapper;
+    public AuthenticationService(KeycloakRoleExtractor roleExtractor, AuthContextMapper authContextMapper) {
+        this.roleExtractor = roleExtractor;
+        this.authContextMapper = authContextMapper;
+    }
 
-    public Uni<AuthContext> extractAuthContext(SecurityIdentity identity) {
-        if (identity == null || identity.isAnonymous()) {
-            LOG.debug("No security identity or anonymous user");
+    public Uni<AuthContext> extractAuthContext(JsonWebToken jwt) {
+        if (jwt == null) {
+            LOG.debug("No JWT token provided");
             return Uni.createFrom().item(AuthContext.anonymous());
         }
 
         try {
-            JsonWebToken jwt = identity.getPrincipal() instanceof JsonWebToken
-                    ? (JsonWebToken) identity.getPrincipal()
-                    : null;
-
-            if (jwt == null) {
-                LOG.warn("Principal is not a JWT token");
-                return Uni.createFrom().item(AuthContext.anonymous());
+            // Use Raw Token as stable cache key to avoid memory leak with proxy objects
+            String cacheKey = jwt.getRawToken();
+            if (cacheKey == null) {
+                LOG.warn("JWT has no raw token, falling back to non-cached extraction");
+                return Uni.createFrom().item(() -> extractFromJwt(jwt));
             }
-
-            return getCachedAuthContext(jwt);
+            return getCachedAuthContext(cacheKey, jwt);
         } catch (Exception e) {
-            LOG.errorf(e, "Failed to extract auth context from security identity");
+            LOG.errorf(e, "Failed to extract auth context from JWT");
             return Uni.createFrom().item(AuthContext.anonymous());
         }
     }
 
     @CacheResult(cacheName = "jwt-cache")
-    public Uni<AuthContext> getCachedAuthContext(JsonWebToken jwt) {
-        LOG.debugf("Cache miss for JWT, extracting context");
+    public Uni<AuthContext> getCachedAuthContext(@CacheKey String key, JsonWebToken jwt) {
+        LOG.debugf("Cache miss for JWT %s, extracting context", key.substring(0, Math.min(key.length(), 10)) + "...");
         return Uni.createFrom().item(() -> extractFromJwt(jwt));
     }
 

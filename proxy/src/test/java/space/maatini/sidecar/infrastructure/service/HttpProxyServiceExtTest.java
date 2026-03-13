@@ -1,8 +1,9 @@
 package space.maatini.sidecar.infrastructure.service;
 
 import io.vertx.mutiny.core.buffer.Buffer;
-import io.vertx.mutiny.ext.web.client.HttpRequest;
-import io.vertx.mutiny.ext.web.client.HttpResponse;
+import io.vertx.mutiny.core.http.HttpClient;
+import io.vertx.mutiny.core.http.HttpClientRequest;
+import io.vertx.mutiny.core.http.HttpClientResponse;
 import io.vertx.mutiny.ext.web.client.WebClient;
 import org.junit.jupiter.api.Test;
 import space.maatini.sidecar.domain.model.AuthContext;
@@ -21,10 +22,10 @@ class HttpProxyServiceExtTest {
 
     @Test
     void testProxyResponseIsSuccess() {
-        ProxyResponse r1 = new ProxyResponse(200, "OK", Map.of(), null);
-        ProxyResponse r2 = new ProxyResponse(299, "OK", Map.of(), null);
-        ProxyResponse r3 = new ProxyResponse(300, "OK", Map.of(), null);
-        ProxyResponse r4 = new ProxyResponse(199, "OK", Map.of(), null);
+        ProxyResponse r1 = new ProxyResponse(200, "OK", Map.of(), null, false);
+        ProxyResponse r2 = new ProxyResponse(299, "OK", Map.of(), null, false);
+        ProxyResponse r3 = new ProxyResponse(300, "OK", Map.of(), null, false);
+        ProxyResponse r4 = new ProxyResponse(199, "OK", Map.of(), null, false);
 
         assertTrue(r1.isSuccess());
         assertTrue(r2.isSuccess());
@@ -35,13 +36,13 @@ class HttpProxyServiceExtTest {
     @Test
     void testProxyResponseHeaders() {
         Map<String, String> h = Map.of("content-type", "application/json", "x-custom", "value");
-        ProxyResponse resp = new ProxyResponse(200, "OK", h, Buffer.buffer("test"));
+        ProxyResponse resp = new ProxyResponse(200, "OK", h, Buffer.buffer("test"), false);
 
         assertEquals(2, resp.headers().size());
         assertEquals("test", resp.bodyAsString());
 
         // Null body → empty string via bodyAsString
-        ProxyResponse respNull = new ProxyResponse(200, "OK", h, null);
+        ProxyResponse respNull = new ProxyResponse(200, "OK", h, null, false);
         assertEquals("", respNull.bodyAsString());
     }
 
@@ -128,6 +129,7 @@ class HttpProxyServiceExtTest {
         s.errorCounter = mock(io.micrometer.core.instrument.Counter.class);
         s.requestTimer = mock(io.micrometer.core.instrument.Timer.class);
         s.webClient = mock(WebClient.class);
+        s.httpClient = mock(HttpClient.class);
         s.config = mock(SidecarConfig.class);
 
         SidecarConfig.ProxyConfig pc = mock(SidecarConfig.ProxyConfig.class);
@@ -145,22 +147,20 @@ class HttpProxyServiceExtTest {
         when(tgt.host()).thenReturn("localhost");
         when(tgt.port()).thenReturn(8081);
 
-        HttpRequest<Buffer> req = mock(HttpRequest.class);
-        when(s.webClient.request(any(), anyInt(), anyString(), anyString())).thenReturn(req);
-        when(req.timeout(anyLong())).thenReturn(req);
+        HttpClientRequest req = mock(HttpClientRequest.class);
+        when(s.httpClient.request(any(), anyInt(), anyString(), anyString())).thenReturn(io.smallrye.mutiny.Uni.createFrom().item(req));
+        when(req.setTimeout(anyLong())).thenReturn(req);
         when(req.putHeader(anyString(), anyString())).thenReturn(req);
-        when(req.addQueryParam(anyString(), anyString())).thenReturn(req);
 
-        HttpResponse<Buffer> mockResp = mock(HttpResponse.class);
+        HttpClientResponse mockResp = mock(HttpClientResponse.class);
         when(mockResp.headers()).thenReturn(io.vertx.mutiny.core.MultiMap.caseInsensitiveMultiMap());
         when(mockResp.statusCode()).thenReturn(200);
         when(mockResp.statusMessage()).thenReturn("OK");
-        when(mockResp.body()).thenReturn(Buffer.buffer("ok"));
         when(req.send()).thenReturn(io.smallrye.mutiny.Uni.createFrom().item(mockResp));
 
         AuthContext ctx = AuthContext.builder().userId("user1").build();
-        s.proxy("GET", "/test", Map.of("x-prop", "v"), Map.of("q", "1"), null, ctx)
-                .subscribe().with(item -> {});
+        s.proxy("GET", "/test", Map.of("x-prop", "v"), Map.of("q", "1"), null, null, ctx)
+                .await().indefinitely();
 
         verify(req, times(1)).send();
         verify(req, times(1)).putHeader("X-Prop", "v");

@@ -25,7 +25,7 @@ sidecar:
       - /health
       - /q/health
       - /q/metrics
-      - /api/public/**
+      - /api/public/*
   
   authz:
     enabled: true

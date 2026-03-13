@@ -3,14 +3,9 @@ package space.maatini.sidecar.infrastructure.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
-import io.micrometer.core.instrument.Timer;
 import io.smallrye.mutiny.Uni;
 import io.vertx.core.http.HttpMethod;
-import io.vertx.mutiny.core.MultiMap;
 import io.vertx.mutiny.core.Vertx;
-import io.vertx.mutiny.core.buffer.Buffer;
-import io.vertx.mutiny.ext.web.client.HttpRequest;
-import io.vertx.mutiny.ext.web.client.HttpResponse;
 import io.vertx.mutiny.ext.web.client.WebClient;
 import io.vertx.ext.web.client.WebClientOptions;
 import jakarta.annotation.PostConstruct;
@@ -49,6 +44,7 @@ public class HttpProxyService implements ProxyService {
 
     protected io.micrometer.core.instrument.Timer requestTimer;
     protected WebClient webClient;
+    protected io.vertx.mutiny.core.http.HttpClient httpClient;
     protected Counter requestCounter;
     protected Counter errorCounter;
 
@@ -65,12 +61,16 @@ public class HttpProxyService implements ProxyService {
                 .setKeepAlive(true);
 
         this.webClient = WebClient.create(vertx, options);
+        this.httpClient = vertx.createHttpClient(options);
     }
 
     @PreDestroy
     void shutdown() {
         if (webClient != null) {
             webClient.close();
+        }
+        if (httpClient != null) {
+            httpClient.close();
         }
     }
 
@@ -81,6 +81,7 @@ public class HttpProxyService implements ProxyService {
             Map<String, String> headers,
             Map<String, String> queryParams,
             io.vertx.core.http.HttpServerRequest clientRequest,
+            io.vertx.core.http.HttpServerResponse clientResponse,
             AuthContext authContext) {
 
         long startTime = System.nanoTime();
@@ -90,36 +91,48 @@ public class HttpProxyService implements ProxyService {
         String targetHost = config.proxy().target().host();
 
         HttpMethod httpMethod = HttpMethod.valueOf(method.toUpperCase());
-        HttpRequest<Buffer> request = webClient
-                .request(httpMethod, targetPort, targetHost, path)
-                .timeout(config.proxy().timeout().read());
-
+        
+        // Build the target path with query params
+        StringBuilder targetPath = new StringBuilder(path);
         if (queryParams != null && !queryParams.isEmpty()) {
-            for (Map.Entry<String, String> entry : queryParams.entrySet()) {
-                request.addQueryParam(entry.getKey(), entry.getValue());
-            }
+            targetPath.append("?");
+            queryParams.forEach((k, v) -> targetPath.append(k).append("=").append(v).append("&"));
+            targetPath.setLength(targetPath.length() - 1); // remove last &
         }
 
         Map<String, String> propagated = resolvePropagatedHeaders(headers);
-        propagated.forEach(request::putHeader);
-
         Map<String, String> authHeaders = resolveAuthContextHeaders(authContext);
-        authHeaders.forEach(request::putHeader);
+        
+        io.vertx.mutiny.core.http.HttpServerResponse mutinyRes = io.vertx.mutiny.core.http.HttpServerResponse.newInstance(clientResponse);
 
-        Uni<HttpResponse<Buffer>> responseUni;
-        if (clientRequest != null && (method.equalsIgnoreCase("POST") || method.equalsIgnoreCase("PUT")
-                || method.equalsIgnoreCase("PATCH"))) {
-            io.vertx.mutiny.core.http.HttpServerRequest mutinyReq = io.vertx.mutiny.core.http.HttpServerRequest
-                    .newInstance(clientRequest);
-            responseUni = request.sendStream(mutinyReq);
-        } else {
-            responseUni = request.send();
-        }
-
-        return responseUni
-                .onItem().transform(response -> {
-                    recordRequestMetrics(startTime, response.statusCode());
-                    return toProxyResponse(response);
+        return httpClient.request(httpMethod, targetPort, targetHost, targetPath.toString())
+                .flatMap(req -> {
+                    req.setTimeout(config.proxy().timeout().read());
+                    propagated.forEach(req::putHeader);
+                    authHeaders.forEach(req::putHeader);
+                    
+                    if (clientRequest != null && (method.equalsIgnoreCase("POST") || method.equalsIgnoreCase("PUT") || method.equalsIgnoreCase("PATCH"))) {
+                        io.vertx.mutiny.core.http.HttpServerRequest mutinyReq = io.vertx.mutiny.core.http.HttpServerRequest.newInstance(clientRequest);
+                        clientRequest.resume();
+                        return req.send(mutinyReq);
+                    } else {
+                        return req.send();
+                    }
+                })
+                .flatMap(resp -> {
+                    // SET STATUS AND HEADERS IMMEDIATELY
+                    if (clientResponse != null) {
+                        clientResponse.setStatusCode(resp.statusCode());
+                        resp.headers().forEach(entry -> clientResponse.putHeader(entry.getKey(), entry.getValue()));
+                    }
+                    
+                    // Pipe the body to clientResponse
+                    Uni<Void> pipeUni = mutinyRes != null ? resp.pipeTo(mutinyRes) : Uni.createFrom().voidItem();
+                    
+                    return pipeUni.onItem().transform(v -> {
+                        recordRequestMetrics(startTime, resp.statusCode());
+                        return ProxyResponse.streamed(resp.statusCode(), resp.statusMessage(), Map.of());
+                    });
                 })
                 .onFailure().recoverWithItem(error -> {
                     errorCounter.increment();
@@ -213,20 +226,6 @@ public class HttpProxyService implements ProxyService {
         return result;
     }
 
-    private ProxyResponse toProxyResponse(HttpResponse<Buffer> response) {
-        Map<String, String> responseHeaders = new java.util.HashMap<>();
-        MultiMap headers = response.headers();
-        for (String name : headers.names()) {
-            responseHeaders.put(name, headers.get(name));
-        }
-
-        Buffer body = response.body();
-        return new ProxyResponse(
-                response.statusCode(),
-                response.statusMessage(),
-                responseHeaders,
-                body != null ? body : Buffer.buffer());
-    }
 
     private void recordRequestMetrics(long startTime, int statusCode) {
         long duration = System.nanoTime() - startTime;

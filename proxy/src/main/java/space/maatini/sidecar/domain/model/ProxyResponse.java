@@ -13,7 +13,8 @@ public record ProxyResponse(
         int statusCode,
         String statusMessage,
         Map<String, String> headers,
-        Buffer body) {
+        Buffer body,
+        boolean isStreamed) {
 
     public boolean isSuccess() {
         return statusCode >= 200 && statusCode < 300;
@@ -23,6 +24,10 @@ public record ProxyResponse(
         return body != null ? body.toString() : "";
     }
 
+    public static ProxyResponse streamed(int statusCode, String statusMessage, Map<String, String> headers) {
+        return new ProxyResponse(statusCode, statusMessage, headers, null, true);
+    }
+
     public static ProxyResponse error(int statusCode, String message) {
         String sanitizedMessage = message != null ? message.replace("\"", "\\\"") : "Internal error";
         String jsonRaw = "{\"error\":\"" + sanitizedMessage + "\"}";
@@ -30,6 +35,7 @@ public record ProxyResponse(
                 statusCode,
                 message,
                 Map.of("Content-Type", "application/json"),
-                Buffer.buffer(jsonRaw));
+                Buffer.buffer(jsonRaw),
+                false);
     }
 }

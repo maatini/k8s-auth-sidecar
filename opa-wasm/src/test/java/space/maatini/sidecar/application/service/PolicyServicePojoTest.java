@@ -1,8 +1,11 @@
 package space.maatini.sidecar.application.service;
+
 import space.maatini.sidecar.infrastructure.policy.WasmPolicyEngine;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.smallrye.mutiny.Uni;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -118,11 +121,43 @@ class PolicyServicePojoTest {
     }
 
     @Test
-    void testParsePolicyResult_MissingReasonAndViolations() throws Exception {
-        // allow: false but NO reason and NO violations array
-        PolicyDecision d = PolicyService.parsePolicyResult(objectMapper.readTree("{\"allow\": false}"));
-        assertFalse(d.allowed());
-        assertEquals("Access denied by policy", d.reason());
-        assertTrue(d.violations().isEmpty());
+    void testParsePolicyResult_DetailedDeny() {
+        ObjectNode node = objectMapper.createObjectNode();
+        node.put("allow", false);
+        node.put("reason", "Custom Reason");
+        ArrayNode violations = node.putArray("violations");
+        violations.add("v1");
+        violations.add("v2");
+
+        PolicyDecision decision = PolicyService.parsePolicyResult(node);
+        assertFalse(decision.allowed());
+        assertEquals("Custom Reason", decision.reason());
+        assertEquals(2, decision.violations().size());
+        assertTrue(decision.violations().contains("v1"));
+    }
+
+    @Test
+    void testParsePolicyResult_AllowTrue() {
+        ObjectNode node = objectMapper.createObjectNode();
+        node.put("allow", true);
+        assertTrue(PolicyService.parsePolicyResult(node).allowed());
+    }
+
+    @Test
+    void testParsePolicyResult_Boolean() {
+        assertTrue(PolicyService.parsePolicyResult(objectMapper.getNodeFactory().booleanNode(true)).allowed());
+        assertFalse(PolicyService.parsePolicyResult(objectMapper.getNodeFactory().booleanNode(false)).allowed());
+    }
+
+    @Test
+    void testEvaluate_DisabledOPA() {
+        SidecarConfig.OpaConfig opa = mock(SidecarConfig.OpaConfig.class);
+        when(config.opa()).thenReturn(opa);
+        when(opa.enabled()).thenReturn(false);
+
+        PolicyDecision decision = policyService.evaluate(null, "GET", "/", Map.of(), Map.of())
+                .await().indefinitely();
+
+        assertTrue(decision.allowed());
     }
 }

@@ -1,7 +1,7 @@
 package space.maatini.sidecar.application.service;
  
-import io.quarkus.security.identity.SecurityIdentity;
 import io.smallrye.mutiny.Uni;
+import org.eclipse.microprofile.jwt.JsonWebToken;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import space.maatini.sidecar.infrastructure.config.SidecarConfig;
@@ -22,25 +22,18 @@ class SidecarRequestProcessorPojoTest {
  
     private SidecarRequestProcessor processor;
     private SidecarConfig config;
-    private SecurityIdentity securityIdentity;
     private AuthenticationService authService;
     private PolicyEngine policyEngine;
     private RolesService rolesService;
  
     @BeforeEach
     void setup() {
-        processor = new SidecarRequestProcessor();
         config = mock(SidecarConfig.class);
-        securityIdentity = mock(SecurityIdentity.class);
         authService = mock(AuthenticationService.class);
         policyEngine = mock(PolicyEngine.class);
         rolesService = mock(RolesService.class);
- 
-        processor.config = config;
-        processor.securityIdentity = securityIdentity;
-        processor.authenticationService = authService;
-        processor.policyEngine = policyEngine;
-        processor.rolesService = rolesService;
+
+        processor = new SidecarRequestProcessor(authService, rolesService, policyEngine, config);
  
         // Common config
         SidecarConfig.AuthConfig authConfig = mock(SidecarConfig.AuthConfig.class);
@@ -51,14 +44,13 @@ class SidecarRequestProcessorPojoTest {
         when(authzConfig.enabled()).thenReturn(true);
         when(authConfig.publicPaths()).thenReturn(Collections.emptyList());
 
-        // Trigger @PostConstruct manually (not called by JUnit in POJO tests)
         processor.init();
     }
 
  
     @Test
     void testProcess_InternalPath() {
-        SidecarRequest request = new SidecarRequest("GET", "/q/health", Map.of(), Map.of());
+        SidecarRequest request = new SidecarRequest("GET", "/q/health", Map.of(), Map.of(), null);
  
         ProcessingResult result = processor.process(request).await().indefinitely();
         assertTrue(result instanceof ProcessingResult.Skip);
@@ -68,7 +60,7 @@ class SidecarRequestProcessorPojoTest {
     @Test
     void testProcess_PublicPath() {
         when(config.auth().publicPaths()).thenReturn(List.of("/health"));
-        SidecarRequest request = new SidecarRequest("GET", "/health", Map.of(), Map.of());
+        SidecarRequest request = new SidecarRequest("GET", "/health", Map.of(), Map.of(), null);
  
         ProcessingResult result = processor.process(request).await().indefinitely();
         assertTrue(result instanceof ProcessingResult.Skip);
@@ -78,7 +70,7 @@ class SidecarRequestProcessorPojoTest {
     @Test
     void testProcess_AuthDisabled() {
         when(config.auth().enabled()).thenReturn(false);
-        SidecarRequest request = new SidecarRequest("GET", "/api/data", Map.of(), Map.of());
+        SidecarRequest request = new SidecarRequest("GET", "/api/data", Map.of(), Map.of(), null);
  
         ProcessingResult result = processor.process(request).await().indefinitely();
         assertTrue(result instanceof ProcessingResult.Proceed);
@@ -87,9 +79,10 @@ class SidecarRequestProcessorPojoTest {
  
     @Test
     void testProcess_AuthFailure() {
-        SidecarRequest request = new SidecarRequest("GET", "/api/data", Map.of(), Map.of());
+        JsonWebToken jwt = mock(JsonWebToken.class);
+        SidecarRequest request = new SidecarRequest("GET", "/api/data", Map.of(), Map.of(), jwt);
  
-        when(authService.extractAuthContext(eq(securityIdentity)))
+        when(authService.extractAuthContext(eq(jwt)))
                 .thenReturn(Uni.createFrom().item(AuthContext.anonymous()));
  
         ProcessingResult result = processor.process(request).await().indefinitely();
@@ -99,10 +92,11 @@ class SidecarRequestProcessorPojoTest {
  
     @Test
     void testProcess_Success() {
-        SidecarRequest request = new SidecarRequest("GET", "/api/data", Map.of(), Map.of());
+        JsonWebToken jwt = mock(JsonWebToken.class);
+        SidecarRequest request = new SidecarRequest("GET", "/api/data", Map.of(), Map.of(), jwt);
  
         AuthContext authCtx = AuthContext.builder().userId("u123").email("u@u").build();
-        when(authService.extractAuthContext(eq(securityIdentity))).thenReturn(Uni.createFrom().item(authCtx));
+        when(authService.extractAuthContext(eq(jwt))).thenReturn(Uni.createFrom().item(authCtx));
         when(rolesService.enrich(any())).thenReturn(Uni.createFrom().item(authCtx));
         when(policyEngine.evaluate(any(), any(), any(), any(), any()))
                 .thenReturn(Uni.createFrom().item(PolicyDecision.allow()));
@@ -114,10 +108,11 @@ class SidecarRequestProcessorPojoTest {
  
     @Test
     void testProcess_Forbidden() {
-        SidecarRequest request = new SidecarRequest("GET", "/api/data", Map.of(), Map.of());
+        JsonWebToken jwt = mock(JsonWebToken.class);
+        SidecarRequest request = new SidecarRequest("GET", "/api/data", Map.of(), Map.of(), jwt);
  
         AuthContext authCtx = AuthContext.builder().userId("u123").email("u@u").build();
-        when(authService.extractAuthContext(eq(securityIdentity))).thenReturn(Uni.createFrom().item(authCtx));
+        when(authService.extractAuthContext(eq(jwt))).thenReturn(Uni.createFrom().item(authCtx));
         when(rolesService.enrich(any())).thenReturn(Uni.createFrom().item(authCtx));
         when(policyEngine.evaluate(any(), any(), any(), any(), any()))
                 .thenReturn(Uni.createFrom().item(PolicyDecision.deny("Denied by test")));

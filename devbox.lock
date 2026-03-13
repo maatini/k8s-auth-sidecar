@@ -221,54 +221,6 @@
         }
       }
     },
-    "open-policy-agent@latest": {
-      "last_modified": "2026-02-23T15:40:43Z",
-      "resolved": "github:NixOS/nixpkgs/80d901ec0377e19ac3f7bb8c035201e2e098cc97#open-policy-agent",
-      "source": "devbox-search",
-      "version": "1.13.2",
-      "systems": {
-        "aarch64-darwin": {
-          "outputs": [
-            {
-              "name": "out",
-              "path": "/nix/store/vall3dgbx1ixwr8hrc5kym144mg36103-open-policy-agent-1.13.2",
-              "default": true
-            }
-          ],
-          "store_path": "/nix/store/vall3dgbx1ixwr8hrc5kym144mg36103-open-policy-agent-1.13.2"
-        },
-        "aarch64-linux": {
-          "outputs": [
-            {
-              "name": "out",
-              "path": "/nix/store/mdi2h11raz4307h7z2znij516kyjs1n5-open-policy-agent-1.13.2",
-              "default": true
-            }
-          ],
-          "store_path": "/nix/store/mdi2h11raz4307h7z2znij516kyjs1n5-open-policy-agent-1.13.2"
-        },
-        "x86_64-darwin": {
-          "outputs": [
-            {
-              "name": "out",
-              "path": "/nix/store/8lf7p03kysyx305a62qm7gacr2gwkijs-open-policy-agent-1.13.2",
-              "default": true
-            }
-          ],
-          "store_path": "/nix/store/8lf7p03kysyx305a62qm7gacr2gwkijs-open-policy-agent-1.13.2"
-        },
-        "x86_64-linux": {
-          "outputs": [
-            {
-              "name": "out",
-              "path": "/nix/store/lg29cq1xcqv1s1p5g4ykr2c51jjixy8y-open-policy-agent-1.13.2",
-              "default": true
-            }
-          ],
-          "store_path": "/nix/store/lg29cq1xcqv1s1p5g4ykr2c51jjixy8y-open-policy-agent-1.13.2"
-        }
-      }
-    },
     "quarkus@latest": {
       "last_modified": "2026-02-23T15:40:43Z",
       "resolved": "github:NixOS/nixpkgs/80d901ec0377e19ac3f7bb8c035201e2e098cc97#quarkus",

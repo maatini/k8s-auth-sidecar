@@ -2,7 +2,6 @@
   "packages": [
     "jdk@21",
     "maven@latest",
-    "open-policy-agent@latest",
     "kubectl@latest",
     "kustomize@latest",
     "quarkus@latest"

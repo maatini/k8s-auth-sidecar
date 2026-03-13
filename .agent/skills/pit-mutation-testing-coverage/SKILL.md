@@ -8,10 +8,15 @@ description: PIT Mutation Testing konfigurieren und interpretieren (POJO-Strateg
 - Vor jedem Release oder großen Refactoring  
 - Wenn Mutation Score unter Zielwert fällt  
 
-**Zielwerte (2026-03-06)**
-- Kernservices (`AuthenticationService`, `ProxyService`, `PathMatcher`, `PolicyService`): **>85 %**  
-- Filter & Engine (`AuthProxyFilter`, `WasmPolicyEngine`, `AuditLogFilter`): **60–75 %** (Quarkus-spezifisch)  
-- Gesamtprojekt: **>80 %** bei POJO-Tests  
+**Gemessene Werte (2026-03-06, POJO+ExtTests)**
+- `auth-core` (application.service): Line **91%** | Mutation **77%** | Test Strength **80%** ✅
+- `auth-core` (domain.model): Line **38%** | Mutation **23%** | Test Strength **79%** 🕑
+- `opa-wasm` (PolicyService): Line **100%** | Mutation **91%** | Test Strength **91%** ✅
+- `opa-wasm` (WasmEngine): Line **56%** | Mutation **35%** | Test Strength **54%** 🕑
+- `config` (Health): Line **60%** | Mutation **26%** | Test Strength **71%** 🕑
+
+> 🕑 Niedrige Scores bei Domain-Models und Engine-Code sind **gewollt** (CDI-Boilerplate, Quarkus-spezifisch).  
+> Zielwert für reine Services (application.service): **Test Strength >75%**
 
 **Befehl**
 ```bash

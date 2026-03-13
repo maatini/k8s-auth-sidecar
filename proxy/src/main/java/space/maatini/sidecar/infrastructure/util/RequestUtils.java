@@ -1,5 +1,7 @@
 package space.maatini.sidecar.infrastructure.util;
  
+import io.vertx.core.http.HttpServerRequest;
+import io.vertx.ext.web.RoutingContext;
 import jakarta.ws.rs.container.ContainerRequestContext;
 import jakarta.ws.rs.core.HttpHeaders;
 import jakarta.ws.rs.core.UriInfo;
@@ -43,6 +45,31 @@ public final class RequestUtils {
         return headers;
     }
  
+    /**
+     * Extracts all request headers from Vert.x RoutingContext.
+     */
+    public static Map<String, String> extractHeaders(RoutingContext ctx) {
+        return extractHeaders(ctx.request());
+    }
+
+    /**
+     * Extracts all request headers from Vert.x HttpServerRequest.
+     */
+    public static Map<String, String> extractHeaders(HttpServerRequest request) {
+        Map<String, String> headers = new HashMap<>();
+        request.headers().forEach(entry -> headers.put(entry.getKey(), entry.getValue()));
+        return headers;
+    }
+
+    /**
+     * Extracts query parameters from Vert.x RoutingContext.
+     */
+    public static Map<String, String> extractQueryParams(RoutingContext ctx) {
+        Map<String, String> params = new HashMap<>();
+        ctx.queryParams().forEach(entry -> params.put(entry.getKey(), entry.getValue()));
+        return params;
+    }
+
     /**
      * Extracts query parameters as a single-valued map from UriInfo.
      */

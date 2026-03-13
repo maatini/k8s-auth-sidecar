@@ -1,12 +1,12 @@
 package space.maatini.sidecar.application.service;
 
-import io.quarkus.security.identity.SecurityIdentity;
-import io.quarkus.vertx.http.runtime.security.ImmutablePathMatcher;
 import io.smallrye.mutiny.Uni;
+import io.quarkus.vertx.http.runtime.security.ImmutablePathMatcher;
 import jakarta.annotation.PostConstruct;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.jboss.logging.Logger;
+import space.maatini.sidecar.domain.util.ProxyUtils;
 import space.maatini.sidecar.infrastructure.config.SidecarConfig;
 import space.maatini.sidecar.domain.model.AuthContext;
 import space.maatini.sidecar.domain.model.ProcessingResult;
@@ -16,18 +16,23 @@ import space.maatini.sidecar.domain.model.SidecarRequest;
 public class SidecarRequestProcessor {
     private static final Logger LOG = Logger.getLogger(SidecarRequestProcessor.class);
 
-    @Inject
-    AuthenticationService authenticationService;
-    @Inject
-    RolesService rolesService;
-    @Inject
-    PolicyEngine policyEngine;
-    @Inject
-    SidecarConfig config;
-    @Inject
-    SecurityIdentity securityIdentity;
+    private final AuthenticationService authenticationService;
+    private final RolesService rolesService;
+    private final PolicyEngine policyEngine;
+    private final SidecarConfig config;
 
     private ImmutablePathMatcher<Boolean> publicPathMatcher;
+
+    @Inject
+    public SidecarRequestProcessor(AuthenticationService authenticationService,
+                                   RolesService rolesService,
+                                   PolicyEngine policyEngine,
+                                   SidecarConfig config) {
+        this.authenticationService = authenticationService;
+        this.rolesService = rolesService;
+        this.policyEngine = policyEngine;
+        this.config = config;
+    }
 
     @PostConstruct
     void init() {
@@ -47,7 +52,7 @@ public class SidecarRequestProcessor {
         String path = request.path();
         String method = request.method();
 
-        if (isPublicPath(path) || isInternalPath(path)) {
+        if (isPublicPath(path) || ProxyUtils.isInternalPath(path)) {
             LOG.debugf("Skipping processing for path: %s", path);
             return Uni.createFrom().item(ProcessingResult.skip());
         }
@@ -57,7 +62,7 @@ public class SidecarRequestProcessor {
             return Uni.createFrom().item(ProcessingResult.proceed(AuthContext.anonymous()));
         }
 
-        return authenticationService.extractAuthContext(securityIdentity)
+        return authenticationService.extractAuthContext(request.jwt())
                 .flatMap(authContext -> {
                     if (!authContext.isAuthenticated()) {
                         LOG.warnf("Authentication failed for request: %s %s", method, path);
@@ -92,17 +97,6 @@ public class SidecarRequestProcessor {
     private boolean isPublicPath(String path) {
         ImmutablePathMatcher.PathMatch<Boolean> match = publicPathMatcher.match(path);
         return match.getValue() == Boolean.TRUE;
-    }
-
-    private boolean isInternalPath(String path) {
-        if (path == null) {
-            return false;
-        }
-        return path.startsWith("/q/") ||
-                path.equals("/health") ||
-                path.equals("/metrics") ||
-                path.equals("/ready") ||
-                path.equals("/live");
     }
 }
 

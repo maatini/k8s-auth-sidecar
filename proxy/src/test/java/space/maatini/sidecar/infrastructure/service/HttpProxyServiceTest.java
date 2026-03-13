@@ -3,10 +3,10 @@ package space.maatini.sidecar.infrastructure.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.smallrye.mutiny.Uni;
-import io.vertx.core.http.HttpMethod;
 import io.vertx.mutiny.core.buffer.Buffer;
-import io.vertx.mutiny.ext.web.client.HttpRequest;
-import io.vertx.mutiny.ext.web.client.HttpResponse;
+import io.vertx.mutiny.core.http.HttpClient;
+import io.vertx.mutiny.core.http.HttpClientRequest;
+import io.vertx.mutiny.core.http.HttpClientResponse;
 import io.vertx.mutiny.ext.web.client.WebClient;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -26,16 +26,18 @@ class HttpProxyServiceTest {
     HttpProxyService proxyService;
     SidecarConfig config;
     WebClient mockWebClient;
-    HttpRequest<Buffer> mockRequest;
-    HttpResponse<Buffer> mockResponse;
+    HttpClient mockHttpClient;
+    HttpClientRequest mockRequest;
+    HttpClientResponse mockResponse;
 
     @BeforeEach
     void setup() throws Exception {
         proxyService = new HttpProxyService();
         config = mock(SidecarConfig.class);
         mockWebClient = mock(WebClient.class);
-        mockRequest = mock(HttpRequest.class);
-        mockResponse = mock(HttpResponse.class);
+        mockHttpClient = mock(HttpClient.class);
+        mockRequest = mock(HttpClientRequest.class);
+        mockResponse = mock(HttpClientResponse.class);
 
         SidecarConfig.ProxyConfig proxyConfig = mock(SidecarConfig.ProxyConfig.class);
         SidecarConfig.ProxyConfig.TargetConfig targetConfig = mock(SidecarConfig.ProxyConfig.TargetConfig.class);
@@ -54,14 +56,15 @@ class HttpProxyServiceTest {
         setField(proxyService, "config", config);
         setField(proxyService, "meterRegistry", new SimpleMeterRegistry());
         setField(proxyService, "webClient", mockWebClient);
+        setField(proxyService, "httpClient", mockHttpClient);
         setField(proxyService, "objectMapper", new ObjectMapper());
 
         setField(proxyService, "requestCounter", new SimpleMeterRegistry().counter("requests"));
         setField(proxyService, "errorCounter", new SimpleMeterRegistry().counter("errors"));
         setField(proxyService, "requestTimer", new SimpleMeterRegistry().timer("duration"));
 
-        when(mockWebClient.request(any(HttpMethod.class), anyInt(), anyString(), anyString())).thenReturn(mockRequest);
-        when(mockRequest.timeout(anyLong())).thenReturn(mockRequest);
+        when(mockHttpClient.request(any(io.vertx.core.http.HttpMethod.class), anyInt(), anyString(), anyString())).thenReturn(Uni.createFrom().item(mockRequest));
+        when(mockRequest.setTimeout(anyLong())).thenReturn(mockRequest);
     }
 
     private void setField(Object target, String name, Object value) throws Exception {
@@ -76,16 +79,15 @@ class HttpProxyServiceTest {
         when(mockResponse.statusCode()).thenReturn(200);
         when(mockResponse.headers())
                 .thenReturn(io.vertx.mutiny.core.MultiMap.caseInsensitiveMultiMap().add("Content-Type", "text/plain"));
-        when(mockResponse.body()).thenReturn(Buffer.buffer("response body"));
 
         AuthContext authContext = AuthContext.builder().userId("user1").build();
 
         ProxyResponse response = proxyService.proxy(
-                "GET", "/api/test", Map.of(), Map.of(), null, authContext).await().indefinitely();
+                "GET", "/api/test", Map.of(), Map.of(), null, null, authContext).await().indefinitely();
 
         assertNotNull(response);
         assertEquals(200, response.statusCode());
-        assertEquals("response body", response.bodyAsString());
+        assertTrue(response.isStreamed());
     }
 
     @Test
@@ -93,7 +95,6 @@ class HttpProxyServiceTest {
         when(mockRequest.send()).thenReturn(Uni.createFrom().item(mockResponse));
         when(mockResponse.statusCode()).thenReturn(200);
         when(mockResponse.headers()).thenReturn(io.vertx.mutiny.core.MultiMap.caseInsensitiveMultiMap());
-        when(mockResponse.body()).thenReturn(Buffer.buffer());
 
         when(config.proxy().addHeaders()).thenReturn(Map.of(
                 "X-User", "${user.id}",
@@ -104,7 +105,7 @@ class HttpProxyServiceTest {
                 .email("e@e.com")
                 .build();
 
-        proxyService.proxy("GET", "/val", Map.of(), Map.of(), null, authContext).await().indefinitely();
+        proxyService.proxy("GET", "/val", Map.of(), Map.of(), null, null, authContext).await().indefinitely();
 
         verify(mockRequest).putHeader("X-User", "u1");
         verify(mockRequest).putHeader("X-Email", "e@e.com");
