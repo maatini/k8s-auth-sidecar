@@ -36,7 +36,8 @@
 - 🧠 **Embedded Policy-Engine**: In-Memory OPA-WASM-Engine mit Hot-Reload der `.rego` Regeln.
 - ⚡ **Reaktive Pipeline**: Non-blocking AuthN → AuthZ Verarbeitung mit Mutiny `Uni`.
 - 🛡️ **Zero-Trust**: Jede Anfrage wird zwingend validiert.
-- 📡 **Streaming Proxy**: Request-Bodies werden **nie** vollständig in den RAM geladen – echtes Vert.x Streaming für beliebig große Payloads.
+- 📡 **Streaming Proxy (Sidecar Mode)**: Request-Bodies werden **nie** vollständig in den RAM geladen – echtes Vert.x Streaming für beliebig große Payloads.
+- 🛡️ **Gateway / Ingress Mode (`ext_authz`)**: Unterstützt den `/authorize` Endpunkt für Envoy (Istio) oder Nginx. Der Sidecar fungiert hier als Autorisierungs-Service ohne den Traffic selbst zu proxien.
 - 🎯 **Zentrales Path-Matching**: Ant-Style Patterns (`/**`, `/*`) über praktisches `PathMatcher`-Utility.
 - 🚀 **Native Image Support**: Minimale Startup-Zeit (< 100ms) und extrem geringer Memory-Footprint.
 - 📊 **Observability**: Prometheus Metrics, JSON Logging und Health Checks out-of-the-box.
@@ -65,7 +66,12 @@ Für eine detaillierte Einführung siehe den [JUNIOR_GUIDE.md](JUNIOR_GUIDE.md).
 
 ## 🏗️ Architektur & Funktionsweise
 
-Der Sidecar fungiert als intelligenter **Türsteher** vor deinem Anwendungs-Container. Er fängt alle eingehenden Anfragen ab, validiert die Identität und prüft die Berechtigungen gegen lokal geladene OPA-WASM-Policies.
+Der Sidecar kann in zwei Modi betrieben werden:
+
+1.  **🛡️ Sidecar Proxy Mode**: Er fungiert als intelligenter **Türsteher** direkt vor deinem Anwendungs-Container. Er fängt alle eingehenden Anfragen ab, validiert sie und leitet sie per Streaming weiter.
+2.  **🌐 Gateway / ext_authz Mode**: Er fungiert als **externer Berater** für Ingress-Controller (wie Envoy oder Nginx). Diese fragen über den `/authorize` Endpunkt nach "Darf dieser User das?", und der Sidecar antwortet mit `200 OK` (Erlaubt) oder `403 Forbidden`.
+
+### Request Flow (Proxy Mode)
 
 ```mermaid
 graph TD

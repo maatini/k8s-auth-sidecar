@@ -100,24 +100,6 @@ quarkus:
 # ===================
 
 sidecar:
-  # Proxy Configuration
-  proxy:
-    target:
-      host: ${PROXY_TARGET_HOST:localhost}
-      port: ${PROXY_TARGET_PORT:8081}
-      scheme: ${PROXY_TARGET_SCHEME:http}
-    timeout:
-      connect: 5000
-      read: 30000
-    pool-size: 4096
-
-    propagate-headers:
-      - X-Request-ID
-      - X-Correlation-ID
-      - X-Forwarded-For
-      - X-Forwarded-Proto
-
-    add-headers: {}
 
   # Authentication Configuration
   auth:

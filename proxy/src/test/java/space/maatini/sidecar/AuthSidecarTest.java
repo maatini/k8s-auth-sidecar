@@ -40,7 +40,7 @@ class AuthSidecarTest {
     @Test
     void testUnauthenticatedApiRequestReturns401() {
         given()
-            .when().get("/api/users")
+            .when().get("/authorize")
             .then()
             .statusCode(401);
     }

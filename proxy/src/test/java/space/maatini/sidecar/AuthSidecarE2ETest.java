@@ -35,7 +35,6 @@ public class AuthSidecarE2ETest {
                 @Override
                 public Map<String, String> getConfigOverrides() {
                         return Map.of(
-                                        "sidecar.proxy.target.port", "8089",
                                         "sidecar.auth.enabled", "true",
                                         "sidecar.authz.enabled", "true",
                                         "sidecar.opa.enabled", "true",
@@ -106,12 +105,13 @@ public class AuthSidecarE2ETest {
                                 .jws().keyId("1").sign(privateKey);
 
                 given()
-                                .header("X-Forwarded-For", "client-happy-path")
+                                .header("X-Envoy-Original-Path", "/api/users/user123/profile")
+                                .header("X-Forwarded-Method", "GET")
                                 .header("Authorization", "Bearer " + token)
-                                .when().get("/api/users/user123/profile")
+                                .when().get("/authorize")
                                 .then()
                                 .statusCode(200)
-                                .body("id", is("user123"));
+                                .header("X-Auth-User-Id", is("user123"));
         }
 
         @Test
@@ -125,11 +125,12 @@ public class AuthSidecarE2ETest {
                                 .jws().keyId("1").sign(privateKey);
 
                 given()
-                                .header("X-Forwarded-For", "client-resilience")
+                                .header("X-Envoy-Original-Path", "/api/admin/error")
+                                .header("X-Forwarded-Method", "GET")
                                 .header("Authorization", "Bearer " + token)
-                                .when().get("/api/admin/error")
+                                .when().get("/authorize")
                                 .then()
-                                .statusCode(500);
+                                .statusCode(200); // Authorize says OK even if backend is failing (since it only checks authz)
         }
 
         // Helper for removing leading zero byte in BigInteger if present for RSA

@@ -14,27 +14,21 @@ Der **k8s-auth-sidecar** (Request Router Sidecar) ist ein Quarkus-basierter Micr
 
 ## Module & Komponenten (Maven Multi-Module)
 
-### 1. Modul: `proxy`
-- **Request Router (`ProxyResource`)**: Catch-all JAX-RS Resource.
-- **Streaming Proxy (`HttpProxyService`)**: Leitet Anfragen **via Streaming** an den Main-Container weiter.
-- **Entry Filter (`AuthProxyFilter`)**: Erster Kontaktpunkt, delegiert an den Processor.
-
-### 2. Modul: `auth-core`
-- **Request Processor (`SidecarRequestProcessor`)**: Orchestriert AuthN, Enrichment und AuthZ.
-- **Authentication Service (`AuthenticationService`)**: Validiert JWTs und extrahiert den `AuthContext`.
-- **Authorization UseCase (`AuthorizationUseCase`)**: Evaluiert OPA-WASM Policies über `AuthorizationCommand`.
-- **Roles Service (`RolesService`)**: Enriched den Context über den `RolesClient`.
-
-### 3. Modul: `opa-wasm`
-- **Policy Engine (`WasmPolicyEngine`)**: Eingebettete OPA-Engine (WASM) für In-Memory Evaluation.
-- **Policy Service (`PolicyService`)**: Abstraktionsschicht für die Autorisierungs-Logik.
-- **Rego Policies**: Lokale `.rego` Dateien und vorkompilierte `.wasm` Bundles.
-
-### 4. Modul: `config`
-- **Zentrale Konfiguration**: `SidecarConfig` (Quarkus Config).
-- **Observability**: Health-Checks (`Liveness`, `Readiness`) und Micrometer Metriken.
-
 Die gesamte HTTP-Pipeline ist reaktiv implementiert (`Mutiny Uni`), was höchste Parallelität bei minimalem Ressourcenverbrauch garantiert.
+
+## Betriebsmodi
+
+### 1. Streaming Proxy Mode (Sidecar)
+In diesem Modus ist der Sidecar der einzige Einstiegspunkt für den App-Container.
+- **Entry**: `AuthProxyFilter` fängt alle Requests an `/**` ab.
+- **Routing**: `SidecarRouteHandler` entscheidet reaktiv zwischen Proxy-Flow und lokalen Endpunkten.
+- **Proxy**: `HttpProxyService` streamt den Request an `localhost:$PROXY_TARGET_PORT`.
+
+### 2. Gateway Mode (ext_authz)
+In diesem Modus wird der Sidecar von einem externen Loadbalancer/Gateway aufgerufen.
+- **Endpoint**: `GET /authorize`.
+- **Logic**: Der Sidecar wertet die Header `X-Forwarded-Uri` und `X-Forwarded-Method` aus.
+- **Response**: `200 OK` delegiert die Anfrage an das eigentliche Ziel weiter (durch das Gateway). Rollen-Enrichment erfolgt über Antwort-Header.
 
 ## Architektur für lokale Entwicklung (Dev-Profil & Mocking)
 

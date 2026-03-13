@@ -1,85 +1,89 @@
 package space.maatini.sidecar.infrastructure.route;
 
-import space.maatini.sidecar.domain.util.ProxyUtils;
 import io.quarkus.vertx.web.Route;
 import io.smallrye.mutiny.Uni;
+import io.vertx.core.http.HttpServerRequest;
 import io.vertx.core.http.HttpServerResponse;
 import io.vertx.ext.web.RoutingContext;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import space.maatini.sidecar.application.service.ProxyService;
-import space.maatini.sidecar.domain.model.AuthContext;
+import org.eclipse.microprofile.jwt.JsonWebToken;
+import space.maatini.sidecar.application.service.SidecarRequestProcessor;
+import space.maatini.sidecar.domain.model.ProcessingResult;
 import space.maatini.sidecar.domain.model.SidecarRequest;
-import space.maatini.sidecar.infrastructure.service.HttpProxyService;
 
+import java.util.HashMap;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
- * Reactive route handler for proxying and authorization endpoints.
- * Replaces ProxyResource.
+ * Reactive route handler for Envoy ext_authz (PDP).
+ * Replaces the streaming proxy logic with a pure authorization endpoint.
  */
 @ApplicationScoped
 public class SidecarRouteHandler {
 
-    private final ProxyService proxyService;
+    private final SidecarRequestProcessor processor;
+    private final JsonWebToken jwt;
 
-     @Inject
-     public SidecarRouteHandler(HttpProxyService proxyService) {
-         this.proxyService = proxyService;
-     }
-
-    @Route(path = "/authorize", methods = Route.HttpMethod.GET)
-    public Uni<Void> authorize(RoutingContext ctx) {
-        AuthContext auth = ctx.get("auth.context");
-        if (auth == null || !auth.isAuthenticated()) {
-            ctx.response().setStatusCode(401).end("{\"message\":\"Unauthorized\"}");
-            return Uni.createFrom().nullItem();
-        }
-        ctx.response().setStatusCode(200).end();
-        return Uni.createFrom().nullItem();
+    @Inject
+    public SidecarRouteHandler(SidecarRequestProcessor processor, JsonWebToken jwt) {
+        this.processor = processor;
+        this.jwt = jwt;
     }
 
-    @Route(path = "/*", order = 1000) // Fallback for all other requests (Proxy)
-    public Uni<Void> proxy(RoutingContext ctx) {
-        SidecarRequest request = ctx.get("sidecar.request");
-        AuthContext auth = ctx.get("auth.context");
-
-        if (request == null) {
-            ctx.fail(500);
-            return Uni.createFrom().nullItem();
+    /**
+     * Envoy ext_authz endpoint.
+     * Checks if the request is authorized and returns enriched headers.
+     */
+    @Route(path = "/authorize", methods = Route.HttpMethod.GET)
+    public Uni<Void> authorize(RoutingContext ctx) {
+        HttpServerRequest vertxRequest = ctx.request();
+        
+        // Extract original request info from Envoy headers or fallback to current request
+        String path = vertxRequest.getHeader("X-Envoy-Original-Path");
+        if (path == null) {
+            path = vertxRequest.path();
+        }
+        
+        String method = vertxRequest.getHeader("X-Forwarded-Method");
+        if (method == null) {
+            method = vertxRequest.method().name();
         }
 
-        if (ProxyUtils.isInternalPath(request.path())) {
-            ctx.next();
-            return Uni.createFrom().nullItem();
-        }
+        Map<String, String> headers = new HashMap<>();
+        vertxRequest.headers().forEach(entry -> headers.put(entry.getKey(), entry.getValue()));
 
-        return proxyService.proxy(
-                request.method(),
-                request.path(),
-                request.headers(),
-                request.queryParams(),
-                ctx.request(),
-                ctx.response(),
-                auth
-        ).onItem().transformToUni(proxyResponse -> {
-            if (proxyResponse.isStreamed()) {
-                // For streamed responses, status and headers are already set by HttpProxyService
-                // and the body is already piped to the response.
-                return Uni.createFrom().voidItem();
-            }
+        Map<String, String> queryParams = vertxRequest.params().entries().stream()
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, (a, b) -> a));
 
-            HttpServerResponse clientResponse = ctx.response();
-            clientResponse.setStatusCode(proxyResponse.statusCode());
-            if (proxyResponse.headers() != null) {
-                proxyResponse.headers().forEach(clientResponse::putHeader);
-            }
-            if (proxyResponse.body() != null) {
-                return Uni.createFrom().completionStage(clientResponse.end(proxyResponse.body().getDelegate()).toCompletionStage())
-                        .replaceWithVoid();
-            } else {
-                return Uni.createFrom().completionStage(clientResponse.end().toCompletionStage())
-                        .replaceWithVoid();
-            }
-        });
+        SidecarRequest request = new SidecarRequest(method, path, headers, queryParams, jwt);
+
+        return processor.process(request)
+                .onItem().transformToUni(result -> {
+                    HttpServerResponse response = ctx.response();
+                    
+                    if (result instanceof ProcessingResult.Proceed proceed) {
+                        response.setStatusCode(200);
+                        // Supplement Envoy request with enriched data
+                        response.putHeader("X-Auth-User-Id", proceed.authContext().userId());
+                        if (proceed.authContext().roles() != null && !proceed.authContext().roles().isEmpty()) {
+                            response.putHeader("X-Enriched-Roles", String.join(",", proceed.authContext().roles()));
+                        }
+                        return Uni.createFrom().completionStage(response.end().toCompletionStage()).replaceWithVoid();
+                    } else if (result instanceof ProcessingResult.Skip) {
+                        response.setStatusCode(200).end();
+                        return Uni.createFrom().nullItem();
+                    } else if (result instanceof ProcessingResult.Forbidden forbidden) {
+                        response.setStatusCode(403).end("{\"message\":\"Forbidden\",\"reason\":\"" + forbidden.decision().reason() + "\"}");
+                        return Uni.createFrom().nullItem();
+                    } else if (result instanceof ProcessingResult.Unauthorized unauthorized) {
+                        response.setStatusCode(401).end("{\"message\":\"Unauthorized\",\"reason\":\"" + unauthorized.message() + "\"}");
+                        return Uni.createFrom().nullItem();
+                    } else {
+                        response.setStatusCode(500).end("{\"message\":\"Internal Server Error\"}");
+                        return Uni.createFrom().nullItem();
+                    }
+                });
     }
 }

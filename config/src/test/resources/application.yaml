@@ -35,12 +35,6 @@ sidecar:
     embedded:
       wasm-path: classpath:policies/authz.wasm
   
-  proxy:
-    target:
-      host: localhost
-      port: 8081
-    # Simplified headers without placeholders for tests
-    add-headers: {}
   
   audit:
     enabled: false

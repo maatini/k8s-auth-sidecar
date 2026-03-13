@@ -132,11 +132,6 @@ public class WasmPolicyEngineTest {
             }
 
             @Override
-            public ProxyConfig proxy() {
-                return null;
-            }
-
-            @Override
             public RolesConfig roles() {
                 return null;
             }

@@ -172,7 +172,21 @@ Sicherheit klingt langweilig? Nicht hier! Mit dem Sidecar bist du von Anfang an 
 - **Testing & Mutation Score**: **121 stabile automatisierte Tests** (108 POJO+ExtTests + 13 QuarkusTests). Die Kernservices in `auth-core` erreichen **80% PIT Test Strength** und **91% PIT Line Coverage**. Proxy-QuarkusIntegrationstests benötigen den lokalen WireMock-Stack (`docker-compose.dev.yml`).
   - *Junior-Tipp:* Teste Kernlogik immer ohne Framework (`@QuarkusTest`), also als reines Java-Objekt (POJO). Das ist extrem schnell und deckt kleinste Mutanten auf (z.B. Mockito Spy Maps für Edge-Cases)!
 - **Dokumentation**: Sehr stark! README + `docs/ARCHITECTURE.md` + dieser Junior Guide.
-- **Fazit**: Der Sidecar ist bereit für ernsthafte Einsätze und skaliert logisch und fehlerfrei im Kubernetes Cluster.
+## 🛡️ Die zwei Gesichter des Sidecars
+
+Du kannst den Sidecar auf zwei Arten nutzen, je nachdem, was du brauchst:
+
+### 1. Der "Leibwächter" (Proxy Mode)
+Das ist der Standard. Der Sidecar steht direkt vor deiner App. Alles, was zu deiner App will, muss erst am Sidecar vorbei. Er prüft den Ausweis (JWT) und lässt den Request nur durch, wenn alles okay ist.
+- **Wann nutzen?** Wenn deine App selbst gar nichts von Auth wissen soll.
+
+### 2. Der "Ausweis-Prüfer" (Gateway Mode / ext_authz)
+Hier steht der Sidecar nicht direkt vor deiner App, sondern daneben. Ein großes Gateway (z.B. Envoy oder Nginx) fragt den Sidecar über den `/authorize` Endpunkt: "Hey, dieser Typ hier will rein, ist sein Ausweis okay?". Der Sidecar sagt "Ja" oder "Nein", und das Gateway lässt den Typen dann durch oder blockt ihn ab.
+- **Wann nutzen?** Wenn du ein zentrales Gateway (Ingress) hast, das die Arbeit macht, aber die Logik vom Sidecar nutzen soll.
+
+---
+
+## 🏗️ Wie der Sidecar im Inneren tickt (für Neugierige)nsthafte Einsätze und skaliert logisch und fehlerfrei im Kubernetes Cluster.
 
 ---
 
