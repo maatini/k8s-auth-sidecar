@@ -38,12 +38,12 @@ public class WasmPolicyEngine {
     /**
      * Internal bundle of the WASM module and its version.
      */
-    private record PolicyBundle(byte[] bytes, long version) {}
+    public record PolicyBundle(byte[] bytes, long version) {}
 
     /**
      * Per-thread instance of the compiled policy.
      */
-    private record PolicyInstance(OpaPolicy policy, long version) {}
+    public record PolicyInstance(OpaPolicy policy, long version) {}
 
     private final AtomicReference<PolicyBundle> wasmBundleRef = new AtomicReference<>();
     private final ThreadLocal<PolicyInstance> threadPolicy = new ThreadLocal<>();
@@ -111,7 +111,7 @@ public class WasmPolicyEngine {
     /**
      * Retrieves or creates a thread-local policy instance that matches the bundle version.
      */
-    private OpaPolicy getThreadLocalPolicy(PolicyBundle bundle) {
+    protected OpaPolicy getThreadLocalPolicy(PolicyBundle bundle) {
         PolicyInstance instance = threadPolicy.get();
         if (instance == null || instance.version() != bundle.version()) {
             LOG.debugf("Creating new OpaPolicy instance for thread %s (version %d)",

@@ -167,4 +167,224 @@ class HttpProxyServiceExtTest {
         verify(req, times(1)).putHeader("X-Added", "constant");
         verify(s.requestCounter, atLeastOnce()).increment();
     }
+
+    @Test
+    void testProxy_nullHeaders() {
+        HttpProxyService s = new HttpProxyService();
+        s.config = mock(SidecarConfig.class);
+        s.httpClient = mock(HttpClient.class);
+        s.requestCounter = mock(io.micrometer.core.instrument.Counter.class);
+        s.errorCounter = mock(io.micrometer.core.instrument.Counter.class);
+        s.requestTimer = mock(io.micrometer.core.instrument.Timer.class);
+
+        SidecarConfig.ProxyConfig pc = mock(SidecarConfig.ProxyConfig.class);
+        when(s.config.proxy()).thenReturn(pc);
+        when(pc.propagateHeaders()).thenReturn(List.of("X-Test"));
+
+        SidecarConfig.ProxyConfig.TargetConfig tgt = mock(SidecarConfig.ProxyConfig.TargetConfig.class);
+        when(pc.target()).thenReturn(tgt);
+        when(tgt.host()).thenReturn("localhost");
+        when(tgt.port()).thenReturn(8081);
+
+        HttpClientRequest req = mock(HttpClientRequest.class);
+        when(s.httpClient.request(any(), anyInt(), anyString(), anyString())).thenReturn(io.smallrye.mutiny.Uni.createFrom().item(req));
+        when(req.setTimeout(anyLong())).thenReturn(req);
+        when(req.putHeader(anyString(), anyString())).thenReturn(req);
+
+        HttpClientResponse mockResp = mock(HttpClientResponse.class);
+        when(mockResp.headers()).thenReturn(io.vertx.mutiny.core.MultiMap.caseInsensitiveMultiMap());
+        when(mockResp.statusCode()).thenReturn(200);
+        when(req.send()).thenReturn(io.smallrye.mutiny.Uni.createFrom().item(mockResp));
+
+        AuthContext authContext = AuthContext.builder().userId("user1").build();
+
+        s.proxy("GET", "/test", null, null, null, null, authContext).await().indefinitely();
+
+        verify(req, never()).putHeader(eq("X-Test"), anyString());
+    }
+
+    @Test
+    void testProxy_nullAuthContext() {
+        HttpProxyService s = new HttpProxyService();
+        s.config = mock(SidecarConfig.class);
+        s.httpClient = mock(HttpClient.class);
+        s.requestCounter = mock(io.micrometer.core.instrument.Counter.class);
+        s.errorCounter = mock(io.micrometer.core.instrument.Counter.class);
+        s.requestTimer = mock(io.micrometer.core.instrument.Timer.class);
+
+        SidecarConfig.ProxyConfig pc = mock(SidecarConfig.ProxyConfig.class);
+        when(s.config.proxy()).thenReturn(pc);
+        when(pc.addHeaders()).thenReturn(Map.of());
+
+        SidecarConfig.ProxyConfig.TargetConfig tgt = mock(SidecarConfig.ProxyConfig.TargetConfig.class);
+        when(pc.target()).thenReturn(tgt);
+        when(tgt.host()).thenReturn("localhost");
+        when(tgt.port()).thenReturn(8081);
+
+        HttpClientRequest req = mock(HttpClientRequest.class);
+        when(s.httpClient.request(any(), anyInt(), anyString(), anyString())).thenReturn(io.smallrye.mutiny.Uni.createFrom().item(req));
+        when(req.setTimeout(anyLong())).thenReturn(req);
+
+        HttpClientResponse mockResp = mock(HttpClientResponse.class);
+        when(mockResp.headers()).thenReturn(io.vertx.mutiny.core.MultiMap.caseInsensitiveMultiMap());
+        when(mockResp.statusCode()).thenReturn(200);
+        when(req.send()).thenReturn(io.smallrye.mutiny.Uni.createFrom().item(mockResp));
+
+        s.proxy("GET", "/test", null, null, null, null, null).await().indefinitely();
+
+        verify(req, never()).putHeader(eq("X-Auth-User-Id"), anyString());
+    }
+
+    @Test
+    void testProxy_timeoutFailure() {
+        HttpProxyService s = new HttpProxyService();
+        s.config = mock(SidecarConfig.class);
+        s.httpClient = mock(HttpClient.class);
+        s.requestCounter = mock(io.micrometer.core.instrument.Counter.class);
+        s.errorCounter = mock(io.micrometer.core.instrument.Counter.class);
+        s.requestTimer = mock(io.micrometer.core.instrument.Timer.class);
+
+        SidecarConfig.ProxyConfig pc = mock(SidecarConfig.ProxyConfig.class);
+        when(s.config.proxy()).thenReturn(pc);
+
+        SidecarConfig.ProxyConfig.TargetConfig tgt = mock(SidecarConfig.ProxyConfig.TargetConfig.class);
+        when(pc.target()).thenReturn(tgt);
+        when(tgt.host()).thenReturn("localhost");
+        when(tgt.port()).thenReturn(8081);
+
+        HttpClientRequest req = mock(HttpClientRequest.class);
+        when(s.httpClient.request(any(), anyInt(), anyString(), anyString())).thenReturn(io.smallrye.mutiny.Uni.createFrom().item(req));
+        when(req.setTimeout(anyLong())).thenReturn(req);
+        when(req.send()).thenReturn(io.smallrye.mutiny.Uni.createFrom().failure(new RuntimeException("Timeout")));
+
+        AuthContext authContext = AuthContext.builder().userId("user1").build();
+
+        ProxyResponse res = s.proxy("GET", "/test", null, null, null, null, authContext).await().indefinitely();
+
+        assertEquals(503, res.statusCode());
+        verify(s.errorCounter).increment();
+    }
+
+    @Test
+    void testResolvePropagatedHeaders_caseInsensitiveContentType() throws Exception {
+        HttpProxyService s = new HttpProxyService();
+        s.config = mock(SidecarConfig.class);
+        SidecarConfig.ProxyConfig pc = mock(SidecarConfig.ProxyConfig.class);
+        when(s.config.proxy()).thenReturn(pc);
+        when(pc.propagateHeaders()).thenReturn(java.util.List.of());
+
+        Map<String, String> headers = Map.of("content-type", "application/json");
+
+        java.lang.reflect.Method m = HttpProxyService.class.getDeclaredMethod("resolvePropagatedHeaders", Map.class);
+        m.setAccessible(true);
+        @SuppressWarnings("unchecked")
+        Map<String, String> res = (Map<String, String>) m.invoke(s, headers);
+
+        assertEquals("application/json", res.get("Content-Type"));
+        assertNull(res.get("content-type"));
+    }
+
+    @Test
+    void testResolvePropagatedHeaders_propagateCaseInsensitiveFind() throws Exception {
+        HttpProxyService s = new HttpProxyService();
+        s.config = mock(SidecarConfig.class);
+        SidecarConfig.ProxyConfig pc = mock(SidecarConfig.ProxyConfig.class);
+        when(s.config.proxy()).thenReturn(pc);
+        when(pc.propagateHeaders()).thenReturn(java.util.List.of("X-Foo"));
+
+        Map<String, String> headers = Map.of("x-foo", "value");
+
+        java.lang.reflect.Method m = HttpProxyService.class.getDeclaredMethod("resolvePropagatedHeaders", Map.class);
+        m.setAccessible(true);
+        @SuppressWarnings("unchecked")
+        Map<String, String> res = (Map<String, String>) m.invoke(s, headers);
+
+        assertEquals("value", res.get("X-Foo"));
+    }
+
+    @Test
+    void testResolvePropagatedHeaders_nullHeaderValue() throws Exception {
+        HttpProxyService s = new HttpProxyService();
+        s.config = mock(SidecarConfig.class);
+        SidecarConfig.ProxyConfig pc = mock(SidecarConfig.ProxyConfig.class);
+        when(s.config.proxy()).thenReturn(pc);
+        when(pc.propagateHeaders()).thenReturn(java.util.List.of("X-Bar"));
+
+        Map<String, String> headers = new java.util.HashMap<>();
+        headers.put("X-Bar", null);
+
+        java.lang.reflect.Method m = HttpProxyService.class.getDeclaredMethod("resolvePropagatedHeaders", Map.class);
+        m.setAccessible(true);
+        @SuppressWarnings("unchecked")
+        Map<String, String> res = (Map<String, String>) m.invoke(s, headers);
+
+        assertNull(res.get("X-Bar"));
+    }
+
+    @Test
+    void testResolveAuthContextHeaders_nullAuth() throws Exception {
+        HttpProxyService s = new HttpProxyService();
+        java.lang.reflect.Method m = HttpProxyService.class.getDeclaredMethod("resolveAuthContextHeaders", AuthContext.class);
+        m.setAccessible(true);
+        @SuppressWarnings("unchecked")
+        Map<String, String> res = (Map<String, String>) m.invoke(s, (AuthContext) null);
+
+        assertTrue(res.isEmpty());
+    }
+
+    @Test
+    void testResolveAuthContextHeaders_notAuthenticated() throws Exception {
+        HttpProxyService s = new HttpProxyService();
+        AuthContext auth = AuthContext.anonymous();
+
+        java.lang.reflect.Method m = HttpProxyService.class.getDeclaredMethod("resolveAuthContextHeaders", AuthContext.class);
+        m.setAccessible(true);
+        @SuppressWarnings("unchecked")
+        Map<String, String> res = (Map<String, String>) m.invoke(s, auth);
+
+        assertTrue(res.isEmpty());
+    }
+
+    @Test
+    void testResolvePlaceholders_nullFields() throws Exception {
+        HttpProxyService s = new HttpProxyService();
+        s.config = mock(SidecarConfig.class);
+        s.httpClient = mock(HttpClient.class);
+        s.requestCounter = mock(io.micrometer.core.instrument.Counter.class);
+        s.errorCounter = mock(io.micrometer.core.instrument.Counter.class);
+        s.requestTimer = mock(io.micrometer.core.instrument.Timer.class);
+
+        SidecarConfig.ProxyConfig pc = mock(SidecarConfig.ProxyConfig.class);
+        when(s.config.proxy()).thenReturn(pc);
+        when(pc.addHeaders()).thenReturn(Map.of("X-Test", "${user.id}-${user.email}-${user.name}-${user.roles}"));
+        SidecarConfig.ProxyConfig.TimeoutConfig tc = mock(SidecarConfig.ProxyConfig.TimeoutConfig.class);
+        when(pc.timeout()).thenReturn(tc);
+        when(tc.read()).thenReturn(30000);
+
+        SidecarConfig.ProxyConfig.TargetConfig tgt = mock(SidecarConfig.ProxyConfig.TargetConfig.class);
+        when(pc.target()).thenReturn(tgt);
+        when(tgt.host()).thenReturn("localhost");
+        when(tgt.port()).thenReturn(8081);
+
+        AuthContext auth = AuthContext.builder()
+            .userId("u123")
+            .email(null)
+            .name(null)
+            .roles(java.util.Set.of())
+            .build();
+
+        HttpClientRequest req = mock(HttpClientRequest.class);
+        when(s.httpClient.request(any(), anyInt(), anyString(), anyString())).thenReturn(io.smallrye.mutiny.Uni.createFrom().item(req));
+        when(req.setTimeout(anyLong())).thenReturn(req);
+        when(req.putHeader(anyString(), anyString())).thenReturn(req);
+
+        HttpClientResponse mockResp = mock(HttpClientResponse.class);
+        when(mockResp.headers()).thenReturn(io.vertx.mutiny.core.MultiMap.caseInsensitiveMultiMap());
+        when(mockResp.statusCode()).thenReturn(200);
+        when(req.send()).thenReturn(io.smallrye.mutiny.Uni.createFrom().item(mockResp));
+
+        s.proxy("GET", "/test", null, null, null, null, auth).await().indefinitely();
+
+        verify(req).putHeader("X-Test", "u123---");
+    }
 }

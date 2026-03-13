@@ -19,7 +19,6 @@ import java.lang.reflect.Field;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -178,50 +177,5 @@ class HttpProxyServicePojoTest {
     @Test
     void testBuildTargetUrl() {
         assertEquals("http://localhost:8081/api/v1", proxyService.buildTargetUrl("/api/v1"));
-    }
-
-    @Test
-    void testResolveAuthContextHeaders_Default() throws Exception {
-        when(config.proxy().addHeaders()).thenReturn(Collections.emptyMap());
-        AuthContext auth = AuthContext.builder()
-                .userId("u1")
-                .email("u1@maatini.space")
-                .roles(Set.of("admin"))
-                .build();
-
-        java.lang.reflect.Method m = HttpProxyService.class.getDeclaredMethod("resolveAuthContextHeaders",
-                AuthContext.class);
-        m.setAccessible(true);
-        Map<String, String> res = (Map<String, String>) m.invoke(proxyService, auth);
-
-        assertEquals("u1", res.get("X-Auth-User-Id"));
-        assertEquals("u1@maatini.space", res.get("X-Auth-User-Email"));
-        assertEquals("admin", res.get("X-Auth-User-Roles"));
-    }
-
-    @Test
-    void testResolvePropagatedHeaders_Special() throws Exception {
-        when(config.proxy().propagateHeaders()).thenReturn(List.of("X-Correl"));
-        Map<String, String> incoming = Map.of(
-                "x-correl", "v1", // case insensitive
-                "content-type", "application/json",
-                "accept", "text/plain");
-
-        java.lang.reflect.Method m = HttpProxyService.class.getDeclaredMethod("resolvePropagatedHeaders", Map.class);
-        m.setAccessible(true);
-        Map<String, String> res = (Map<String, String>) m.invoke(proxyService, incoming);
-
-        assertEquals("v1", res.get("X-Correl"));
-        assertEquals("application/json", res.get("Content-Type"));
-        assertEquals("text/plain", res.get("Accept"));
-    }
-
-    @Test
-    void testShutdown() throws Exception {
-        java.lang.reflect.Method m = HttpProxyService.class.getDeclaredMethod("shutdown");
-        m.setAccessible(true);
-        m.invoke(proxyService);
-        verify(webClient).close();
-        verify(httpClient).close();
     }
 }

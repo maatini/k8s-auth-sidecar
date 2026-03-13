@@ -11,6 +11,9 @@ import space.maatini.sidecar.infrastructure.config.SidecarConfig;
 import space.maatini.sidecar.domain.model.PolicyDecision;
 import space.maatini.sidecar.domain.model.PolicyInput;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
@@ -145,5 +148,69 @@ public class WasmPolicyEngineTest {
         PolicyDecision decision = wasmPolicyEngine.evaluateEmbeddedWasm(dummyInput).await().indefinitely();
         assertNotNull(decision);
         assertFalse(decision.allowed()); // Depends on dummy.wasm content
+    }
+
+    @Test
+    void testResolvePathWithLeadingSlash() {
+        Path path = wasmPolicyEngine.resolvePath("classpath:/policies/dummy.wasm");
+        assertNotNull(path);
+        assertTrue(path.toString().endsWith("dummy.wasm"));
+    }
+
+    @Test
+    void testResolvePathClasspathNotFound() {
+        Path path = wasmPolicyEngine.resolvePath("classpath:/non/existent.wasm");
+        assertNull(path);
+    }
+
+    @Test
+    void testResolvePathFileDirectly() {
+        Path path = wasmPolicyEngine.resolvePath("/tmp/some-policy.wasm");
+        assertEquals(Paths.get("/tmp/some-policy.wasm"), path);
+    }
+
+    @Test
+    void testGetMaxModifiedTimeNonExistentDir() throws Exception {
+        long time = wasmPolicyEngine.getMaxModifiedTime(Paths.get("/non/existent/dir"));
+        assertEquals(0, time);
+    }
+
+    @Test
+    void testGetMaxModifiedTimeWithFiles() throws Exception {
+        Path tempDir = Files.createTempDirectory("wasm-test");
+        try {
+            Path regoFile = tempDir.resolve("test.rego");
+            Files.writeString(regoFile, "package test");
+            
+            Path wasmFile = tempDir.resolve("test.wasm");
+            Files.writeString(wasmFile, "wasm content");
+
+            Path otherFile = tempDir.resolve("test.txt");
+            Files.writeString(otherFile, "ignored content");
+
+            long maxTime = wasmPolicyEngine.getMaxModifiedTime(tempDir);
+            assertTrue(maxTime > 0);
+            
+            // Wait a bit and modify one
+            Thread.sleep(100);
+            Files.writeString(regoFile, "package test updated");
+            long updatedMaxTime = wasmPolicyEngine.getMaxModifiedTime(tempDir);
+            assertTrue(updatedMaxTime > maxTime);
+
+        } finally {
+            // Clean up
+            Files.walk(tempDir)
+                    .sorted((p1, p2) -> p2.compareTo(p1))
+                    .map(Path::toFile)
+                    .forEach(java.io.File::delete);
+        }
+    }
+
+    @Test
+    void testThreadLocalPolicyConsistency() {
+        PolicyDecision d1 = wasmPolicyEngine.evaluateEmbeddedWasm(dummyInput).await().indefinitely();
+        PolicyDecision d2 = wasmPolicyEngine.evaluateEmbeddedWasm(dummyInput).await().indefinitely();
+        assertNotNull(d1);
+        assertNotNull(d2);
     }
 }
