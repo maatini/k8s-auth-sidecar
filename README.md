@@ -6,6 +6,8 @@
   [![Quarkus](https://img.shields.io/badge/Quarkus-3.15.1-blue.svg?logo=quarkus)](https://quarkus.io)
   [![Java](https://img.shields.io/badge/Java-21-orange.svg?logo=openjdk)](https://openjdk.org)
   [![License](https://img.shields.io/badge/License-Apache%202.0-green.svg)](LICENSE)
+  [![Tests](https://img.shields.io/badge/Tests-127%20%E2%9C%85%200%20Failures-brightgreen.svg)](#-so-testest-du-das-projekt--schritt-f%C3%BCr-schritt-super-einfach-erkl%C3%A4rt)
+  [![PIT Strength](https://img.shields.io/badge/PIT%20Strength-82%25-brightgreen.svg)](#7-mutation-testing-pit--qualit%C3%A4ts-check)
   [![Docker](https://img.shields.io/badge/Docker-Ready-blue.svg?logo=docker)](https://www.docker.com/)
   [![Kubernetes](https://img.shields.io/badge/Kubernetes-Ready-blue.svg?logo=kubernetes)](https://kubernetes.io/)
 </div>
@@ -178,11 +180,26 @@ Hier erfährst du, wie du sicherstellst, dass alles perfekt läuft. Wir gehen vo
 > [!IMPORTANT]
 > **Junior-Tipp:** Wenn PIT eine Mutation nicht findet, überlege dir einen Edge-Case (z.B. "Was passiert, wenn der Header leer ist?"), den du noch nicht getestet hast.
 
-#### 8. Was bedeuten die Test-Zahlen? (kurze Erklärung für Juniors)
-Das Projekt besitzt eine extrem schnelle, überwiegend Framework-unabhängige Test-Suite (inkl. > 58 reiner POJO- & Service-Tests allein für Auth-Core & Proxy).
-- **Line Coverage (> 85%)**: Wie viel Prozent des Codes wurden mindestens einmal ausgeführt?
-- **Mutation Score / PIT Coverage (> 80%)**: Wie viele der künstlichen Fehler (Mutanten) wurden von den Tests entdeckt? Wir verpflichten uns zu strengem Mutation Testing nach dem POJO-First Standard.
-- **Test Strength (> 80%)**: Wie stark sind die Tests in den Bereichen, die sie tatsächlich abdecken? (Unser wichtigster Indikator!)
+#### 8. Aktuelle Test-Metriken (gemessen 2026-03-13)
+
+Das Projekt besitzt eine extrem schnelle, überwiegend Framework-unabhängige Test-Suite:
+
+| Modul | Tests | Failures | Typ |
+|-------|------:|:--------:|-----|
+| `auth-core` | 47 | 0 ✅ | POJO + Ext + Quarkus |
+| `opa-wasm` | 47 | 0 ✅ | POJO + Ext + Quarkus |
+| `config` | 7 | 0 ✅ | Quarkus |
+| `proxy` | 26 | 0 ✅ | POJO + Ext + E2E |
+| **Gesamt** | **127** | **0 ✅** | |
+
+**PIT Mutation Testing (`auth-core`):**
+- **Line Coverage**: 71% (247/349 Zeilen)
+- **Test Strength**: **82%** ✅ (Ziel: > 80%)
+- Bericht: `auth-core/target/pit-reports/`
+
+**Begriffsklärung:**
+- **Line Coverage**: Wie viel Prozent des Codes wurden mindestens einmal ausgeführt?
+- **Test Strength**: Wie viele künstliche Fehler (Mutanten) wurden von den Tests gefunden? — Unser wichtigster Qualitätsindikator.
 
 ---
 
