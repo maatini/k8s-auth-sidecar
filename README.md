@@ -3,7 +3,7 @@
 
   # K8s-Auth-Sidecar - AuthN/AuthZ Sidecar für Kubernetes
 
-  [![Quarkus](https://img.shields.io/badge/Quarkus-3.15.1-blue.svg?logo=quarkus)](https://quarkus.io)
+  [![Quarkus](https://img.shields.io/badge/Quarkus-3.32.2-blue.svg?logo=quarkus)](https://quarkus.io)
   [![Java](https://img.shields.io/badge/Java-21-orange.svg?logo=openjdk)](https://openjdk.org)
   [![License](https://img.shields.io/badge/License-Apache%202.0-green.svg)](LICENSE)
   [![Tests](https://img.shields.io/badge/Tests-127%20%E2%9C%85%200%20Failures-brightgreen.svg)](#-so-testest-du-das-projekt--schritt-f%C3%BCr-schritt-super-einfach-erkl%C3%A4rt)
