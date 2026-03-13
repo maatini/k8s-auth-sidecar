@@ -48,6 +48,7 @@ root/
 - Erstelle neue UseCases mit den Templates oben  
 - Erweitere dieses Guide, wenn du neue Patterns entdeckst  
 - Halte Coverage > 85 % und PIT-Strength > 80 %
+- **🔧 Performance-Architektur**: Zukünftige Architektur-Tasks **müssen** den Fokus auf **Non-blocking Event Loop Offloading** für CPU-intensive Operationen legen (WASM-Evaluierung, JSON-Serialisierung). Blockierende Calls auf dem Vert.x Event Loop sind ein kritisches Anti-Pattern – stets `@Blocking` oder `Uni.emitOn(Infrastructure.getDefaultWorkerPool())` verwenden. Detaillierte Bottleneck-Analyse: [ARCHITECTURE.md → Roadmap](ARCHITECTURE.md#-performance--production-readiness-roadmap).
 
 Du bist jetzt offiziell **Antigravity-ready**!  
 

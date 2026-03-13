@@ -17,6 +17,16 @@
 
 ---
 
+> [!TIP]
+> ## 🚀 POC‑Ready
+> Das Projekt bildet alle Kernfeatures vollständig und stabil ab: **OIDC-Validierung (Keycloak & Entra ID), embedded OPA-WASM-Autorisierung und reaktives Streaming-Proxy**. Eine sofort lauffähige Demo startet in unter 3 Minuten:
+> ```bash
+> docker compose -f docker-compose.demo.yml up -d   # Demo-Stack (WireMock + Sidecar)
+> ```
+> Ideal für Stakeholder-Demos, technische Evaluierungen und Proof-of-Concept-Reviews.
+
+---
+
 ## ✨ Features
 
 - ⚡ **Blitzschnelle lokale Entwicklung**: Out-of-the-Box Mocking für Identity Provider (Keycloak) via WireMock.
@@ -194,6 +204,7 @@ Das Projekt besitzt eine extrem schnelle, überwiegend Framework-unabhängige Te
 - **Trusted Proxies**: Schutz vor IP-Spoofing für `X-Forwarded-For`.
 - **Non-blocking Proxy**: Basiert auf Vert.x WebClient für maximale Skalierbarkeit.
 - **WASM Hot-Reload**: Ersetze Policies im laufenden Betrieb ohne Downtime.
+- **⚠️ Durchsatz-Hinweis (> 1000 RPS)**: Bei hoher Last (> 1000 Req/s) wurden in Lasttests Engpässe identifiziert (Event-Loop Blockade, Connection-Pool-Limit, synchrones Logging). Die Architektur ist bereits auf deren Beseitigung ausgelegt; die konkreten Optimierungen sind in [`docs/ARCHITECTURE.md` → Roadmap](docs/ARCHITECTURE.md#-performance--production-readiness-roadmap) dokumentiert. **Für den POC ist dies irrelevant.**
 
 ---
 
