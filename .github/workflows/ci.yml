@@ -97,7 +97,7 @@ jobs:
 
       # Build an AMD64 image locally specifically for the vulnerability scanner
       - name: Build local Image for Scanning (amd64)
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           platforms: linux/amd64
@@ -118,7 +118,7 @@ jobs:
 
       # Perform a dry-run multi-arch build to ensure arm64 and amd64 both compile successfully
       - name: Test Multi-Arch Build (No Push)
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           platforms: linux/amd64,linux/arm64
