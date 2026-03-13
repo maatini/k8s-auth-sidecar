@@ -36,7 +36,7 @@ jobs:
 
       # Buildx is required for multi-arch builds and generating provenance/SBOMs
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       # Authenticate to GitHub Container Registry
       - name: Login to GHCR
