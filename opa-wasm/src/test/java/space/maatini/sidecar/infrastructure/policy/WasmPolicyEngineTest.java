@@ -1,5 +1,4 @@
 package space.maatini.sidecar.infrastructure.policy;
-import space.maatini.sidecar.infrastructure.policy.WasmPolicyEngine;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.quarkus.test.junit.QuarkusTest;
@@ -52,9 +51,8 @@ public class WasmPolicyEngineTest {
     }
 
     @Test
-    void testInitAndShutdown() {
+    void testInit() {
         assertDoesNotThrow(() -> wasmPolicyEngine.init());
-        assertDoesNotThrow(() -> wasmPolicyEngine.shutdown());
     }
 
     @Test
@@ -89,6 +87,21 @@ public class WasmPolicyEngineTest {
                     @Override
                     public String wasmPath() {
                         return "classpath:policies/dummy.wasm";
+                    }
+                };
+            }
+
+            @Override
+            public HotReloadConfig hotReload() {
+                return new HotReloadConfig() {
+                    @Override
+                    public boolean enabled() {
+                        return false;
+                    }
+
+                    @Override
+                    public String interval() {
+                        return "5s";
                     }
                 };
             }

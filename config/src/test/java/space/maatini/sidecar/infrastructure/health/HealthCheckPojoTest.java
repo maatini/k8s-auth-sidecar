@@ -52,6 +52,10 @@ class HealthCheckPojoTest {
         Field webClientField = ReadinessCheck.class.getDeclaredField("webClient");
         webClientField.setAccessible(true);
         webClientField.set(readinessCheck, mock(WebClient.class));
+
+        Field netClientField = ReadinessCheck.class.getDeclaredField("netClient");
+        netClientField.setAccessible(true);
+        netClientField.set(readinessCheck, mock(io.vertx.mutiny.core.net.NetClient.class));
     }
 
     @Test
@@ -105,12 +109,10 @@ class HealthCheckPojoTest {
         when(httpResponse.statusCode()).thenReturn(500);
 
         // Socket fallback mock
-        io.vertx.mutiny.core.Vertx vertx = mock(io.vertx.mutiny.core.Vertx.class);
-        io.vertx.mutiny.core.net.NetClient netClient = mock(io.vertx.mutiny.core.net.NetClient.class);
-        Field vertxField = ReadinessCheck.class.getDeclaredField("vertx");
-        vertxField.setAccessible(true);
-        vertxField.set(readinessCheck, vertx);
-        when(vertx.createNetClient()).thenReturn(netClient);
+        Field netClientField = ReadinessCheck.class.getDeclaredField("netClient");
+        netClientField.setAccessible(true);
+        io.vertx.mutiny.core.net.NetClient netClient = (io.vertx.mutiny.core.net.NetClient) netClientField.get(readinessCheck);
+        
         when(netClient.connect(anyInt(), anyString()))
                 .thenReturn(io.smallrye.mutiny.Uni.createFrom().failure(new RuntimeException("Socket fail")));
 
@@ -135,15 +137,11 @@ class HealthCheckPojoTest {
         when(request.send()).thenReturn(io.smallrye.mutiny.Uni.createFrom().failure(new RuntimeException("HTTP fail")));
 
         // Socket fallback
-        io.vertx.mutiny.core.Vertx vertx = mock(io.vertx.mutiny.core.Vertx.class);
-        io.vertx.mutiny.core.net.NetClient netClient = mock(io.vertx.mutiny.core.net.NetClient.class);
+        Field netClientField = ReadinessCheck.class.getDeclaredField("netClient");
+        netClientField.setAccessible(true);
+        io.vertx.mutiny.core.net.NetClient netClient = (io.vertx.mutiny.core.net.NetClient) netClientField.get(readinessCheck);
         io.vertx.mutiny.core.net.NetSocket netSocket = mock(io.vertx.mutiny.core.net.NetSocket.class);
 
-        Field vertxField = ReadinessCheck.class.getDeclaredField("vertx");
-        vertxField.setAccessible(true);
-        vertxField.set(readinessCheck, vertx);
-
-        when(vertx.createNetClient()).thenReturn(netClient);
         when(netClient.connect(anyInt(), anyString())).thenReturn(io.smallrye.mutiny.Uni.createFrom().item(netSocket));
 
         HealthCheckResponse response = readinessCheck.call();

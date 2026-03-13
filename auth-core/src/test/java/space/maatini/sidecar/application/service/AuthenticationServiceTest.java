@@ -1,23 +1,28 @@
 package space.maatini.sidecar.application.service;
 
-import io.quarkus.test.junit.QuarkusTest;
-import jakarta.inject.Inject;
 import org.eclipse.microprofile.jwt.JsonWebToken;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import space.maatini.sidecar.domain.model.AuthContext;
 
-import java.util.Map;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.when;
 
-@QuarkusTest
 class AuthenticationServiceTest {
 
-    @Inject
-    AuthenticationService authenticationService;
+    private AuthenticationService authenticationService;
+    private KeycloakRoleExtractor roleExtractor;
+    private AuthContextMapper authContextMapper;
+
+    @BeforeEach
+    void setup() {
+        roleExtractor = Mockito.mock(KeycloakRoleExtractor.class);
+        authContextMapper = Mockito.mock(AuthContextMapper.class);
+        authenticationService = new AuthenticationService(roleExtractor, authContextMapper);
+    }
 
     @Test
     void testExtractFromJwt_Normal() {
@@ -28,9 +33,19 @@ class AuthenticationServiceTest {
         when(jwt.getClaim("email")).thenReturn("user@example.com");
         when(jwt.getClaim("name")).thenReturn("Test User");
         when(jwt.getClaimNames()).thenReturn(Set.of("sub", "email", "name"));
+        when(jwt.getRawToken()).thenReturn("test-raw-token-789");
 
-        Map<String, Object> realmAccess = Map.of("roles", Set.of("user", "admin"));
-        when(jwt.getClaim("realm_access")).thenReturn(realmAccess);
+        Set<String> roles = Set.of("user", "admin");
+        when(roleExtractor.extractRoles(jwt)).thenReturn(roles);
+        
+        AuthContext expectedContext = AuthContext.builder()
+                .userId("user-123")
+                .email("user@example.com")
+                .name("Test User")
+                .roles(roles)
+                .build();
+                
+        when(authContextMapper.mapToAuthContext(jwt, roles)).thenReturn(expectedContext);
 
         AuthContext context = authenticationService.extractFromJwt(jwt);
 

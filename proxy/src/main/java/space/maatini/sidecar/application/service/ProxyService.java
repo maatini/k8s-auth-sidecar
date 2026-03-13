@@ -1,7 +1,6 @@
 package space.maatini.sidecar.application.service;
 
 import io.smallrye.mutiny.Uni;
-import io.vertx.core.http.HttpServerRequest;
 import space.maatini.sidecar.domain.model.AuthContext;
 import space.maatini.sidecar.domain.model.ProxyResponse;
 
@@ -20,7 +19,8 @@ public interface ProxyService {
             String path,
             Map<String, String> headers,
             Map<String, String> queryParams,
-            HttpServerRequest clientRequest,
+            io.vertx.core.http.HttpServerRequest clientRequest,
+            io.vertx.core.http.HttpServerResponse clientResponse,
             AuthContext authContext);
 
     /**

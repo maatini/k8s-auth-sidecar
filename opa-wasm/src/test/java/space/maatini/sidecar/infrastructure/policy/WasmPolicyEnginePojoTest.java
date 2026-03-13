@@ -93,10 +93,22 @@ class WasmPolicyEnginePojoTest {
         when(failingMapper.writeValueAsString(any())).thenThrow(new RuntimeException("JSON fail"));
         setField(engine, "objectMapper", failingMapper);
 
-        OpaPolicy policy = mock(OpaPolicy.class);
-        java.util.concurrent.atomic.AtomicReference<OpaPolicy> ref = new java.util.concurrent.atomic.AtomicReference<>(
-                policy);
-        setField(engine, "wasmPolicyRef", ref);
+        // Mock a bundle so that the engine doesn't return the "not initialized" decision early
+        byte[] dummyBytes = "dummy".getBytes();
+        // The PolicyBundle record is private, so we might need a different approach if we can't instantiate it
+        // However, we can use reflection or just load a dummy to set the wasmBundleRef
+        
+        // Actually, the simplest way is to use reflected construction of the inner record
+        // It is private: private record PolicyBundle(byte[] bytes, long version) {}
+        
+        // Use reflection to set a dummy PolicyBundle to set the wasmBundleRef
+        Class<?> bundleClass = Class.forName("space.maatini.sidecar.infrastructure.policy.WasmPolicyEngine$PolicyBundle");
+        java.lang.reflect.Constructor<?> constructor = bundleClass.getDeclaredConstructor(byte[].class, long.class);
+        constructor.setAccessible(true);
+        Object bundle = constructor.newInstance(new byte[0], 1L);
+        
+        java.util.concurrent.atomic.AtomicReference<Object> ref = new java.util.concurrent.atomic.AtomicReference<>(bundle);
+        setField(engine, "wasmBundleRef", ref);
 
         PolicyInput input = new PolicyInput(
                 new PolicyInput.RequestInfo("GET", "/path", Map.of(), Map.of()),

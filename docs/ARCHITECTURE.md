@@ -22,6 +22,7 @@ Der **k8s-auth-sidecar** (Request Router Sidecar) ist ein Quarkus-basierter Micr
 ### 2. Modul: `auth-core`
 - **Request Processor (`SidecarRequestProcessor`)**: Orchestriert AuthN, Enrichment und AuthZ.
 - **Authentication Service (`AuthenticationService`)**: Validiert JWTs und extrahiert den `AuthContext`.
+- **Authorization UseCase (`AuthorizationUseCase`)**: Evaluiert OPA-WASM Policies über `AuthorizationCommand`.
 - **Roles Service (`RolesService`)**: Enriched den Context über den `RolesClient`.
 
 ### 3. Modul: `opa-wasm`
@@ -82,12 +83,6 @@ PROXY_TARGET_PORT=8081
 OPA_MODE=embedded
 OPA_WASM_PATH=/policies/authz.wasm
 OPA_DECISION_ENDPOINT=/v1/data/authz/allow
-
-# Rate Limiting
-RATE_LIMIT_ENABLED=true
-RATE_LIMIT_RPS=100
-RATE_LIMIT_BURST=200
-RATE_LIMIT_TRUSTED_PROXIES=10.244.0.1,10.244.0.2
 
 # Metrics & Logging
 QUARKUS_LOG_LEVEL=INFO

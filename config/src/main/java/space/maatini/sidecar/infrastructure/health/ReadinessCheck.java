@@ -32,16 +32,21 @@ public class ReadinessCheck implements HealthCheck {
     Vertx vertx;
  
     private WebClient webClient;
+    private io.vertx.mutiny.core.net.NetClient netClient;
  
     @PostConstruct
     void init() {
         this.webClient = WebClient.create(vertx);
+        this.netClient = vertx.createNetClient();
     }
  
     @PreDestroy
     void shutdown() {
         if (webClient != null) {
             webClient.close();
+        }
+        if (netClient != null) {
+            netClient.close();
         }
     }
  
@@ -91,7 +96,7 @@ public class ReadinessCheck implements HealthCheck {
         } catch (Exception e) {
             LOG.debugf("Backend health check failed: %s", e.getMessage());
             try {
-                var socket = vertx.createNetClient()
+                var socket = netClient
                         .connect(port, host)
                         .await().atMost(Duration.ofSeconds(2));
                 socket.close();

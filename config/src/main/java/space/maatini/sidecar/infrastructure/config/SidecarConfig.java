@@ -142,6 +142,18 @@ public interface SidecarConfig {
             @WithDefault("classpath:policies/authz.wasm")
             String wasmPath();
         }
+
+        @WithName("hot-reload")
+        HotReloadConfig hotReload();
+
+        interface HotReloadConfig {
+            @WithDefault("true")
+            boolean enabled();
+
+            @WithDefault("5s")
+            @WithName("interval")
+            String interval();
+        }
     }
  
     /**

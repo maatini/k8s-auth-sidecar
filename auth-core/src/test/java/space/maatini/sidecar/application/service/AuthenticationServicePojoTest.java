@@ -1,6 +1,5 @@
 package space.maatini.sidecar.application.service;
 
-import io.quarkus.security.identity.SecurityIdentity;
 import org.eclipse.microprofile.jwt.JsonWebToken;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -27,34 +26,20 @@ class AuthenticationServicePojoTest {
         AuthContextMapperImpl authContextMapper = new AuthContextMapperImpl();
         authContextMapper.claimExtractor = claimExtractor;
 
-        authenticationService = new AuthenticationService();
-        authenticationService.roleExtractor = roleExtractor;
-        authenticationService.authContextMapper = authContextMapper;
-    }
-
-    @Test
-    void testExtractAuthContext_Anonymous() {
-        SecurityIdentity identity = mock(SecurityIdentity.class);
-        when(identity.isAnonymous()).thenReturn(true);
-
-        AuthContext context = authenticationService.extractAuthContext(identity).await().indefinitely();
-        assertFalse(context.isAuthenticated());
-        assertEquals("anonymous", context.userId());
+        authenticationService = new AuthenticationService(roleExtractor, authContextMapper);
     }
 
     @Test
     void testExtractAuthContext_ValidJwt() {
-        SecurityIdentity identity = mock(SecurityIdentity.class);
         JsonWebToken jwt = mock(JsonWebToken.class);
-        when(identity.isAnonymous()).thenReturn(false);
-        when(identity.getPrincipal()).thenReturn(jwt);
         when(jwt.getSubject()).thenReturn("user123");
         when(jwt.getIssuer()).thenReturn("https://issuer");
         when(jwt.getClaimNames()).thenReturn(Set.of("sub", "iss"));
         when(jwt.getClaim("sub")).thenReturn("user123");
         when(jwt.getClaim("iss")).thenReturn("https://issuer");
+        when(jwt.getRawToken()).thenReturn("mock-raw-token-123");
 
-        AuthContext context = authenticationService.extractAuthContext(identity).await().indefinitely();
+        AuthContext context = authenticationService.extractAuthContext(jwt).await().indefinitely();
         assertTrue(context.isAuthenticated());
         assertEquals("user123", context.userId());
         assertEquals("https://issuer", context.issuer());
@@ -68,6 +53,7 @@ class AuthenticationServicePojoTest {
         when(jwt.getClaim("email")).thenReturn("user@example.com");
         when(jwt.getClaim("preferred_username")).thenReturn("jdoe");
         when(jwt.getClaim("name")).thenReturn("John Doe");
+        when(jwt.getRawToken()).thenReturn("mock-raw-token-456");
 
         Map<String, Object> realmAccess = Map.of("roles", List.of("admin", "user"));
         when(jwt.getClaim("realm_access")).thenReturn(realmAccess);

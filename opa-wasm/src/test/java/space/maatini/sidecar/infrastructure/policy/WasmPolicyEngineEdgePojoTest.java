@@ -1,5 +1,4 @@
 package space.maatini.sidecar.infrastructure.policy;
-import space.maatini.sidecar.infrastructure.policy.WasmPolicyEngine;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
@@ -43,8 +42,5 @@ public class WasmPolicyEngineEdgePojoTest {
         when(embedConfig.wasmPath()).thenReturn(tempFile.toAbsolutePath().toString());
         engine.loadWasmModule();
         Files.deleteIfExists(tempFile);
-
-        // 5. Trigger Shutdown
-        engine.shutdown();
     }
 }

@@ -5,9 +5,9 @@ import io.micrometer.core.instrument.Timer;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.smallrye.mutiny.Uni;
 import io.vertx.core.http.HttpMethod;
-import io.vertx.mutiny.core.buffer.Buffer;
-import io.vertx.mutiny.ext.web.client.HttpRequest;
-import io.vertx.mutiny.ext.web.client.HttpResponse;
+import io.vertx.mutiny.core.http.HttpClient;
+import io.vertx.mutiny.core.http.HttpClientRequest;
+import io.vertx.mutiny.core.http.HttpClientResponse;
 import io.vertx.mutiny.ext.web.client.WebClient;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -29,9 +29,10 @@ class HttpProxyServicePojoTest {
 
     private HttpProxyService proxyService;
     private SidecarConfig config;
+    private HttpClient httpClient;
+    private HttpClientRequest request;
+    private HttpClientResponse response;
     private WebClient webClient;
-    private HttpRequest<Buffer> request;
-    private HttpResponse<Buffer> response;
 
     private Counter requestCounter;
     private Counter errorCounter;
@@ -43,8 +44,6 @@ class HttpProxyServicePojoTest {
         proxyService = new HttpProxyService();
         config = mock(SidecarConfig.class);
         webClient = mock(WebClient.class);
-        request = mock(HttpRequest.class);
-        response = mock(HttpResponse.class);
 
         SidecarConfig.ProxyConfig proxyConfig = mock(SidecarConfig.ProxyConfig.class);
         SidecarConfig.ProxyConfig.TargetConfig targetConfig = mock(SidecarConfig.ProxyConfig.TargetConfig.class);
@@ -65,15 +64,21 @@ class HttpProxyServicePojoTest {
         requestTimer = mock(Timer.class);
 
         setField(proxyService, "config", config);
+        httpClient = mock(HttpClient.class);
+        request = mock(HttpClientRequest.class);
+        response = mock(HttpClientResponse.class);
+        setField(proxyService, "httpClient", httpClient);
         setField(proxyService, "webClient", webClient);
         setField(proxyService, "meterRegistry", new SimpleMeterRegistry());
         setField(proxyService, "requestCounter", requestCounter);
         setField(proxyService, "errorCounter", errorCounter);
         setField(proxyService, "requestTimer", requestTimer);
 
-        when(webClient.request(any(HttpMethod.class), anyInt(), anyString(), anyString())).thenReturn(request);
-        when(request.timeout(anyLong())).thenReturn(request);
+        when(httpClient.request(any(HttpMethod.class), anyInt(), anyString(), anyString())).thenReturn(Uni.createFrom().item(request));
+        when(request.setTimeout(anyLong())).thenReturn(request);
         when(request.putHeader(anyString(), anyString())).thenReturn(request);
+        when(request.send()).thenReturn(Uni.createFrom().item(response));
+        when(request.send(any(io.vertx.mutiny.core.http.HttpServerRequest.class))).thenReturn(Uni.createFrom().item(response));
     }
 
     private void setField(Object target, String name, Object value) throws Exception {
@@ -85,20 +90,17 @@ class HttpProxyServicePojoTest {
     @Test
     @SuppressWarnings("unchecked")
     void testProxy_Success() {
-        when(request.send()).thenReturn(Uni.createFrom().item(response));
         when(response.statusCode()).thenReturn(200);
         when(response.headers()).thenReturn(io.vertx.mutiny.core.MultiMap.caseInsensitiveMultiMap());
-        when(response.body()).thenReturn(Buffer.buffer("ok"));
 
         AuthContext authContext = AuthContext.builder().userId("user1").build();
 
         ProxyResponse res = proxyService
-                .proxy("GET", "/test", Collections.emptyMap(), Collections.emptyMap(), null, authContext)
+                .proxy("GET", "/test", Collections.emptyMap(), Collections.emptyMap(), null, null, authContext)
                 .await().indefinitely();
 
         assertNotNull(res);
         assertEquals(200, res.statusCode());
-        assertEquals("ok", res.bodyAsString());
 
         verify(requestCounter).increment();
     }
@@ -110,7 +112,7 @@ class HttpProxyServicePojoTest {
         AuthContext authContext = AuthContext.builder().userId("user1").build();
 
         ProxyResponse res = proxyService
-                .proxy("GET", "/test", Collections.emptyMap(), Collections.emptyMap(), null, authContext)
+                .proxy("GET", "/test", Collections.emptyMap(), Collections.emptyMap(), null, null, authContext)
                 .await().indefinitely();
 
         assertNotNull(res);
@@ -131,7 +133,7 @@ class HttpProxyServicePojoTest {
 
         Map<String, String> incomingHeaders = Map.of("X-Test-Propagate", "test-value", "X-Hidden", "secret");
 
-        proxyService.proxy("GET", "/test", incomingHeaders, null, null, AuthContext.anonymous())
+        proxyService.proxy("GET", "/test", incomingHeaders, null, null, null, AuthContext.anonymous())
                 .await().indefinitely();
 
         verify(request).putHeader("X-Test-Propagate", "test-value");
@@ -152,7 +154,7 @@ class HttpProxyServicePojoTest {
                 .email("u123@example.com")
                 .build();
 
-        proxyService.proxy("GET", "/test", null, null, null, authContext)
+        proxyService.proxy("GET", "/test", null, null, null, null, authContext)
                 .await().indefinitely();
 
         verify(request).putHeader("X-User-Email", "u123@example.com");
@@ -160,18 +162,17 @@ class HttpProxyServicePojoTest {
 
     @Test
     void testProxy_PostStreaming() {
-        when(request.sendStream(any(io.vertx.mutiny.core.streams.ReadStream.class)))
-                .thenReturn(Uni.createFrom().item(response));
         when(response.statusCode()).thenReturn(201);
         when(response.headers()).thenReturn(io.vertx.mutiny.core.MultiMap.caseInsensitiveMultiMap());
-
+ 
         io.vertx.core.http.HttpServerRequest mockClientReq = mock(io.vertx.core.http.HttpServerRequest.class);
-
-        ProxyResponse res = proxyService.proxy("POST", "/upload", null, null, mockClientReq, AuthContext.anonymous())
+ 
+        ProxyResponse res = proxyService.proxy("POST", "/upload", null, null, mockClientReq, null, AuthContext.anonymous())
                 .await().indefinitely();
-
+ 
         assertEquals(201, res.statusCode());
-        verify(request).sendStream(any(io.vertx.mutiny.core.streams.ReadStream.class));
+        verify(mockClientReq).resume();
+        verify(request).send(any(io.vertx.mutiny.core.http.HttpServerRequest.class));
     }
 
     @Test
@@ -221,5 +222,6 @@ class HttpProxyServicePojoTest {
         m.setAccessible(true);
         m.invoke(proxyService);
         verify(webClient).close();
+        verify(httpClient).close();
     }
 }

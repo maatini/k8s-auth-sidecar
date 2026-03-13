@@ -72,9 +72,9 @@ graph TD
 
 ### 🧠 Die Pipeline im Detail
 Jeder Request durchläuft diese reaktiven Schritte:
-1.  **🔍 Token Validierung**: Check von Signatur, Ablaufdatum und Issuer (blitzschnell dank **Caffeine Cache**).
-2.  **⚖️ Policy Check**: In-Memory Evaluierung via WASM (vorkompilierte Rego-Regeln).
-3.  **🚀 Proxying**: Effizientes Streaming an das Backend. Request-Bodies werden **nie** vollständig in den RAM geladen!
+1.  **🔍 Token Extraktion & Authentifizierung (`AuthProxyFilter`)**: Ein JAX-RS Filter extrahiert den Bearer-Token, validiert Signatur/Issuer via Caffeine-Cache und injiziert einen sicheren `AuthContext`. Schlägt dies fehl, blockt der Filter sofort ab (`HTTP 401`).
+2.  **⚖️ Policy Check & Autorisierung (`AuthorizationUseCase`)**: In-Memory Evaluierung via WASM anhand des `AuthContext` (inkl. extrahierter Rollen) gegen vorkompilierte `.rego` Regeln.
+3.  **🚀 Proxying**: Effizientes Streaming an das Backend über Mutiny `Uni`. Request-Bodies werden **nie** vollständig in den RAM geladen!
 
 ---
 
@@ -169,10 +169,10 @@ Hier erfährst du, wie du sicherstellst, dass alles perfekt läuft. Wir gehen vo
 > **Junior-Tipp:** Wenn PIT eine Mutation nicht findet, überlege dir einen Edge-Case (z.B. "Was passiert, wenn der Header leer ist?"), den du noch nicht getestet hast.
 
 #### 8. Was bedeuten die Test-Zahlen? (kurze Erklärung für Juniors)
-Aktuell haben wir **142 Tests**. Das ist eine Menge!
-- **Line Coverage (~76%)**: Wie viel Prozent des Codes wurden mindestens einmal ausgeführt?
-- **Mutation Score (~53%)**: Wie viele der künstlichen Fehler (Mutanten) wurden von den Tests entdeckt?
-- **Test Strength (~71%)**: Wie stark sind die Tests in den Bereichen, die sie tatsächlich abdecken? (Unser wichtigster Indikator!)
+Das Projekt besitzt eine extrem schnelle, überwiegend Framework-unabhängige Test-Suite (inkl. > 58 reiner POJO- & Service-Tests allein für Auth-Core & Proxy).
+- **Line Coverage (> 85%)**: Wie viel Prozent des Codes wurden mindestens einmal ausgeführt?
+- **Mutation Score / PIT Coverage (> 80%)**: Wie viele der künstlichen Fehler (Mutanten) wurden von den Tests entdeckt? Wir verpflichten uns zu strengem Mutation Testing nach dem POJO-First Standard.
+- **Test Strength (> 80%)**: Wie stark sind die Tests in den Bereichen, die sie tatsächlich abdecken? (Unser wichtigster Indikator!)
 
 ---
 

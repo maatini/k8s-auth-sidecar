@@ -36,15 +36,13 @@ public class AuthenticationServiceExtTest {
         authContextMapper = new AuthContextMapperImpl();
         authContextMapper.claimExtractor = claimExtractor;
 
-        service = new AuthenticationService();
-        service.roleExtractor = roleExtractor;
-        service.authContextMapper = authContextMapper;
+        service = new AuthenticationService(roleExtractor, authContextMapper);
     }
 
     // --- AuthenticationService lifecycle tests ---
 
     @Test
-    void testExtractAuthContext_NullIdentity() {
+    void testExtractAuthContext_NullJwt() {
         Uni<AuthContext> uni = service.extractAuthContext(null);
         AuthContext ctx = uni.await().indefinitely();
         assertFalse(ctx.isAuthenticated());
@@ -52,31 +50,10 @@ public class AuthenticationServiceExtTest {
     }
 
     @Test
-    void testExtractAuthContext_AnonymousIdentity() {
-        SecurityIdentity identity = mock(SecurityIdentity.class);
-        when(identity.isAnonymous()).thenReturn(true);
-        AuthContext ctx = service.extractAuthContext(identity).await().indefinitely();
-        assertFalse(ctx.isAuthenticated());
-        assertEquals("anonymous", ctx.userId());
-    }
-
-    @Test
-    void testExtractAuthContext_NotJsonWebToken() {
-        SecurityIdentity identity = mock(SecurityIdentity.class);
-        when(identity.isAnonymous()).thenReturn(false);
-        Principal principal = mock(Principal.class);
-        when(identity.getPrincipal()).thenReturn(principal);
-        AuthContext ctx = service.extractAuthContext(identity).await().indefinitely();
-        assertFalse(ctx.isAuthenticated());
-    }
-
-    @Test
-    void testExtractAuthContext_ExceptionFallback() {
-        SecurityIdentity identity = mock(SecurityIdentity.class);
-        when(identity.isAnonymous()).thenReturn(false);
-        when(identity.getPrincipal()).thenThrow(new RuntimeException("Test exception"));
-        AuthContext ctx = service.extractAuthContext(identity).await().indefinitely();
-        assertFalse(ctx.isAuthenticated());
+    void testExtractAuthContext_ExceptionFailure() {
+        JsonWebToken jwt = mock(JsonWebToken.class);
+        when(jwt.getSubject()).thenThrow(new RuntimeException("Test exception"));
+        assertThrows(RuntimeException.class, () -> service.extractAuthContext(jwt).await().indefinitely());
     }
 
     // --- KeycloakRoleExtractorImpl tests (formerly private methods in AuthenticationService) ---
@@ -185,6 +162,7 @@ public class AuthenticationServiceExtTest {
         when(jwt.getClaim("iat")).thenReturn(1700000000L);
         when(jwt.getClaim("exp")).thenReturn(1700003600L);
         when(jwt.getClaim("jti")).thenReturn("token-id-123");
+        when(jwt.getRawToken()).thenReturn("full-raw-token-999");
         when(jwt.getGroups()).thenReturn(Set.of("group-a", "group-b"));
         when(jwt.getClaim("realm_access")).thenReturn(Map.of("roles", List.of("power-user")));
         when(jwt.getClaim("resource_access")).thenReturn(Map.of("app1", Map.of("roles", List.of("admin"))));

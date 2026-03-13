@@ -37,6 +37,7 @@ public class KeycloakRoleExtractorImpl implements KeycloakRoleExtractor {
     public Set<String> extractRealmRoles(JsonWebToken jwt) {
         Object rolesObj;
         try {
+            @SuppressWarnings("unchecked")
             Map<String, Object> realmAccess = claimExtractor.extractClaim(jwt, CLAIM_REALM_ACCESS, Map.class);
             if (realmAccess == null || !realmAccess.containsKey("roles")) {
                 return Collections.emptySet();
