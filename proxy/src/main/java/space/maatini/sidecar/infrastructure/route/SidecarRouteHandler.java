@@ -12,8 +12,8 @@ import space.maatini.sidecar.application.service.SidecarRequestProcessor;
 import space.maatini.sidecar.domain.model.ProcessingResult;
 import space.maatini.sidecar.domain.model.SidecarRequest;
 
-import java.util.HashMap;
 import java.util.Map;
+import java.util.TreeMap;
 import java.util.stream.Collectors;
 
 /**
@@ -51,11 +51,11 @@ public class SidecarRouteHandler {
             method = vertxRequest.method().name();
         }
 
-        Map<String, String> headers = new HashMap<>();
+        Map<String, String> headers = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
         vertxRequest.headers().forEach(entry -> headers.put(entry.getKey(), entry.getValue()));
 
         Map<String, String> queryParams = vertxRequest.params().entries().stream()
-                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, (a, b) -> a));
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, (a, b) -> a, () -> new TreeMap<>(String.CASE_INSENSITIVE_ORDER)));
 
         SidecarRequest request = new SidecarRequest(method, path, headers, queryParams, jwt);
 

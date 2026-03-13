@@ -20,6 +20,7 @@ public class SidecarRequestProcessor {
     private final RolesService rolesService;
     private final PolicyEngine policyEngine;
     private final SidecarConfig config;
+    private final String nonAppRoot;
 
     private ImmutablePathMatcher<Boolean> publicPathMatcher;
 
@@ -27,11 +28,13 @@ public class SidecarRequestProcessor {
     public SidecarRequestProcessor(AuthenticationService authenticationService,
                                    RolesService rolesService,
                                    PolicyEngine policyEngine,
-                                   SidecarConfig config) {
+                                   SidecarConfig config,
+                                   @org.eclipse.microprofile.config.inject.ConfigProperty(name = "quarkus.http.non-application-root-path", defaultValue = "/q") String nonAppRoot) {
         this.authenticationService = authenticationService;
         this.rolesService = rolesService;
         this.policyEngine = policyEngine;
         this.config = config;
+        this.nonAppRoot = nonAppRoot;
     }
 
     @PostConstruct
@@ -52,7 +55,7 @@ public class SidecarRequestProcessor {
         String path = request.path();
         String method = request.method();
 
-        if (isPublicPath(path) || ProxyUtils.isInternalPath(path)) {
+        if (isPublicPath(path) || ProxyUtils.isInternalPath(path, nonAppRoot)) {
             LOG.debugf("Skipping processing for path: %s", path);
             return Uni.createFrom().item(ProcessingResult.skip());
         }

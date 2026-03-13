@@ -33,7 +33,7 @@ class SidecarRequestProcessorPojoTest {
         policyEngine = mock(PolicyEngine.class);
         rolesService = mock(RolesService.class);
 
-        processor = new SidecarRequestProcessor(authService, rolesService, policyEngine, config);
+        processor = new SidecarRequestProcessor(authService, rolesService, policyEngine, config, "/q");
  
         // Common config
         SidecarConfig.AuthConfig authConfig = mock(SidecarConfig.AuthConfig.class);

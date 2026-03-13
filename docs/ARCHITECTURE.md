@@ -45,7 +45,7 @@ Für eine erstklassige Developer Experience ohne externe Abhängigkeiten nutzt d
 | Language | Java 21 |
 | OIDC | quarkus-oidc |
 | HTTP Client | quarkus-rest-client-reactive |
-| Policy Engine | OPA WASM (Chicory) oder REST (external) |
+| Policy Engine | OPA WASM (Chicory Embedded) |
 | Metrics | Micrometer + Prometheus |
 | Logging | quarkus-logging-json |
 | Container | GraalVM Native Image |
@@ -154,6 +154,7 @@ Weitere Details zum Testen findest du in unserem **legendären Testing-Abschnitt
 - **Streaming Proxy**: Schützt vor Out-of-Memory-Attacken bei riesigen Uploads.
 - **Secure Defaults**: Alles ist standardmäßig verboten (`Deny by default`).
 - **WASM Hot-Reload**: Policies können im laufenden Betrieb ohne Neustart aktualisiert werden.
+- **Fail-Closed Strategy**: Bei Fehlern im `RolesService` oder der Policy-Engine wird der Zugriff strikt verweigert.
 
 ---
 
@@ -170,17 +171,17 @@ Dieses Dokument wird stetig erweitert. Bei Fragen wende dich an die Architektur-
 
 | # | Bottleneck | Ursache | Geplante Lösung |
 |---|-----------|---------|-----------------|
-| 1 | **Event-Loop CPU-Blockade** | `WasmPolicyEngine` ruft `Jackson ObjectMapper` & Styra WASM-Engine synchron auf dem Vert.x Event Loop auf. Blockiert alle parallelen Requests auf demselben Thread. | Offloading auf den Quarkus Worker-Pool via `@Blocking` oder `Uni.emitOn(Infrastructure.getDefaultWorkerPool())`. |
-| 2 | **Connection Pool Limit** | `HttpProxyService` nutzt einen HTTP-Connection-Pool mit Default-`pool-size` = 100. Bei > 100 gleichzeitigen In-Flight Requests staut sich die Queue (Little's Law). | Für Prod: `quarkus.rest-client.pool-size` und `io.vertx.core.http.poolSize` auf Last prüfen und dynamisch erhöhen. |
-| 3 | **Synchrones JSON-Logging** | `quarkus-logging-json` schreibt Logs synchron auf dem Event-Loop – bei hohem Log-Volume addiert sich die I/O-Latenz. | Asynchrones Logging aktivieren: `quarkus.log.handler.console.async=true` in `application.properties`. |
-| 4 | **GC-Druck durch Header-Parsing** | Header-Propagierung im Proxy nutzt `Map`-Iterationen und `Stream`-Operationen, die kurzlebige Objekte erzeugen und den GC belasten. | Umstellung auf Vert.x `MultiMap` (case-insensitive, allocation-optimiert, kein Boxing). |
+| 1 | **Event-Loop CPU-Blockade** [FIXED] | `WasmPolicyEngine` ruft `Jackson ObjectMapper` & Styra WASM-Engine synchron auf dem Vert.x Event Loop auf. | Offloaded on the Quarkus Worker-Pool via `Uni.emitOn(Infrastructure.getDefaultWorkerPool())`. |
+| 2 | **Connection Pool Limit** | `HttpProxyService` nutzt einen HTTP-Connection-Pool mit Default-`pool-size` = 100. | Für Prod: `quarkus.rest-client.pool-size` und `io.vertx.core.http.poolSize` auf Last prüfen. |
+| 3 | **Synchrones JSON-Logging** | `quarkus-logging-json` schreibt Logs synchron auf dem Event-Loop. | Asynchrones Logging aktivieren: `quarkus.log.handler.console.async=true`. |
+| 4 | **GC-Druck durch Header-Parsing** | Header-Propagierung im Proxy nutzt `Map`-Iterationen und `Stream`-Operationen. | Umstellung auf Vert.x `MultiMap` (case-insensitive, allocation-optimiert). |
 
 ### POC vs. Production
 
 | Dimension | POC (aktuell) | Production (Ziel) |
 |-----------|--------------|-------------------|
-| Durchsatz | < 100 RPS (Showcase) | > 1000 RPS |
-| Event-Loop-Safety | Sync WASM-Eval | Worker-Pool Offloading |
+| Durchsatz | ~1000 RPS | > 2000 RPS |
+| Event-Loop-Safety | **Offloaded (Worker-Pool)** | Optimized / Virtual Threads |
 | Connection Pool | Default 100 | Lastabhängig konfiguriert |
 | Logging | Synchron | Asynchron |
 | Header-Handling | Stream/Map | Vert.x MultiMap |

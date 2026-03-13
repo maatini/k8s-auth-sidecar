@@ -10,9 +10,7 @@ import space.maatini.sidecar.domain.model.PolicyDecision;
 import space.maatini.sidecar.domain.model.PolicyInput;
 import space.maatini.sidecar.application.service.PolicyService;
 
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStream;
+import java.io.*;
 import java.nio.file.*;
 import java.util.concurrent.atomic.AtomicReference;
 import io.smallrye.mutiny.Uni;
@@ -83,7 +81,7 @@ public class WasmPolicyEngine {
             return Uni.createFrom().item(PolicyDecision.deny("WASM module not initialized"));
         }
 
-        return Uni.createFrom().<PolicyDecision>deferred(() -> {
+        return Uni.createFrom().deferred(() -> {
             try {
                 OpaPolicy policy = getThreadLocalPolicy(bundle);
                 String inputJson = objectMapper.writeValueAsString(input);
@@ -105,7 +103,7 @@ public class WasmPolicyEngine {
                 LOG.errorf(e, "WASM evaluation failed: %s", e.getMessage());
                 return Uni.createFrom().item(PolicyDecision.deny("WASM evaluation failed: " + e.getMessage()));
             }
-        });
+        }).emitOn(io.smallrye.mutiny.infrastructure.Infrastructure.getDefaultWorkerPool());
     }
 
     /**
@@ -128,9 +126,15 @@ public class WasmPolicyEngine {
      */
     public void loadWasmModule() {
         String wasmPath = config.opa().embedded().wasmPath();
+        File tempWasm = new File("/tmp/authz.wasm");
+        
         try {
             byte[] wasmBytes;
-            if (wasmPath.startsWith("classpath:")) {
+            // Hot-reload target in /tmp takes precedence if it exists
+            if (tempWasm.exists()) {
+                LOG.debugf("Loading WASM from hot-reload target: %s", tempWasm.getAbsolutePath());
+                wasmBytes = Files.readAllBytes(tempWasm.toPath());
+            } else if (wasmPath.startsWith("classpath:")) {
                 String cpPath = wasmPath.substring("classpath:".length());
                 if (cpPath.startsWith("/")) {
                     cpPath = cpPath.substring(1);
@@ -153,10 +157,10 @@ public class WasmPolicyEngine {
 
             long newVersion = wasmBundleRef.get() == null ? 1 : wasmBundleRef.get().version() + 1;
             wasmBundleRef.set(new PolicyBundle(wasmBytes, newVersion));
-            LOG.infof("Successfully loaded OPA WASM bundle version %d from %s (%d bytes)",
-                    newVersion, wasmPath, wasmBytes.length);
+            LOG.infof("Successfully loaded OPA WASM bundle version %d (%d bytes)",
+                    newVersion, wasmBytes.length);
         } catch (Exception e) {
-            LOG.errorf(e, "Failed to load OPA WASM module from %s: %s", wasmPath, e.getMessage());
+            LOG.errorf(e, "Failed to load OPA WASM module: %s", e.getMessage());
         }
     }
 
@@ -192,9 +196,8 @@ public class WasmPolicyEngine {
         try {
             long currentMaxModified = getMaxModifiedTime(watchDir);
             if (currentMaxModified > lastModifiedTime) {
-                LOG.info("Detected changes in policies directory. Recompiling and reloading...");
+                LOG.info("Detected changes in policies directory. Reloading WASM module...");
                 lastModifiedTime = currentMaxModified;
-                recompileWasm(watchDir);
                 loadWasmModule();
             }
         } catch (IOException e) {
@@ -206,7 +209,7 @@ public class WasmPolicyEngine {
         if (!Files.exists(dir)) return 0;
         try (var stream = Files.walk(dir, 1)) {
             return stream
-                    .filter(p -> p.toString().endsWith(".rego") || p.toString().endsWith(".wasm") || p.toString().contains("..data"))
+                    .filter(p -> p.toString().endsWith(".wasm") || p.toString().contains("..data"))
                     .mapToLong(p -> {
                         try {
                             return Files.getLastModifiedTime(p).toMillis();
@@ -229,42 +232,5 @@ public class WasmPolicyEngine {
             return prodPolicies;
         }
         return null;
-    }
-
-    protected void recompileWasm(Path policyDir) {
-        try {
-            ProcessBuilder checkPb = new ProcessBuilder("opa", "version");
-            if (checkPb.start().waitFor() != 0) {
-                return;
-            }
-
-            String outPath = config.opa().embedded().wasmPath();
-            if (outPath.startsWith("classpath:")) {
-                outPath = "target/classes/policies/authz.wasm";
-            }
-
-            File outFile = new File(outPath);
-            if (outFile.getParentFile() != null) {
-                outFile.getParentFile().mkdirs();
-            }
-
-            ProcessBuilder pb = new ProcessBuilder(
-                    "sh", "-c",
-                    String.format(
-                            "opa build -t wasm -e %s/%s -o bundle.tar.gz %s && tar -xOzf bundle.tar.gz /policy.wasm > %s && rm bundle.tar.gz",
-                            config.opa().defaultPackage(), config.opa().defaultRule(),
-                            policyDir.toAbsolutePath(), outPath));
-            pb.directory(policyDir.toFile());
-            pb.redirectErrorStream(true);
-            Process p = pb.start();
-            int exitCode = p.waitFor();
-            if (exitCode == 0) {
-                LOG.info("Successfully recompiled OPA policies to WASM");
-            } else {
-                LOG.errorf("Failed to compile OPA policies. Opa cli exit code: %d", exitCode);
-            }
-        } catch (Exception e) {
-            LOG.debugf("Skipping recompilation. (opa cli might be missing): %s", e.getMessage());
-        }
     }
 }

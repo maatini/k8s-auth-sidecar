@@ -1,6 +1,6 @@
 package space.maatini.sidecar.infrastructure.policy;
 
-import space.maatini.sidecar.infrastructure.policy.WasmPolicyEngine;
+
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.styra.opa.wasm.OpaPolicy;
@@ -13,7 +13,7 @@ import space.maatini.sidecar.domain.model.PolicyInput;
 import java.lang.reflect.Field;
 import java.nio.file.Path;
 import java.nio.file.Files;
-import java.nio.file.Paths;
+
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -79,14 +79,11 @@ class WasmPolicyEnginePojoTest {
     void testResolveWatchDir_Logic() throws Exception {
         // Just invoke the public/protected logic to see if it handles the path
         // correctly
-        Path watchDir = engine.resolveWatchDir();
+        engine.resolveWatchDir();
         // Skip assertion if we can't guarantee environment state
     }
 
-    @Test
-    void testRecompileWasm_NoOpa() {
-        assertDoesNotThrow(() -> engine.recompileWasm(Paths.get(".")));
-    }
+
 
     @Test
     void testEvaluate_Exception() throws Exception {
@@ -130,14 +127,7 @@ class WasmPolicyEnginePojoTest {
         assertTrue(engine.isModuleLoaded());
     }
 
-    @Test
-    void testRecompileWasm_WithValidDir() throws Exception {
-        Path tempDir = Files.createTempDirectory("policies");
-        Files.copy(getClass().getResourceAsStream("/policies/dummy.wasm"), tempDir.resolve("dummy.wasm"));
 
-        assertDoesNotThrow(() -> engine.recompileWasm(tempDir));
-        // Check bundle updated (version increment simulated)
-    }
 
     @Test
     @SuppressWarnings("rawtypes")
@@ -201,8 +191,8 @@ class WasmPolicyEnginePojoTest {
     void testGetMaxModifiedTime_Files() throws Exception {
         Path tempDir = Files.createTempDirectory("pitest-maxmod");
         try {
-            Path file1 = tempDir.resolve("test.rego");
-            Files.writeString(file1, "package test");
+            Path file1 = tempDir.resolve("test.wasm");
+            Files.writeString(file1, "wasm content");
             long time1 = Files.getLastModifiedTime(file1).toMillis();
 
             long max = engine.getMaxModifiedTime(tempDir);

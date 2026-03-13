@@ -9,22 +9,23 @@ class ProxyUtilsPojoTest {
     @Test
     void testIsInternalPath() {
         // Internal paths
-        assertTrue(ProxyUtils.isInternalPath("/q/health"));
-        assertTrue(ProxyUtils.isInternalPath("/q/metrics"));
-        assertTrue(ProxyUtils.isInternalPath("/health"));
-        assertTrue(ProxyUtils.isInternalPath("/metrics"));
-        assertTrue(ProxyUtils.isInternalPath("/ready"));
-        assertTrue(ProxyUtils.isInternalPath("/live"));
+        assertTrue(ProxyUtils.isInternalPath("/q/health", "/q"));
+        assertTrue(ProxyUtils.isInternalPath("/q/metrics", "/q"));
+        assertTrue(ProxyUtils.isInternalPath("/health", "/q"));
+        assertTrue(ProxyUtils.isInternalPath("/metrics", "/q"));
+        assertTrue(ProxyUtils.isInternalPath("/ready", "/q"));
+        assertTrue(ProxyUtils.isInternalPath("/live", "/q"));
 
         // Regular paths (should NOT be internal)
-        assertFalse(ProxyUtils.isInternalPath("/api/v1/users"));
-        assertFalse(ProxyUtils.isInternalPath("/index.html"));
-        assertFalse(ProxyUtils.isInternalPath("/"));
-        assertFalse(ProxyUtils.isInternalPath(""));
-        assertFalse(ProxyUtils.isInternalPath(null));
+        assertFalse(ProxyUtils.isInternalPath("/api/v1/users", "/q"));
+        assertFalse(ProxyUtils.isInternalPath("/index.html", "/q"));
+        assertFalse(ProxyUtils.isInternalPath("/", "/q"));
+        assertFalse(ProxyUtils.isInternalPath("", "/q"));
+        assertFalse(ProxyUtils.isInternalPath(null, "/q"));
         
         // Edge cases
-        assertFalse(ProxyUtils.isInternalPath("/health-custom"));
-        assertFalse(ProxyUtils.isInternalPath("/q")); // Should probably be true if we want to block all /q/*
+        assertFalse(ProxyUtils.isInternalPath("/health-custom", "/q"));
+        assertTrue(ProxyUtils.isInternalPath("/q/test", "/q"));
+        assertTrue(ProxyUtils.isInternalPath("/custom/health", "/custom"));
     }
 }

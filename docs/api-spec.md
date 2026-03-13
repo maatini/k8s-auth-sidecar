@@ -17,7 +17,10 @@ Dieser Endpunkt wird von Envoy (`ext_authz`) oder Nginx (`auth_request`) aufgeru
 ### Response
 
 - **200 OK**: Der Request ist autorisiert.
-    - **Header**: `X-Auth-User`, `X-Auth-Roles`, etc. (werden vom Sidecar zur Anreicherung gesetzt).
+    - **Header**:
+        - `X-Auth-User`: UserID/Subject aus dem Token.
+        - `X-Auth-Roles`: Komma-separierte Liste der Rollen.
+        - `X-Auth-Context`: Der vollständige `AuthContext` (User, Roles, Claims) als **Base64-kodierter JSON-String**.
 - **401 Unauthorized**: Kein gültiges Token gefunden.
 - **403 Forbidden**: Token gültig, aber keine Berechtigung für den originalen Pfad/die Methode durch die OPA-Policy.
 - **500 Internal Server Error**: Fehler bei der Validierung oder Policy-Evaluierung.

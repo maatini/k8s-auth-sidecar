@@ -46,7 +46,10 @@ Der Sidecar ist wie ein **Sicherheits-Checkpoint** auf einem Flughafen:
    - Beispiel: „Wenn der User `admin` ist UND der Pfad mit `/api/admin` beginnt → erlauben“.
 
 4. **Weiterleitung oder Blockieren (Proxy)**  
-   - Erlaubt? → Request wird an `localhost:8081` (deine App) weitergeleitet. Zusätzlich werden nützliche Header mitgeschickt (z. B. `X-Auth-User-Roles`).  
+   - Erlaubt? → Request wird an `localhost:8081` (deine App) weitergeleitet. Zusätzlich werden nützliche Header mitgeschickt:
+     - `X-Auth-User`: Die User-ID.
+     - `X-Auth-Roles`: Die Rollen.
+     - `X-Auth-Context`: **Base64-kodierter JSON-String** mit allen Infos (`AuthContext`). Diesen kannst du in Java einfach deserialisieren!
    - Verboten? → sofort `403 Forbidden` an den Client. Deine App wird **nie** aufgerufen → super performant und sicher!
 
 ---
@@ -56,8 +59,8 @@ Der Sidecar ist wie ein **Sicherheits-Checkpoint** auf einem Flughafen:
 - **Sidecar-Pattern**: Zwei Container im selben Pod teilen sich Netzwerk und Storage. Der eine hilft dem anderen.
 - **Zero-Trust**: Niemandem wird automatisch vertraut – jeder Request wird geprüft.
 - **JWT (JSON Web Token)**: Ein verschlüsseltes „Ausweis-Kärtchen“ mit User-Infos.
-- **OPA + Rego**: Die „Gesetzbücher“ deiner App. Du schreibst Regeln in Rego, kompilierst sie zu WASM und der Sidecar entscheidet in Millisekunden In-Memory.
-- **Hot-Reload**: Du änderst eine `.wasm` oder `.rego`-Datei in einer ConfigMap → der Sidecar merkt es und lädt sie neu, ohne Neustart!
+- **Hot-Reload**: Du änderst eine `.wasm` Datei in einer ConfigMap → der Sidecar merkt es und lädt sie neu, ohne Neustart!
+- **OPA Workflow**: Schreibe Rego, kompiliere lokal zu WASM (`opa build -t wasm ...`) und mounte die `.wasm` Datei.
 - **Quarkus**: Ein super-schnelles Java-Framework, das auch als winziges **Native-Image** (keine JVM nötig) laufen kann.
 - **Reaktives Streaming**: Der Sidecar streamt selbst riesige Payloads (z. B. 500 MB Dateiuploads) ohne RAM-Probleme. Die Connection-Pools für solche Weiterleitungen (Proxy) sind dynamisch konfigurierbar.
 - **Micro-Caching**: Um bei jedem Nutzer nicht ständig aufwendig Kryptografie prüfen zu müssen, behält der Sidecar verifizierte Ausweise kurz im Gedächtnis (JWT Caffeine Cache).
@@ -67,7 +70,7 @@ Der Sidecar ist wie ein **Sicherheits-Checkpoint** auf einem Flughafen:
 ## ✨ Alle Features im Überblick
 
 - Unterstützt **Keycloak** und **Entra ID** (auch Multi-Tenant)
-- **Embedded OPA WASM** (In-Memory) oder externer OPA-Server, jetzt mit **v1.x OPA CLI** im Container für automatisches `.rego`-Kompilieren
+- **Embedded OPA WASM** (In-Memory) – Lädt vorkompilierte `.wasm` Policies für maximale Speed.
 - Rollen-Enrichment aus eigenem Service
 - **Reaktive Pipeline** (Mutiny `Uni`) und **Streaming-Proxy** (Vert.x) – minimale Speicherbelegung!
 - Ant-Style Path-Matching (`/**`, `/api/*/users`)

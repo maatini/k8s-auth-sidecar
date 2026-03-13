@@ -114,12 +114,7 @@ class WasmPolicyEngineExtTest {
         assertTrue(Files.isDirectory(p));
     }
 
-    @Test
-    void testRecompileWasm_FailsGracefully() throws Exception {
-        Method m = WasmPolicyEngine.class.getDeclaredMethod("recompileWasm", java.nio.file.Path.class);
-        m.setAccessible(true);
-        m.invoke(engine, java.nio.file.Paths.get("/non/existent/dir/123991"));
-    }
+
 
     @Test
     void testLoadWasmModule_FileNotFound() throws Exception {
@@ -210,10 +205,7 @@ class WasmPolicyEngineExtTest {
     }
 
 
-    @Test
-    void testRecompileWasm_OpaMissing() {
-        engine.recompileWasm(Paths.get("src/main/resources/policies"));
-    }
+
 
     @Test
     void testIsModuleLoaded() {
@@ -249,10 +241,7 @@ class WasmPolicyEngineExtTest {
         assertEquals(tempFile.toAbsolutePath(), p.toAbsolutePath());
     }
 
-    @Test
-    void testRecompileWasm_Direct() {
-        engine.recompileWasm(Paths.get("src/main/resources/policies"));
-    }
+
 
     private void setWasmBundle(WasmPolicyEngine engine, byte[] bytes, long version) throws Exception {
         Class<?> bundleClass = Class.forName("space.maatini.sidecar.infrastructure.policy.WasmPolicyEngine$PolicyBundle");

@@ -6,8 +6,8 @@ import jakarta.ws.rs.container.ContainerRequestContext;
 import jakarta.ws.rs.core.HttpHeaders;
 import jakarta.ws.rs.core.UriInfo;
  
-import java.util.HashMap;
 import java.util.Map;
+import java.util.TreeMap;
  
 /**
  * Utility class for common request processing tasks.
@@ -23,7 +23,7 @@ public final class RequestUtils {
      * ContainerRequestContext.
      */
     public static Map<String, String> extractHeaders(ContainerRequestContext requestContext) {
-        Map<String, String> headers = new HashMap<>();
+        Map<String, String> headers = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
         if (requestContext.getHeaders() != null) {
             for (String headerName : requestContext.getHeaders().keySet()) {
                 headers.put(headerName, requestContext.getHeaderString(headerName));
@@ -36,7 +36,7 @@ public final class RequestUtils {
      * Extracts all request headers from JAX-RS HttpHeaders.
      */
     public static Map<String, String> extractHeaders(HttpHeaders httpHeaders) {
-        Map<String, String> headers = new HashMap<>();
+        Map<String, String> headers = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
         if (httpHeaders != null && httpHeaders.getRequestHeaders() != null) {
             for (String headerName : httpHeaders.getRequestHeaders().keySet()) {
                 headers.put(headerName, httpHeaders.getHeaderString(headerName));
@@ -56,7 +56,7 @@ public final class RequestUtils {
      * Extracts all request headers from Vert.x HttpServerRequest.
      */
     public static Map<String, String> extractHeaders(HttpServerRequest request) {
-        Map<String, String> headers = new HashMap<>();
+        Map<String, String> headers = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
         request.headers().forEach(entry -> headers.put(entry.getKey(), entry.getValue()));
         return headers;
     }
@@ -65,7 +65,7 @@ public final class RequestUtils {
      * Extracts query parameters from Vert.x RoutingContext.
      */
     public static Map<String, String> extractQueryParams(RoutingContext ctx) {
-        Map<String, String> params = new HashMap<>();
+        Map<String, String> params = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
         ctx.queryParams().forEach(entry -> params.put(entry.getKey(), entry.getValue()));
         return params;
     }
@@ -74,7 +74,7 @@ public final class RequestUtils {
      * Extracts query parameters as a single-valued map from UriInfo.
      */
     public static Map<String, String> extractQueryParams(UriInfo uriInfo) {
-        Map<String, String> params = new HashMap<>();
+        Map<String, String> params = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
         if (uriInfo != null && uriInfo.getQueryParameters() != null) {
             uriInfo.getQueryParameters().forEach((key, values) -> {
                 if (values != null && !values.isEmpty()) {

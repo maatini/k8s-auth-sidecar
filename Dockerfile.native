@@ -20,14 +20,6 @@ RUN --mount=type=cache,target=/root/.m2 mvn dependency:go-offline -B
 # Copy source code
 COPY src ./src
 
-# HOT-RELOAD FIX – P0.5: Install OPA CLI for down-level copying
-ARG OPA_VERSION=1.14.0
-ARG TARGETARCH
-RUN microdnf install -y curl tar gzip && microdnf clean all && \
-    curl -L -o /usr/local/bin/opa \
-    "https://github.com/open-policy-agent/opa/releases/download/v${OPA_VERSION}/opa_linux_${TARGETARCH:-amd64}_static" && \
-    chmod +x /usr/local/bin/opa
-
 # Note: To drastically improve build times on CI, the CI workflow 
 # should build the native binary *before* the docker build and provide it in target/*-runner.
 # This Dockerfile still performs the build independently if no binary is provided,
@@ -54,9 +46,6 @@ WORKDIR /app
 
 # Switch to root to change ownership
 USER root
-
-# Copy OPA CLI from build stage
-COPY --from=build /usr/local/bin/opa /usr/local/bin/opa
 
 # Copy policies
 COPY --chown=1001:1001 src/main/resources/policies /policies

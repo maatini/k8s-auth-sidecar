@@ -33,11 +33,12 @@
 
 - ⚡ **Schnelle lokale Entwicklung**: Out-of-the-Box Mocking für Identity Provider (Keycloak) via WireMock.
 - 🏢 **OIDC-Support**: Standardisierter Support für Keycloak, Microsoft Entra ID und generische OIDC-Provider.
-- 🧠 **Embedded Policy-Engine**: In-Memory OPA-WASM-Engine mit Hot-Reload der `.rego` Regeln.
+- 🧠 **Embedded Policy-Engine**: In-Memory OPA-WASM-Engine (Chicory) mit Hot-Reload der `.wasm` Regeln.
 - ⚡ **Reaktive Pipeline**: Non-blocking AuthN → AuthZ Verarbeitung mit Mutiny `Uni`.
 - 🛡️ **Zero-Trust**: Jede Anfrage wird zwingend validiert.
 - 📡 **Streaming Proxy (Sidecar Mode)**: Request-Bodies werden **nie** vollständig in den RAM geladen – echtes Vert.x Streaming für beliebig große Payloads.
 - 🛡️ **Gateway / Ingress Mode (`ext_authz`)**: Unterstützt den `/authorize` Endpunkt für Envoy (Istio) oder Nginx. Der Sidecar fungiert hier als Autorisierungs-Service ohne den Traffic selbst zu proxien.
+- 🚀 **Context Enrichment**: Reichert Anfragen an das Backend mit `X-Auth-User`, `X-Auth-Roles` und dem vollständigen `X-Auth-Context` (Base64 JSON) an.
 - 🎯 **Zentrales Path-Matching**: Ant-Style Patterns (`/**`, `/*`) über praktisches `PathMatcher`-Utility.
 - 🚀 **Native Image Support**: Minimale Startup-Zeit (< 100ms) und extrem geringer Memory-Footprint.
 - 📊 **Observability**: Prometheus Metrics, JSON Logging und Health Checks out-of-the-box.
@@ -162,7 +163,7 @@ Hier erfährst du, wie du sicherstellst, dass alles perfekt läuft. Wir gehen vo
 **Was du tust:** Prüfe deine Sicherheitsregeln (`.rego` Dateien).
 - **Befehl:** `opa test opa-wasm/src/main/resources/policies/ -v` (wenn OPA installiert ist)
 - **Was du sehen solltest:** `PASS` für alle definierten Regeln.
-- **Warum das wichtig ist:** So verhinderst du, dass du dich versehentlich selbst aussperrst oder Sicherheitslücken einbaust.
+- **Warum das wichtig ist:** So verhinderst du, dass du dich versehentlich selbst aussperrst oder Sicherheitslücken einbaust. Lokale Kompilierung zu WASM: `opa build -t wasm -e authz/allow authz.rego`.
 
 #### 5. Docker-Image bauen & testen
 **Was du tust:** Erstelle ein fertiges Container-Image.

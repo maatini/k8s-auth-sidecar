@@ -70,17 +70,15 @@ public class RolesServicePojoTest {
     }
 
     @Test
-    void testEnrich_Failure_Graceful() {
+    void testEnrich_Failure_FailClosed() {
         when(rolesConfig.enabled()).thenReturn(true);
         AuthContext context = AuthContext.builder().userId("u1").roles(Set.of("user")).build();
 
         when(mockClient.getUserRoles("u1")).thenReturn(Uni.createFrom().failure(new RuntimeException("API Down")));
 
-        AuthContext result = rolesService.enrich(context).await().indefinitely();
-
-        assertSame(context, result);
-        assertTrue(result.roles().contains("user"));
-        assertEquals(1, result.roles().size());
+        assertThrows(SecurityException.class, () -> 
+            rolesService.enrich(context).await().indefinitely()
+        );
     }
 
     @Test

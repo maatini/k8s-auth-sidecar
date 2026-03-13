@@ -34,12 +34,13 @@ public class RolesService {
         if (!config.roles().enabled() || !context.isAuthenticated()) {
             return Uni.createFrom().item(context);
         }
- 
-        return getEnrichedRoles(context.userId())
+
+        String userId = context.userId();
+        return getEnrichedRoles(userId)
                 .onItem().transform(response -> {
                     Set<String> allRoles = new HashSet<>(context.roles());
                     Set<String> allPermissions = new HashSet<>(context.permissions());
- 
+
                     if (response != null) {
                         if (response.roles() != null) {
                             allRoles.addAll(response.roles());
@@ -48,14 +49,10 @@ public class RolesService {
                             allPermissions.addAll(response.permissions());
                         }
                     }
- 
+
                     return context.withRolesAndPermissions(allRoles, allPermissions);
                 })
-                .onFailure().recoverWithItem(t -> {
-                    LOG.errorf(t, "Failed to enrich roles for user: %s. Continuing with original roles.",
-                            context.userId());
-                    return context;
-                });
+                .onFailure().transform(t -> new SecurityException("Roles enrichment failed for user " + userId, t));
     }
  
     @CacheResult(cacheName = "roles-cache")
