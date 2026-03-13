@@ -32,7 +32,7 @@ jobs:
 
       # QEMU allows building for ARM64 on AMD64 runners
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+        uses: docker/setup-qemu-action@v4
 
       # Buildx is required for multi-arch builds and generating provenance/SBOMs
       - name: Set up Docker Buildx
