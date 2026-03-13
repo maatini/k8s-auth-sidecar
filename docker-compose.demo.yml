@@ -68,9 +68,6 @@ services:
       OPA_MODE: "embedded"
       OPA_POLICY_DIR: "/policies"
 
-      # Rate Limiting
-      RATE_LIMIT_ENABLED: "false"
-
       # Logging
       QUARKUS_LOG_LEVEL: "DEBUG"
     depends_on:

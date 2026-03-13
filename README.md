@@ -12,7 +12,7 @@
   [![Kubernetes](https://img.shields.io/badge/Kubernetes-Ready-blue.svg?logo=kubernetes)](https://kubernetes.io/)
 </div>
 
-**K8s-Auth-Sidecar** (Request Router Sidecar) ist ein Quarkus-basierter Microservice, der als Sidecar in Kubernetes-Pods läuft und Authentifizierung (AuthN) sowie Autorisierung (AuthZ) für den Haupt-Container übernimmt – inklusive dynamischem Rollen-Enrichment und blitzschneller lokaler Entwicklung.
+**K8s-Auth-Sidecar** (Request Router Sidecar) ist ein Quarkus-basierter Microservice, der als Sidecar in Kubernetes-Pods läuft und Authentifizierung (AuthN) sowie Autorisierung (AuthZ) für den Haupt-Container übernimmt – inklusive dynamischem Rollen-Enrichment und schneller lokaler Entwicklung.
 
 > [!NOTE]
 > Dieses Projekt ist für Cloud-Native Umgebungen optimiert, unterstützt **Native Image** via GraalVM und bietet **Hot-Reload** für Sicherheits-Policies.
@@ -31,10 +31,10 @@
 
 ## ✨ Features
 
-- ⚡ **Blitzschnelle lokale Entwicklung**: Out-of-the-Box Mocking für Identity Provider (Keycloak) via WireMock.
+- ⚡ **Schnelle lokale Entwicklung**: Out-of-the-Box Mocking für Identity Provider (Keycloak) via WireMock.
 - 🏢 **OIDC-Support**: Standardisierter Support für Keycloak, Microsoft Entra ID und generische OIDC-Provider.
 - 🧠 **Embedded Policy-Engine**: In-Memory OPA-WASM-Engine mit Hot-Reload der `.rego` Regeln.
-- ⚡ **Reaktive Pipeline**: Vollständig non-blocking AuthN → AuthZ Verarbeitung mit Mutiny `Uni`.
+- ⚡ **Reaktive Pipeline**: Non-blocking AuthN → AuthZ Verarbeitung mit Mutiny `Uni`.
 - 🛡️ **Zero-Trust**: Jede Anfrage wird zwingend validiert.
 - 📡 **Streaming Proxy**: Request-Bodies werden **nie** vollständig in den RAM geladen – echtes Vert.x Streaming für beliebig große Payloads.
 - 🎯 **Zentrales Path-Matching**: Ant-Style Patterns (`/**`, `/*`) über praktisches `PathMatcher`-Utility.
@@ -226,9 +226,7 @@ Das Projekt besitzt eine extrem schnelle, überwiegend Framework-unabhängige Te
 
 ## 🛡️ Sicherheit & Performance
 
-- **Zero-Allocation Logging**: JSON-Logs für schnelle Verarbeitung.
-- **Trusted Proxies**: Schutz vor IP-Spoofing für `X-Forwarded-For`.
-- **Non-blocking Proxy**: Basiert auf Vert.x WebClient für maximale Skalierbarkeit.
+- **Stream-basierter Proxy**: Basiert auf Vert.x WebClient für maximale Skalierbarkeit.
 - **WASM Hot-Reload**: Ersetze Policies im laufenden Betrieb ohne Downtime.
 - **⚠️ Durchsatz-Hinweis (> 1000 RPS)**: Bei hoher Last (> 1000 Req/s) wurden in Lasttests Engpässe identifiziert (Event-Loop Blockade, Connection-Pool-Limit, synchrones Logging). Die Architektur ist bereits auf deren Beseitigung ausgelegt; die konkreten Optimierungen sind in [`docs/ARCHITECTURE.md` → Roadmap](docs/ARCHITECTURE.md#-performance--production-readiness-roadmap) dokumentiert. **Für den POC ist dies irrelevant.**
 

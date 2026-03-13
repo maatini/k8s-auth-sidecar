@@ -37,7 +37,7 @@ Der Sidecar ist wie ein **Sicherheits-Checkpoint** auf einem Flughafen:
 2. **Rollen-Anreicherung (Enrichment)**  
    - Im JWT stehen oft nur grobe Rollen (z. B. „user“).  
    - Der Sidecar fragt einen separaten **Roles-Service** (dein eigener Microservice): „Hey, was darf user-123 noch alles in Projekt-X?“  
-   - Die Antworten auf diese Rollenabfrage sowie die aufwändige JWT-Validierung selbst werden mittels eines **Caffeine-Caches in-Memory in Sekundenbruchteilen** zwischengespeichert ($O(1)$). Ersatz-Anfragen kosten also so gut wie gar keine Zeit.
+   - Die Antworten auf diese Rollenabfrage sowie die aufwändige JWT-Validierung selbst werden mittels eines **Caffeine-Caches in-Memory** zwischengespeichert ($O(1)$). Ersatz-Anfragen kosten also so gut wie gar keine Zeit.
 
 3. **Regel-Prüfung (AuthZ mit OPA)**  
    - Der Sidecar baut ein JSON mit allen Infos (User, Rollen, Request-Methode, Pfad …).  
@@ -59,7 +59,7 @@ Der Sidecar ist wie ein **Sicherheits-Checkpoint** auf einem Flughafen:
 - **OPA + Rego**: Die „Gesetzbücher“ deiner App. Du schreibst Regeln in Rego, kompilierst sie zu WASM und der Sidecar entscheidet in Millisekunden In-Memory.
 - **Hot-Reload**: Du änderst eine `.wasm` oder `.rego`-Datei in einer ConfigMap → der Sidecar merkt es und lädt sie neu, ohne Neustart!
 - **Quarkus**: Ein super-schnelles Java-Framework, das auch als winziges **Native-Image** (keine JVM nötig) laufen kann.
-- **Reaktives Streaming**: Der Sidecar blockiert keine Threads und streamt selbst riesige Payloads (z. B. 500 MB Dateiuploads) ohne RAM-Probleme. Die Connection-Pools für solche Weiterleitungen (Proxy) sind dynamisch konfigurierbar.
+- **Reaktives Streaming**: Der Sidecar streamt selbst riesige Payloads (z. B. 500 MB Dateiuploads) ohne RAM-Probleme. Die Connection-Pools für solche Weiterleitungen (Proxy) sind dynamisch konfigurierbar.
 - **Micro-Caching**: Um bei jedem Nutzer nicht ständig aufwendig Kryptografie prüfen zu müssen, behält der Sidecar verifizierte Ausweise kurz im Gedächtnis (JWT Caffeine Cache).
 
 ---
@@ -67,11 +67,10 @@ Der Sidecar ist wie ein **Sicherheits-Checkpoint** auf einem Flughafen:
 ## ✨ Alle Features im Überblick
 
 - Unterstützt **Keycloak** und **Entra ID** (auch Multi-Tenant)
-- **Embedded OPA WASM** (In-Memory, enorm schnell) oder externer OPA-Server, jetzt mit **v1.x OPA CLI** im Container für automatisches `.rego`-Kompilieren
+- **Embedded OPA WASM** (In-Memory) oder externer OPA-Server, jetzt mit **v1.x OPA CLI** im Container für automatisches `.rego`-Kompilieren
 - Rollen-Enrichment aus eigenem Service
-- **Vollständig reaktive Pipeline** (Mutiny `Uni`) und **Streaming-Proxy** (Vert.x) – minimale Speicherbelegung!
+- **Reaktive Pipeline** (Mutiny `Uni`) und **Streaming-Proxy** (Vert.x) – minimale Speicherbelegung!
 - Ant-Style Path-Matching (`/**`, `/api/*/users`)
-- **Rate-Limiting** mit Caffeine-Cache und Schutz vor IP-Spoofing
 - Prometheus-Metriken + OpenTelemetry + JSON-Logging
 - Health-Checks (liveness/readiness)
 - GraalVM Native Image (sehr klein & schnell)
@@ -168,7 +167,7 @@ Sicherheit klingt langweilig? Nicht hier! Mit dem Sidecar bist du von Anfang an 
 
 ## 📊 Projekt-Reife & Setup
 
-- **Sehr stabil**: Komplettes Refactoring (reaktiv + streaming + Memory-Optimierung) extrem performant. Null Objekt-Allokationen bei Fehler-Fallbacks.
+- **Sehr stabil**: Komplettes Refactoring (reaktiv + streaming + Memory-Optimierung) extrem performant.
 - **Aktiv in Entwicklung**: Core-Funktionen (Auth-Filter, Proxy, OPA, Path-Matcher) inkl. serverseitigen Caffeine-Caches (Session & Profiling) sind produktionsreif.
 - **Testing & Mutation Score**: **121 stabile automatisierte Tests** (108 POJO+ExtTests + 13 QuarkusTests). Die Kernservices in `auth-core` erreichen **80% PIT Test Strength** und **91% PIT Line Coverage**. Proxy-QuarkusIntegrationstests benötigen den lokalen WireMock-Stack (`docker-compose.dev.yml`).
   - *Junior-Tipp:* Teste Kernlogik immer ohne Framework (`@QuarkusTest`), also als reines Java-Objekt (POJO). Das ist extrem schnell und deckt kleinste Mutanten auf (z.B. Mockito Spy Maps für Edge-Cases)!

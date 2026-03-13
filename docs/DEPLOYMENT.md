@@ -40,10 +40,6 @@ ENTRA_CLIENT_ID: "your-azure-client-id"
 # Roles Service URL
 ROLES_SERVICE_URL: "http://roles-service.namespace.svc.cluster.local:8080"
 
-# Rate Limit & Ingress Controller (Extrem WICHTIG für K8s)
-RATE_LIMIT_ENABLED: "true"
-RATE_LIMIT_TRUSTED_PROXIES: "10.244.0.1,10.244.0.2" # IP(s) deines Ingress-Controllers eintragen!
-
 ### 2.2 Secrets erstellen
 
 ```bash

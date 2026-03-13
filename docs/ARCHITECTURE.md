@@ -16,7 +16,7 @@ Der **k8s-auth-sidecar** (Request Router Sidecar) ist ein Quarkus-basierter Micr
 
 ### 1. Modul: `proxy`
 - **Request Router (`ProxyResource`)**: Catch-all JAX-RS Resource.
-- **Streaming Proxy (`HttpProxyService`)**: Leitet Anfragen **via non-blocking Streaming** an den Main-Container weiter.
+- **Streaming Proxy (`HttpProxyService`)**: Leitet Anfragen **via Streaming** an den Main-Container weiter.
 - **Entry Filter (`AuthProxyFilter`)**: Erster Kontaktpunkt, delegiert an den Processor.
 
 ### 2. Modul: `auth-core`
@@ -34,7 +34,7 @@ Der **k8s-auth-sidecar** (Request Router Sidecar) ist ein Quarkus-basierter Micr
 - **Zentrale Konfiguration**: `SidecarConfig` (Quarkus Config).
 - **Observability**: Health-Checks (`Liveness`, `Readiness`) und Micrometer Metriken.
 
-Die gesamte HTTP-Pipeline ist vollständig reaktiv implementiert (`Mutiny Uni`), was höchste Parallelität bei minimalem Ressourcenverbrauch garantiert.
+Die gesamte HTTP-Pipeline ist reaktiv implementiert (`Mutiny Uni`), was höchste Parallelität bei minimalem Ressourcenverbrauch garantiert.
 
 ## Architektur für lokale Entwicklung (Dev-Profil & Mocking)
 

@@ -32,11 +32,6 @@ data:
   OPA_MODE: "embedded"
   OPA_POLICY_DIR: "/policies"
   
-  # Rate Limiting & Anti-Spoofing
-  RATE_LIMIT_ENABLED: "true"
-  RATE_LIMIT_RPS: "100"
-  RATE_LIMIT_BURST: "200"
-  RATE_LIMIT_TRUSTED_PROXIES: "10.244.0.1,10.244.0.2" # WICHTIG: Hier Ingress-Netz oder Loadbalancer-IPs eintragen!
   
   # Logging
   QUARKUS_LOG_LEVEL: "INFO"
