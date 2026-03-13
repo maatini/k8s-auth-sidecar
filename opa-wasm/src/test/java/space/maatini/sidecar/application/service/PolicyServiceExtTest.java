@@ -10,6 +10,7 @@ import space.maatini.sidecar.infrastructure.config.SidecarConfig;
 import space.maatini.sidecar.domain.model.AuthContext;
 import space.maatini.sidecar.domain.model.PolicyDecision;
 import space.maatini.sidecar.domain.model.PolicyInput;
+import space.maatini.sidecar.domain.model.PolicyCacheKey;
 
 import java.lang.reflect.Method;
 import java.util.Map;
@@ -96,7 +97,13 @@ class PolicyServiceExtTest {
                 new PolicyInput.ResourceInfo("api", null, null),
                 java.util.Map.of());
 
-        Uni<PolicyDecision> decisionUni = service.evaluatePolicy(input);
+        PolicyCacheKey key = new PolicyCacheKey(
+                input.user().id(),
+                input.user().roles(),
+                input.request().method(),
+                input.request().path()
+        );
+        Uni<PolicyDecision> decisionUni = service.evaluatePolicy(key, input);
         PolicyDecision d = decisionUni.await().indefinitely(); // Will be evaluated through recoverWithItem
         assertFalse(d.allowed());
         assertTrue(d.reason().contains("Policy evaluation failed"));

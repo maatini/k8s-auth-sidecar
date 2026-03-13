@@ -75,7 +75,7 @@ public class SidecarRouteHandler {
                         response.setStatusCode(200).end();
                         return Uni.createFrom().nullItem();
                     } else if (result instanceof ProcessingResult.Forbidden forbidden) {
-                        response.setStatusCode(403).end("{\"message\":\"Forbidden\",\"reason\":\"" + forbidden.decision().reason() + "\"}");
+                        response.setStatusCode(403).end("{\"message\":\"Forbidden\",\"reason\":\"" + forbidden.result().reason() + "\"}");
                         return Uni.createFrom().nullItem();
                     } else if (result instanceof ProcessingResult.Unauthorized unauthorized) {
                         response.setStatusCode(401).end("{\"message\":\"Unauthorized\",\"reason\":\"" + unauthorized.message() + "\"}");

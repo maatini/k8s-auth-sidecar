@@ -10,13 +10,15 @@ import space.maatini.sidecar.domain.model.PolicyDecision;
 import space.maatini.sidecar.domain.model.PolicyInput;
 import space.maatini.sidecar.application.service.PolicyService;
 
-import java.io.*;
-import java.nio.file.*;
-import java.util.concurrent.atomic.AtomicReference;
 import io.smallrye.mutiny.Uni;
+import io.smallrye.mutiny.infrastructure.Infrastructure;
 import jakarta.annotation.PostConstruct;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import java.io.*;
+import java.nio.file.*;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Engine for evaluating OPA policies compiled to WASM.
@@ -44,7 +46,7 @@ public class WasmPolicyEngine {
     public record PolicyInstance(OpaPolicy policy, long version) {}
 
     private final AtomicReference<PolicyBundle> wasmBundleRef = new AtomicReference<>();
-    private final ThreadLocal<PolicyInstance> threadPolicy = new ThreadLocal<>();
+    private final ArrayBlockingQueue<OpaPolicy> policyPool = new ArrayBlockingQueue<>(10);
     private long lastModifiedTime = 0;
 
     @PostConstruct
@@ -81,44 +83,58 @@ public class WasmPolicyEngine {
             return Uni.createFrom().item(PolicyDecision.deny("WASM module not initialized"));
         }
 
-        return Uni.createFrom().deferred(() -> {
+        return Uni.createFrom().emitter(emitter -> {
+            OpaPolicy policy = null;
             try {
-                OpaPolicy policy = getThreadLocalPolicy(bundle);
+                policy = policyPool.poll(5, java.util.concurrent.TimeUnit.SECONDS);
+                if (policy == null) {
+                    emitter.complete(PolicyDecision.deny("WASM policy pool exhausted"));
+                    return;
+                }
+
                 String inputJson = objectMapper.writeValueAsString(input);
                 String resultJson = policy.evaluate(inputJson);
                 LOG.debugf("WASM evaluation result: %s", resultJson);
 
                 if (resultJson == null) {
-                    return Uni.createFrom().item(PolicyDecision.deny("WASM evaluation returned null result"));
+                    emitter.complete(PolicyDecision.deny("WASM evaluation returned null result"));
+                    return;
                 }
 
                 JsonNode resultNode = objectMapper.readTree(resultJson);
+                PolicyDecision decision;
                 if (resultNode.isArray() && resultNode.size() > 0) {
                     JsonNode resultObj = resultNode.get(0).get("result");
-                    return Uni.createFrom().item(PolicyService.parsePolicyResult(resultObj));
+                    decision = PolicyService.parsePolicyResult(resultObj);
+                } else {
+                    decision = PolicyService.parsePolicyResult(resultNode);
                 }
-
-                return Uni.createFrom().item(PolicyService.parsePolicyResult(resultNode));
+                emitter.complete(decision);
             } catch (Exception e) {
                 LOG.errorf(e, "WASM evaluation failed: %s", e.getMessage());
-                return Uni.createFrom().item(PolicyDecision.deny("WASM evaluation failed: " + e.getMessage()));
+                emitter.complete(PolicyDecision.deny("WASM evaluation failed: " + e.getMessage()));
+            } finally {
+                if (policy != null) {
+                    policyPool.offer(policy);
+                }
             }
-        }).emitOn(io.smallrye.mutiny.infrastructure.Infrastructure.getDefaultWorkerPool());
+        }).runSubscriptionOn(Infrastructure.getDefaultWorkerPool())
+          .map(it -> (PolicyDecision) it);
     }
 
     /**
      * Retrieves or creates a thread-local policy instance that matches the bundle version.
      */
-    protected OpaPolicy getThreadLocalPolicy(PolicyBundle bundle) {
-        PolicyInstance instance = threadPolicy.get();
-        if (instance == null || instance.version() != bundle.version()) {
-            LOG.debugf("Creating new OpaPolicy instance for thread %s (version %d)",
-                    Thread.currentThread().getName(), bundle.version());
+    /**
+     * Clears and refills the policy pool with new instances for the given bundle.
+     */
+    protected void refreshPolicyPool(PolicyBundle bundle) {
+        policyPool.clear();
+        for (int i = 0; i < 10; i++) {
+            LOG.debugf("Creating OpaPolicy instance %d for pool (version %d)", i, bundle.version());
             OpaPolicy newPolicy = OpaPolicy.builder().withPolicy(bundle.bytes()).build();
-            instance = new PolicyInstance(newPolicy, bundle.version());
-            threadPolicy.set(instance);
+            policyPool.offer(newPolicy);
         }
-        return instance.policy();
     }
 
     /**
@@ -156,7 +172,9 @@ public class WasmPolicyEngine {
             }
 
             long newVersion = wasmBundleRef.get() == null ? 1 : wasmBundleRef.get().version() + 1;
-            wasmBundleRef.set(new PolicyBundle(wasmBytes, newVersion));
+            PolicyBundle newBundle = new PolicyBundle(wasmBytes, newVersion);
+            wasmBundleRef.set(newBundle);
+            refreshPolicyPool(newBundle);
             LOG.infof("Successfully loaded OPA WASM bundle version %d (%d bytes)",
                     newVersion, wasmBytes.length);
         } catch (Exception e) {
@@ -209,7 +227,7 @@ public class WasmPolicyEngine {
         if (!Files.exists(dir)) return 0;
         try (var stream = Files.walk(dir, 1)) {
             return stream
-                    .filter(p -> p.toString().endsWith(".wasm") || p.toString().contains("..data"))
+                    .filter(p -> p.toString().endsWith(".wasm") || p.toString().endsWith(".rego") || p.toString().contains("..data"))
                     .mapToLong(p -> {
                         try {
                             return Files.getLastModifiedTime(p).toMillis();

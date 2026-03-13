@@ -11,6 +11,7 @@ import space.maatini.sidecar.infrastructure.config.SidecarConfig;
 import space.maatini.sidecar.domain.model.AuthContext;
 import space.maatini.sidecar.domain.model.PolicyDecision;
 import space.maatini.sidecar.domain.model.PolicyInput;
+import space.maatini.sidecar.domain.model.PolicyCacheKey;
 import space.maatini.sidecar.infrastructure.policy.WasmPolicyEngine;
  
 import java.util.*;
@@ -47,11 +48,17 @@ public class PolicyService implements PolicyEngine {
         }
  
         PolicyInput input = PolicyInput.from(authContext, method, path, headers, queryParams);
-        return evaluatePolicy(input);
+        PolicyCacheKey key = new PolicyCacheKey(
+                authContext.userId(),
+                authContext.roles(),
+                method,
+                path
+        );
+        return evaluatePolicy(key, input);
     }
  
     @CacheResult(cacheName = "policy-decision-cache")
-    public Uni<PolicyDecision> evaluatePolicy(PolicyInput input) {
+    public Uni<PolicyDecision> evaluatePolicy(@io.quarkus.cache.CacheKey PolicyCacheKey key, PolicyInput input) {
         return wasmEngine.evaluateEmbeddedWasm(input)
                 .onFailure().recoverWithItem(error -> {
                     LOG.warnf("WASM evaluation failed on path %s: %s",

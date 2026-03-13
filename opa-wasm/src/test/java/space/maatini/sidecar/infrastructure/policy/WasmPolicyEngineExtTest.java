@@ -256,15 +256,10 @@ class WasmPolicyEngineExtTest {
     }
 
     private void injectMockPolicy(WasmPolicyEngine engine, OpaPolicy policy, long version) throws Exception {
-        Field threadPolicyField = WasmPolicyEngine.class.getDeclaredField("threadPolicy");
-        threadPolicyField.setAccessible(true);
-        ThreadLocal<Object> threadLocal = (ThreadLocal<Object>) threadPolicyField.get(engine);
-
-        Class<?> instanceClass = Class.forName("space.maatini.sidecar.infrastructure.policy.WasmPolicyEngine$PolicyInstance");
-        Constructor<?> constructor = instanceClass.getDeclaredConstructor(OpaPolicy.class, long.class);
-        constructor.setAccessible(true);
-        Object instance = constructor.newInstance(policy, version);
-
-        threadLocal.set(instance);
+        Field policyPoolField = WasmPolicyEngine.class.getDeclaredField("policyPool");
+        policyPoolField.setAccessible(true);
+        java.util.concurrent.ArrayBlockingQueue<OpaPolicy> pool = (java.util.concurrent.ArrayBlockingQueue<OpaPolicy>) policyPoolField.get(engine);
+        pool.clear();
+        pool.offer(policy);
     }
 }

@@ -91,10 +91,11 @@ class WasmPolicyEnginePojoTest {
         when(failingMapper.writeValueAsString(any())).thenThrow(new RuntimeException("JSON fail"));
         setField(engine, "objectMapper", failingMapper);
 
-        // Mock a bundle so that the engine doesn't return the "not initialized" decision early
-        Object bundle = createDummyBundle(1L);
+        // Properly initialize the engine using the dummy bundle so that policyPool is populated
+        WasmPolicyEngine.PolicyBundle bundle = createDummyBundle(1L);
         java.util.concurrent.atomic.AtomicReference<Object> ref = new java.util.concurrent.atomic.AtomicReference<>(bundle);
         setField(engine, "wasmBundleRef", ref);
+        engine.refreshPolicyPool(bundle);
 
         PolicyInput input = new PolicyInput(
                 new PolicyInput.RequestInfo("GET", "/path", Map.of(), Map.of()),
@@ -130,20 +131,21 @@ class WasmPolicyEnginePojoTest {
 
 
     @Test
-    @SuppressWarnings("rawtypes")
-    void testGetThreadLocalPolicy_VersionMismatch() throws Exception {
+    void testPolicyPool_VersionMismatch() throws Exception {
         Object bundle1 = createDummyBundle(1L);
         Object bundle2 = createDummyBundle(2L);
 
         WasmPolicyEngine.PolicyBundle pb1 = (WasmPolicyEngine.PolicyBundle) bundle1;
         WasmPolicyEngine.PolicyBundle pb2 = (WasmPolicyEngine.PolicyBundle) bundle2;
 
-        OpaPolicy policy1 = engine.getThreadLocalPolicy(pb1);
-        assertNotNull(policy1);
+        engine.refreshPolicyPool(pb1);
+        Field poolField = WasmPolicyEngine.class.getDeclaredField("policyPool");
+        poolField.setAccessible(true);
+        java.util.concurrent.ArrayBlockingQueue<OpaPolicy> pool = (java.util.concurrent.ArrayBlockingQueue<OpaPolicy>) poolField.get(engine);
+        assertEquals(10, pool.size());
 
-        OpaPolicy policy2 = engine.getThreadLocalPolicy(pb2);
-        assertNotNull(policy2);
-        assertNotSame(policy1, policy2); // Should create new instance for new version
+        engine.refreshPolicyPool(pb2);
+        assertEquals(10, pool.size());
     }
 
     @Test

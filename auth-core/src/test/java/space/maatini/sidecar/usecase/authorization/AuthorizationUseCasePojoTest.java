@@ -4,6 +4,7 @@ import io.smallrye.mutiny.Uni;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import space.maatini.sidecar.application.service.PolicyEngine;
+import space.maatini.sidecar.application.service.RolesService;
 import space.maatini.sidecar.domain.model.AuthContext;
 import space.maatini.sidecar.domain.model.PolicyDecision;
 
@@ -18,13 +19,15 @@ import static org.mockito.Mockito.*;
 class AuthorizationUseCasePojoTest {
 
     private PolicyEngine policyEngine;
+    private RolesService rolesService;
     private AuthorizationUseCase useCase;
     private AuthContext mockContext;
 
     @BeforeEach
     void setUp() {
         policyEngine = mock(PolicyEngine.class);
-        useCase = new AuthorizationUseCase(policyEngine);
+        rolesService = mock(RolesService.class);
+        useCase = new AuthorizationUseCase(policyEngine, rolesService);
         mockContext = AuthContext.builder().userId("test-user").roles(java.util.Set.of("user")).build();
     }
 
@@ -38,23 +41,25 @@ class AuthorizationUseCasePojoTest {
                 Map.of("Param1", "Val1")
         );
 
+        when(rolesService.enrich(any())).thenReturn(Uni.createFrom().item(mockContext));
         when(policyEngine.evaluate(
-                eq(command.context()),
+                eq(mockContext),
                 eq(command.method()),
                 eq(command.path()),
                 eq(command.headers()),
                 eq(command.queryParams())
         )).thenReturn(Uni.createFrom().item(PolicyDecision.allow()));
 
-        AuthorizationResult result = useCase.execute(Uni.createFrom().item(command))
+        AuthorizationResult result = useCase.execute(command)
                 .await().indefinitely();
 
         assertTrue(result.allowed());
         assertNull(result.reason());
         assertTrue(result.violations().isEmpty());
         // Verify all fields are passed correctly
+        verify(rolesService).enrich(command.context());
         verify(policyEngine).evaluate(
-                command.context(),
+                mockContext,
                 command.method(),
                 command.path(),
                 command.headers(),
@@ -72,10 +77,11 @@ class AuthorizationUseCasePojoTest {
                 Map.of()
         );
 
+        when(rolesService.enrich(any())).thenReturn(Uni.createFrom().item(mockContext));
         when(policyEngine.evaluate(any(), any(), any(), any(), any()))
                 .thenReturn(Uni.createFrom().item(PolicyDecision.deny("Not authorized")));
 
-        AuthorizationResult result = useCase.execute(Uni.createFrom().item(command))
+        AuthorizationResult result = useCase.execute(command)
                 .await().indefinitely();
 
         assertFalse(result.allowed());
@@ -93,10 +99,11 @@ class AuthorizationUseCasePojoTest {
                 Map.of()
         );
 
+        when(rolesService.enrich(any())).thenReturn(Uni.createFrom().item(mockContext));
         when(policyEngine.evaluate(any(), any(), any(), any(), any()))
                 .thenReturn(Uni.createFrom().item(PolicyDecision.deny("Violation occurred", List.of("Role mismatch", "Invalid scoping"))));
 
-        AuthorizationResult result = useCase.execute(Uni.createFrom().item(command))
+        AuthorizationResult result = useCase.execute(command)
                 .await().indefinitely();
 
         assertFalse(result.allowed());
