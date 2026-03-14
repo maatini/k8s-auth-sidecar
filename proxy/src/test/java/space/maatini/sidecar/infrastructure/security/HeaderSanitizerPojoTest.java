@@ -166,8 +166,28 @@ class HeaderSanitizerPojoTest {
             "'///', '/'",
             "'/a/../b', '/b'",
             "'/a/./b', '/a/b'",
+            "'//admin//panel', '/admin/panel'",
+            "'/api/../admin?page=1', '/admin?page=1'",
     })
     void normalizePath_handlesEdgeCases(String input, String expected) {
         assertEquals(expected, HeaderSanitizer.normalizePath(input));
+    }
+
+    @Test
+    void normalizePath_doubleEncoding_doesNotDecodeTwice() {
+        // %252e is percent-encoded '%2e' – after one decode it becomes '%2e', not '.'
+        // This ensures double-encoding attacks do not bypass normalization
+        String result = HeaderSanitizer.normalizePath("/api/%252e%252e/admin");
+        assertFalse(result.contains(".."), "Double-encoded traversal should not resolve to ..");
+    }
+
+    @Test
+    void normalizePath_nullInput_returnsRoot() {
+        assertEquals("/", HeaderSanitizer.normalizePath(null));
+    }
+
+    @Test
+    void normalizePath_blankInput_returnsRoot() {
+        assertEquals("/", HeaderSanitizer.normalizePath("   "));
     }
 }

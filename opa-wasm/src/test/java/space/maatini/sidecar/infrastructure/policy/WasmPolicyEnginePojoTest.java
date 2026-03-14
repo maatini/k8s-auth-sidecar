@@ -37,6 +37,7 @@ class WasmPolicyEnginePojoTest {
         when(config.opa()).thenReturn(opaConfig);
         when(opaConfig.embedded()).thenReturn(embeddedConfig);
         when(embeddedConfig.poolSize()).thenReturn(10);
+        when(embeddedConfig.poolAcquireTimeoutMs()).thenReturn(50);
         setField(engine, "config", config);
         setField(engine, "policyService", policyService);
         // Initialize pool manually since @PostConstruct is not called

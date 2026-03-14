@@ -96,6 +96,11 @@ public class WasmPolicyEngineTest {
                     public int poolSize() {
                         return 10;
                     }
+
+                    @Override
+                    public int poolAcquireTimeoutMs() {
+                        return 50;
+                    }
                 };
             }
 

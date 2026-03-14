@@ -16,6 +16,7 @@ import space.maatini.sidecar.domain.model.PolicyCacheKey;
 import space.maatini.sidecar.infrastructure.policy.WasmPolicyEngine;
  
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
  
 /**
  * Service for evaluating authorization policies using embedded OPA WASM.
@@ -71,15 +72,30 @@ public class PolicyService implements PolicyEngine {
         return evaluatePolicy(key, input);
     }
  
+    /** In-flight tracker: ensures only one WASM evaluation per cache key runs concurrently. */
+    private final ConcurrentHashMap<PolicyCacheKey, Uni<PolicyDecision>> inFlight =
+            new ConcurrentHashMap<>();
+
     @CacheResult(cacheName = "policy-decision-cache")
     public Uni<PolicyDecision> evaluatePolicy(@io.quarkus.cache.CacheKey PolicyCacheKey key, PolicyInput input) {
-        return wasmEngine.evaluateEmbeddedWasm(input)
-                .onFailure().recoverWithItem(error -> {
-                    LOG.warnf("WASM evaluation failed on path %s: %s",
-                            input.request().path(), error.getMessage());
-                    return PolicyDecision.deny(
-                            "Policy evaluation failed. Access denied for security.");
-                });
+        // Single-flight: coalesce duplicate in-flight evaluations for the same key
+        return Uni.createFrom().deferred(() -> {
+            Uni<PolicyDecision> existing = inFlight.get(key);
+            if (existing != null) {
+                return existing;
+            }
+            Uni<PolicyDecision> evaluation = wasmEngine.evaluateEmbeddedWasm(input)
+                    .onFailure().recoverWithItem(error -> {
+                        LOG.warnf("WASM evaluation failed on path %s: %s",
+                                input.request().path(), error.getMessage());
+                        return PolicyDecision.deny(
+                                "Policy evaluation failed. Access denied for security.");
+                    })
+                    .onTermination().invoke(() -> inFlight.remove(key))
+                    .memoize().indefinitely();
+            Uni<PolicyDecision> winner = inFlight.putIfAbsent(key, evaluation);
+            return winner != null ? winner : evaluation;
+        });
     }
  
     /**

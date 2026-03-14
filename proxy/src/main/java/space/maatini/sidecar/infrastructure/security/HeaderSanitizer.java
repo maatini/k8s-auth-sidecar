@@ -4,6 +4,8 @@ import io.vertx.core.http.HttpServerRequest;
 import jakarta.enterprise.context.ApplicationScoped;
 import org.jboss.logging.Logger;
 
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Set;
@@ -82,10 +84,12 @@ public class HeaderSanitizer {
 
     /**
      * Normalizes a URI path to prevent traversal attacks.
+     * Uses {@link URI#normalize()} (RFC 3986) instead of custom logic
+     * to avoid bypass risks from double encoding or Unicode evasion.
      * <ul>
-     *   <li>URL-decodes percent-encoded sequences</li>
-     *   <li>Collapses double slashes (//)</li>
-     *   <li>Removes path traversal segments (..)</li>
+     *   <li>URL-decodes percent-encoded sequences before normalization</li>
+     *   <li>Delegates to java.net.URI for .., ., // handling</li>
+     *   <li>Blocks traversal above root</li>
      *   <li>Ensures the path starts with /</li>
      * </ul>
      */
@@ -94,46 +98,58 @@ public class HeaderSanitizer {
             return "/";
         }
 
-        // Strip query string if present (only the path segment matters)
+        // Strip query string – normalize only the path segment
         int queryIdx = path.indexOf('?');
         String pathOnly = queryIdx >= 0 ? path.substring(0, queryIdx) : path;
 
-        // Decode percent-encoded characters (handles %2e%2e, %2F, etc.)
+        // Decode percent-encoded characters before URI normalization
+        // (catches %2e%2e, %2F, etc.)
         String decoded = urlDecode(pathOnly);
 
-        // Collapse double slashes
+        // Collapse double slashes before URI parsing
+        // (URI treats // as authority separator per RFC 3986)
         while (decoded.contains("//")) {
             decoded = decoded.replace("//", "/");
         }
 
-        // Remove path traversal segments
-        String[] segments = decoded.split("/");
-        StringBuilder result = new StringBuilder();
-        for (String segment : segments) {
-            if (segment.isEmpty() || ".".equals(segment)) {
-                continue;
-            }
-            if ("..".equals(segment)) {
-                // Remove last segment (go up one level) – but never above root
-                int lastSlash = result.lastIndexOf("/");
-                if (lastSlash >= 0) {
-                    result.setLength(lastSlash);
-                }
-                continue;
-            }
-            result.append('/').append(segment);
+        // Ensure path starts with /
+        if (!decoded.startsWith("/")) {
+            decoded = "/" + decoded;
         }
 
-        if (result.isEmpty()) {
+        // Use 5-arg URI constructor to prevent internal percent-decode
+        // This keeps %2e as literal %2e instead of resolving to .
+        try {
+            String normalized = new URI(null, null, decoded, null, null)
+                    .normalize().getPath();
+            if (normalized == null || normalized.isEmpty()) {
+                normalized = "/";
+            }
+            // Block path-traversal above root
+            // URI.normalize() may produce leading /../ for excessive ..
+            while (normalized.startsWith("/..")) {
+                if (normalized.equals("/..")) {
+                    normalized = "/";
+                    break;
+                }
+                if (normalized.startsWith("/../")) {
+                    normalized = normalized.substring(3);
+                } else {
+                    break;
+                }
+            }
+            if (normalized.isEmpty()) {
+                normalized = "/";
+            }
+            // Re-append query string if present
+            if (queryIdx >= 0) {
+                return normalized + path.substring(queryIdx);
+            }
+            return normalized;
+        } catch (URISyntaxException e) {
+            LOG.warnf("Failed to parse path as URI: '%s', returning /", path);
             return "/";
         }
-
-        // Re-append query string if it was present
-        if (queryIdx >= 0) {
-            result.append(path.substring(queryIdx));
-        }
-
-        return result.toString();
     }
 
     private static String urlDecode(String value) {

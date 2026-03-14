@@ -24,10 +24,10 @@ patches:
   - patch: |-
       - op: replace
         path: /spec/template/spec/containers/0/resources/requests/memory
-        value: "256Mi"
+        value: "96Mi"
       - op: replace
         path: /spec/template/spec/containers/0/resources/limits/memory
-        value: "1Gi"
+        value: "256Mi"
     target:
       kind: Deployment
       name: my-application
@@ -41,7 +41,8 @@ configMapGenerator:
       - QUARKUS_LOG_JSON=true
       - OTEL_ENABLED=true
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+      - SIDECAR_OPA_EMBEDDED_POOL_ACQUIRE_TIMEOUT_MS=50
 
 images:
   - name: space.maatini/k8s-auth-sidecar
-    newTag: "1.0.0"
+    newTag: "0.3.1"

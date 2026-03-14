@@ -42,6 +42,7 @@ class WasmPolicyEngineExtTest {
         when(opaConfig.enabled()).thenReturn(true);
         when(embeddedConfig.wasmPath()).thenReturn("classpath:policies/authz.wasm");
         when(embeddedConfig.poolSize()).thenReturn(10);
+        when(embeddedConfig.poolAcquireTimeoutMs()).thenReturn(50);
 
         objectMapper = new ObjectMapper();
 

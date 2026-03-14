@@ -104,6 +104,10 @@ public interface SidecarConfig {
             @WithName("pool-size")
             @WithDefault("50")
             int poolSize();
+
+            @WithName("pool-acquire-timeout-ms")
+            @WithDefault("50")
+            int poolAcquireTimeoutMs();
         }
 
         @WithName("hot-reload")

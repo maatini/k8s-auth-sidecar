@@ -136,6 +136,7 @@ sidecar:
     embedded:
       wasm-path: ${OPA_WASM_PATH:classpath:policies/authz.wasm}
       pool-size: ${OPA_POOL_SIZE:50}
+      pool-acquire-timeout-ms: ${OPA_POOL_ACQUIRE_TIMEOUT_MS:50}
     default-package: authz
     default-rule: allow
 

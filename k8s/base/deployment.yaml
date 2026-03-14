@@ -35,7 +35,7 @@ spec:
         # Handles AuthN/AuthZ before forwarding to main app
         # ==========================================
         - name: k8s-auth-sidecar
-          image: space.maatini/k8s-auth-sidecar:0.3.0
+          image: space.maatini/k8s-auth-sidecar:0.3.1
           imagePullPolicy: IfNotPresent
           
           ports:
@@ -60,11 +60,11 @@ spec:
           
           resources:
             requests:
-              memory: "128Mi"
-              cpu: "100m"
+              memory: "64Mi"
+              cpu: "50m"
             limits:
-              memory: "512Mi"
-              cpu: "500m"
+              memory: "256Mi"
+              cpu: "250m"
           
           livenessProbe:
             httpGet:

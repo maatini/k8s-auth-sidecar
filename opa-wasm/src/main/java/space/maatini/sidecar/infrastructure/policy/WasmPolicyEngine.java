@@ -18,6 +18,7 @@ import jakarta.inject.Inject;
 import java.io.*;
 import java.nio.file.*;
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
@@ -98,8 +99,9 @@ public class WasmPolicyEngine {
         return Uni.createFrom().emitter(emitter -> {
             OpaPolicy policy = null;
             try {
-                // Non-blocking poll: fail-fast if all instances are in use
-                policy = pool.poll();
+                // Wait up to configured timeout for a free WASM instance (smooths micro-bursts)
+                int timeoutMs = config.opa().embedded().poolAcquireTimeoutMs();
+                policy = pool.poll(timeoutMs, TimeUnit.MILLISECONDS);
                 if (policy == null) {
                     emitter.complete(PolicyDecision.deny("429: Too Many Requests - WASM Pool exhausted"));
                     return;
