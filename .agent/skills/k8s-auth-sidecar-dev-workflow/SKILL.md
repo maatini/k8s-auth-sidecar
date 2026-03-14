@@ -28,7 +28,7 @@ curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/test
 - auth-core: **47 Tests, 0 Failures** ✅  
 - opa-wasm: **47 Tests, 0 Failures** ✅  
 - config: **7 Tests, 0 Failures** ✅  
-- proxy: **26 Tests, 0 Failures** ✅  
+- ext-authz: **26 Tests, 0 Failures** ✅  
 - Gesamt: **127 Tests, 0 Failures** ✅  
 - PIT Test Strength auth-core: **82%** ✅ (Ziel: >80%)  
 - PIT Line Coverage auth-core: **71%** (247/349 Zeilen)  
@@ -41,4 +41,4 @@ curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/test
 **Verwandte Skills**  
 - pit-mutation-testing-coverage  
 - policy-testing-validation  
-- quarkus-sidecar-proxy-pattern
+- quarkus-sidecar-ext-authz-pattern

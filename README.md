@@ -190,7 +190,7 @@ Das Projekt besitzt eine extrem schnelle, überwiegend Framework-unabhängige Te
 | `config` | 4 | 0 ✅ | POJO + Quarkus |
 | `auth-core` | 48 | 0 ✅ | POJO + Ext + Quarkus |
 | `opa-wasm` | 57 | 0 ✅ | POJO + Ext + Quarkus |
-| `proxy` | 38 | 0 ✅ | POJO + E2E + Quarkus |
+| `ext-authz` | 38 | 0 ✅ | POJO + E2E + Quarkus |
 | **Gesamt** | **147** | **0 ✅** | |
 
 **PIT Scores per Module:**
@@ -200,7 +200,7 @@ Das Projekt besitzt eine extrem schnelle, überwiegend Framework-unabhängige Te
 | config    | 29       | 100        | 53         |
 | auth-core | 48       | 79         | 71         |
 | opa-wasm  | 67       | 70         | 88         |
-| proxy     | 46       | 84         | 41         |
+| ext-authz | 46       | 84         | 41         |
 
 - Bericht: `<modul>/target/pit-reports/`
 
@@ -215,7 +215,7 @@ Das Projekt besitzt eine extrem schnelle, überwiegend Framework-unabhängige Te
 ## 📂 Projektstruktur (Maven Multi-Module)
 
 - `auth-core/`: Domain-Modelle, Request-Processor und Auth-Logik.
-- `proxy/`: Vert.x Route Handler (`/authorize`) und JAX-RS Filter.
+- `ext-authz/`: Vert.x Route Handler (`/authorize`) und JAX-RS Filter.
 - `opa-wasm/`: OPA WASM Engine und Rego-Policies (`.rego`).
 - `config/`: Quarkus-Config, Metriken und Health-Checks.
 - `k8s/`: Kustomize Manifeste für das Deployment.

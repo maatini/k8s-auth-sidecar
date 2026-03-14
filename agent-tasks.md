@@ -36,7 +36,7 @@ Du bist Senior Quarkus-Architect. Implementiere einen neuen UseCase im Modul aut
 - Verwende WasmPolicyEngine + PolicyService
 - Hot-Reload-fähig via ConfigMap
 - Vollständige POJO-Tests + opa test Integration
-- Erweitere ProxyResource.java um neuen Endpoint /authorize
+- Erweitere SidecarRouteHandler.java um neuen Endpoint /authorize
 - OpenAPI-Beispiel-Request in docs/api-spec.md hinzufügen
 
 Plane, implementiere, teste und committe alles in einem Durchgang.

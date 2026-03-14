@@ -18,7 +18,7 @@ description: Erzwingt Quarkus-spezifische Best Practices für das k8s-auth-sidec
 ### 2. Reaktive & Non-Blocking Entwicklung
 - Alle Services müssen reaktiv sein (`Uni<T>` / `Multi<T>`).
 - Kein `block()`, `await()`, `join()` außer in Tests oder @Blocking-Annotation.
-- Streaming-Proxy immer mit `HttpClient` + `BodyHandler` (kein vollständiges Laden in RAM).
+- Streaming immer mit `HttpClient` + `BodyHandler` (kein vollständiges Laden in RAM).
 
 ### 3. Native Image Optimierungen (GraalVM)
 - Jede neue Klasse mit `@RegisterForReflection` markieren, wenn Reflection nötig (z. B. OPA-WASM, Jackson).
@@ -35,7 +35,7 @@ description: Erzwingt Quarkus-spezifische Best Practices für das k8s-auth-sidec
 
 ### 5. Modul-spezifische Einschränkungen
 - auth-core: Nur Domain + Application Services (keine REST, keine Config).
-- proxy: Nur Streaming-Proxy + Path-Matcher.
+- ext-authz: Nur Route Handler + Path-Matcher.
 - opa-wasm: Nur WASM-Engine + Hot-Reload + Policy-Loader.
 - config: Nur Quarkus Config + Metrics + Health.
 

@@ -3,11 +3,11 @@ package space.maatini.sidecar.domain.util;
 import java.util.List;
 
 /**
- * Utility class for sidecar proxy operations.
+ * Utility class for sidecar ext-authz operations.
  */
-public final class ProxyUtils {
+public final class ExtAuthzUtils {
 
-    /** Well-known management paths that should never be proxied or auth-checked. */
+    /** Well-known management paths that should never be forwarded or auth-checked. */
     public static final List<String> MANAGEMENT_PATHS = List.of(
             "/health", "/metrics", "/ready", "/live"
     );
@@ -15,7 +15,7 @@ public final class ProxyUtils {
     /** Default Quarkus non-application root path. */
     public static final String DEFAULT_NON_APP_ROOT = "/q";
 
-    private ProxyUtils() {
+    private ExtAuthzUtils() {
         // Private constructor to prevent instantiation
     }
 

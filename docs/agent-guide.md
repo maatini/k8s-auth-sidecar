@@ -11,7 +11,7 @@ Dieses Dokument ist dein offizieller Leitfaden, wie du im **k8s-auth-sidecar** R
 root/
 ├── .agent/              ← deine Regeln & Skills
 ├── auth-core/           ← alle UseCases + Domain + POJO-Tests
-├── proxy/               ← REST-Resources + Route Handler
+├── ext-authz/           ← REST-Resources + Route Handler
 ├── docs/
 │   ├── agent-guide.md   ← du bist hier
 │   ├── ARCHITECTURE.md
@@ -24,7 +24,7 @@ root/
 
 1. Lies `agent-tasks.md` → wähle Template  
 2. Kopiere den Prompt in dein Agent-Tool  
-3. Agent erstellt: UseCase + Tests + Integration in Proxy  
+3. Agent erstellt: UseCase + Tests + Integration in Ext-Authz  
 4. Starte `docker compose -f docker-compose.dev.yml up -d`  
 5. Teste mit `./mvnw quarkus:dev` + Swagger  
 6. Commit & PR
@@ -34,7 +34,7 @@ root/
 - **Immer POJO-First**: Kein `@QuarkusTest` für Kernlogik (siehe JUNIOR_GUIDE.md)
 - **Clean Architecture**: UseCase → Service → Repository
 - **Mutiny überall**: `Uni<...>` statt Blocking
-- **AuthContext in REST**: In REST-Endpoints (wie `ProxyResource`) die Auth-Informationen über `containerRequestContext.getProperty("auth.context")` extrahieren (gesetzt durch `AuthProxyFilter`).
+- **AuthContext in REST**: In REST-Endpoints (wie `SidecarRouteHandler`) die Auth-Informationen über `containerRequestContext.getProperty("auth.context")` extrahieren (gesetzt durch `AuditRouteFilter`).
 - **Dokumentation**: Jede Klasse bekommt einzeiligen Header + JavaDoc
 - **OpenAPI**: Nach jedem neuen Endpoint `docs/api-spec.md` aktualisieren
 - **PIT-Testing**: Neue Tests müssen PIT-Strength > 80 % halten

@@ -1,5 +1,5 @@
 ---
-name: quarkus-sidecar-proxy-pattern
+name: quarkus-sidecar-ext-authz-pattern
 description: ext_authz Route Handler, Auth-Header-Anreicherung und non-blocking Pipeline (Vert.x + Mutiny)
 ---
 

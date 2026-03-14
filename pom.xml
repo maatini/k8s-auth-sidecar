@@ -14,7 +14,7 @@
  
     <modules>
         <module>auth-core</module>
-        <module>proxy</module>
+        <module>ext-authz</module>
         <module>opa-wasm</module>
         <module>config</module>
     </modules>
@@ -65,7 +65,7 @@
             </dependency>
             <dependency>
                 <groupId>${project.groupId}</groupId>
-                <artifactId>proxy</artifactId>
+                <artifactId>ext-authz</artifactId>
                 <version>${project.version}</version>
             </dependency>
             

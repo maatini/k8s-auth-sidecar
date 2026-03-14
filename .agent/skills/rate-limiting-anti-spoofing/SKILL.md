@@ -30,4 +30,4 @@ sidecar:
 
 **Verwandte Skills**  
 - security-hardening-trivy-cve  
-- quarkus-sidecar-proxy-pattern
+- quarkus-sidecar-ext-authz-pattern

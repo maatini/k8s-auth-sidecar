@@ -10,8 +10,8 @@
         <version>0.3.1</version>
     </parent>
 
-    <artifactId>proxy</artifactId>
-    <name>K8s-Auth-Sidecar - Proxy</name>
+    <artifactId>ext-authz</artifactId>
+    <name>K8s-Auth-Sidecar - Ext-Authz</name>
 
     <dependencies>
         <dependency>

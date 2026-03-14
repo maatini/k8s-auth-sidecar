@@ -17,7 +17,7 @@ WORKDIR /app
 # Copy poms first for better layer caching
 COPY pom.xml .
 COPY auth-core/pom.xml auth-core/
-COPY proxy/pom.xml proxy/
+COPY ext-authz/pom.xml ext-authz/
 COPY opa-wasm/pom.xml opa-wasm/
 COPY config/pom.xml config/
 
@@ -26,12 +26,12 @@ RUN mvn dependency:go-offline -B
 
 # Copy source code for all modules
 COPY auth-core/src auth-core/src
-COPY proxy/src proxy/src
+COPY ext-authz/src ext-authz/src
 COPY opa-wasm/src opa-wasm/src
 COPY config/src config/src
 
-# Build the proxy application (which includes other modules)
-RUN mvn package -DskipTests -Dquarkus.package.type=uber-jar -pl proxy -am
+# Build the ext-authz application (which includes other modules)
+RUN mvn package -DskipTests -Dquarkus.package.type=uber-jar -pl ext-authz -am
 
 # =====================================================
 # Stage 3: Runtime (JVM Mode)
@@ -56,8 +56,8 @@ RUN apk upgrade --no-cache
 
 WORKDIR /app
 
-# Copy the uber-jar from build stage (located in proxy module target)
-COPY --from=build /app/proxy/target/*-runner.jar /app/k8s-auth-sidecar.jar
+# Copy the uber-jar from build stage (located in ext-authz module target)
+COPY --from=build /app/ext-authz/target/*-runner.jar /app/k8s-auth-sidecar.jar
 
 # Copy policies (generated at build time from authz.rego)
 COPY --from=build /app/opa-wasm/target/classes/policies /policies

@@ -6,7 +6,7 @@ import jakarta.annotation.PostConstruct;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.jboss.logging.Logger;
-import space.maatini.sidecar.domain.util.ProxyUtils;
+import space.maatini.sidecar.domain.util.ExtAuthzUtils;
 import space.maatini.sidecar.infrastructure.config.SidecarConfig;
 import space.maatini.sidecar.domain.model.AuthContext;
 import space.maatini.sidecar.domain.model.ProcessingResult;
@@ -54,7 +54,7 @@ public class SidecarRequestProcessor {
         String path = request.path();
         String method = request.method();
 
-        if (isPublicPath(path) || ProxyUtils.isInternalPath(path, nonAppRoot)) {
+        if (isPublicPath(path) || ExtAuthzUtils.isInternalPath(path, nonAppRoot)) {
             LOG.debugf("Skipping processing for path: %s", path);
             return Uni.createFrom().item(ProcessingResult.skip());
         }

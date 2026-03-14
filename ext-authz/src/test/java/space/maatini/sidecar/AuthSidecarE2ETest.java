@@ -22,7 +22,7 @@ import static io.restassured.RestAssured.given;
 import static org.hamcrest.CoreMatchers.*;
 
 /**
- * End-to-End integration test for the sidecar proxy pipeline.
+ * End-to-End integration test for the sidecar ext-authz pipeline.
  */
 @QuarkusTest
 @io.quarkus.test.junit.TestProfile(AuthSidecarE2ETest.E2EProfile.class)

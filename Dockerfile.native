@@ -17,7 +17,7 @@ COPY --from=openpolicyagent/opa:latest-static /opa /usr/local/bin/opa
 # Copy pom.xml files first for better layer caching (multi-module)
 COPY pom.xml .
 COPY auth-core/pom.xml auth-core/
-COPY proxy/pom.xml proxy/
+COPY ext-authz/pom.xml ext-authz/
 COPY opa-wasm/pom.xml opa-wasm/
 COPY config/pom.xml config/
 
@@ -26,12 +26,12 @@ RUN --mount=type=cache,target=/root/.m2 mvn dependency:go-offline -B
 
 # Copy source code for all modules
 COPY auth-core/src auth-core/src
-COPY proxy/src proxy/src
+COPY ext-authz/src ext-authz/src
 COPY opa-wasm/src opa-wasm/src
 COPY config/src config/src
 
-# Build the proxy application (which includes other modules) as native image
-RUN --mount=type=cache,target=/root/.m2 mvn package -Pnative -DskipTests -pl proxy -am \
+# Build the ext-authz application (which includes other modules) as native image
+RUN --mount=type=cache,target=/root/.m2 mvn package -Pnative -DskipTests -pl ext-authz -am \
     -Dquarkus.native.additional-build-args="-H:+ReportExceptionStackTraces"
 
 # =====================================================
@@ -58,7 +58,7 @@ USER root
 COPY --chown=1001:1001 --from=build /app/opa-wasm/target/classes/policies /policies
 
 # Copy the native executable from the build stage with proper ownership
-COPY --chown=1001:1001 --from=build /app/proxy/target/*-runner /app/k8s-auth-sidecar
+COPY --chown=1001:1001 --from=build /app/ext-authz/target/*-runner /app/k8s-auth-sidecar
 
 # Switch back to non-root user (1001 is the default quarkus user in micro-image)
 USER 1001

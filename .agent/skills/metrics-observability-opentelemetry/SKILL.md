@@ -9,11 +9,11 @@ description: Prometheus-Metriken + OpenTelemetry Tracing konfigurieren und erwei
 - Wenn OTEL-Tracing aktiviert werden soll  
 
 **Wichtige Metriken**
-- `sidecar_proxy_requests_total`
-- `sidecar_proxy_errors_total`
+- `sidecar_ext_authz_requests_total`
+- `sidecar_ext_authz_errors_total`
 - `sidecar_auth_success_total` / `sidecar_auth_failure_total`
 - `sidecar_authz_allow_total` / `sidecar_authz_deny_total`
-- `sidecar_proxy_latency_seconds` (Histogram)
+- `sidecar_ext_authz_latency_seconds` (Histogram)
 
 **Konfiguration (application.yaml)**
 ```yaml

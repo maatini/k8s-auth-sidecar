@@ -27,7 +27,7 @@ Jeder Agent liest diese Datei **automatisch** beim Workspace-Scan und folgt den 
 
 - **Immer POJO-First**: Kernlogik = reine Java-Klassen (kein `@QuarkusTest` für Domain/UseCase)
 - **Mutiny überall**: `Uni<T>` / `Multi<T>` – kein Blocking
-- **Clean Layers**: `proxy/` (Resources) → `auth-core/usecase/` → Service → Repository
+- **Clean Layers**: `ext-authz/` (Resources) → `auth-core/usecase/` → Service → Repository
 - **Dokumentation**: Jede neue Klasse bekommt einzeiligen Header + JavaDoc + `@Description`
 - **OpenAPI**: Nach jedem neuen Endpoint `docs/api-spec.md` + smallrye-openapi aktualisieren
 - **Tests**: PIT-Mutation-Testing muss > 80 % bleiben (Plugin ist bereits im Root-POM)
