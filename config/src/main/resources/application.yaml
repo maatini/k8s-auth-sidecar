@@ -129,7 +129,9 @@ sidecar:
   # OPA (Embedded WASM via Chicory)
   opa:
     enabled: ${OPA_ENABLED:true}
-    hot-reload-interval: ${OPA_HOT_RELOAD_INTERVAL:10s}
+    hot-reload:
+      enabled: true
+      interval: ${OPA_HOT_RELOAD_INTERVAL:10s}
     embedded:
       wasm-path: ${OPA_WASM_PATH:classpath:policies/authz.wasm}
       pool-size: ${OPA_POOL_SIZE:50}
