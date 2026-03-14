@@ -11,6 +11,9 @@ WORKDIR /app
 # Install Maven
 RUN microdnf install -y maven && microdnf clean all
 
+# OPA CLI for WASM policy compilation (exec-maven-plugin needs it)
+COPY --from=openpolicyagent/opa:latest-static /opa /usr/local/bin/opa
+
 # Copy pom.xml files first for better layer caching (multi-module)
 COPY pom.xml .
 COPY auth-core/pom.xml auth-core/

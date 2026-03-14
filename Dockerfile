@@ -9,6 +9,9 @@ LABEL description="K8s-Auth-Sidecar AuthN/AuthZ Microservice Build Stage"
 # Install Maven
 RUN apk add --no-cache maven
 
+# OPA CLI for WASM policy compilation (exec-maven-plugin needs it)
+COPY --from=openpolicyagent/opa:latest-static /opa /usr/local/bin/opa
+
 WORKDIR /app
 
 # Copy poms first for better layer caching
