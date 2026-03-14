@@ -32,6 +32,12 @@ jobs:
           distribution: 'temurin'
           cache: 'maven'
 
+      # OPA CLI is needed by exec-maven-plugin to compile .rego → .wasm
+      - name: Install OPA CLI
+        run: |
+          curl -fsSL -o /usr/local/bin/opa https://github.com/open-policy-agent/opa/releases/latest/download/opa_linux_amd64_static
+          chmod +x /usr/local/bin/opa
+
       # Standard Maven verify phase: runs unit & integration tests
       - name: Verify (Tests, Static Analysis)
         run: ./mvnw clean verify -B --no-transfer-progress
@@ -64,6 +70,12 @@ jobs:
           java-version: '21'
           distribution: 'graalvm-community'
           cache: 'maven'
+
+      # OPA CLI is needed by exec-maven-plugin to compile .rego → .wasm
+      - name: Install OPA CLI
+        run: |
+          curl -fsSL -o /usr/local/bin/opa https://github.com/open-policy-agent/opa/releases/latest/download/opa_linux_amd64_static
+          chmod +x /usr/local/bin/opa
 
       # Build the native image (without tests, as they ran in the JVM phase)
       - name: Package Native Image
