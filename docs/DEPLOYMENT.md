@@ -124,11 +124,6 @@ spec:
           image: your-registry.io/k8s-auth-sidecar:1.0.0
           ports:
             - containerPort: 8080
-          env:
-            - name: PROXY_TARGET_HOST
-              value: "localhost"
-            - name: PROXY_TARGET_PORT
-              value: "8080"  # Port deiner App
           envFrom:
             - configMapRef:
                 name: k8s-auth-sidecar-config
@@ -188,10 +183,10 @@ spec:
 
 1. Backend erreichbar?
    ```bash
-   kubectl exec -c k8s-auth-sidecar ... -- wget -qO- http://localhost:$PROXY_TARGET_PORT/health
+   kubectl exec -c k8s-auth-sidecar ... -- wget -qO- http://localhost:8085/health
    ```
 
-2. Backend-Port korrekt?
+2. Ingress-/Envoy-Konfiguration korrekt? Stellt sicher, dass das Gateway den `/authorize` Endpunkt des Sidecars aufruft.
 
 ## Monitoring Setup
 

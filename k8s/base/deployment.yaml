@@ -49,15 +49,7 @@ spec:
             - secretRef:
                 name: k8s-auth-sidecar-secrets
           
-          env:
-            # Reserved for future streaming proxy mode (not yet mapped in application.yaml)
-            # - name: PROXY_TARGET_HOST
-            #   value: "localhost"
-            # - name: PROXY_TARGET_PORT
-            #   value: "8085"
-            # - name: PROXY_TARGET_SCHEME
-            #   value: "http"
-          
+
           resources:
             requests:
               memory: "64Mi"

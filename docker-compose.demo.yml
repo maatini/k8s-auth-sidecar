@@ -5,8 +5,8 @@ services:
   backend-app:
     image: traefik/whoami
     container_name: demo-backend-app
-    # Wir exposen absichtlich keinen lokalen Port, 
-    # da der Zugriff NUR über den Sidecar (Port 8080) erfolgen soll!
+    # Das Backend wird direkt vom Gateway aufgerufen, nachdem der Sidecar die Autorisierung erteilt hat.
+    # In der Demo ist kein extra Port exponiert, da der Sidecar nur als ext_authz Endpunkt dient.
     networks:
       - demo-network
 

@@ -9,14 +9,14 @@ description: Kustomize-Overlays, Deployment, Service-Routing und ConfigMap für 
 - Bei Policy- oder Secret-Änderungen  
 
 **Schritt-für-Schritt**
-1. `k8s/base/deployment.yaml` anpassen (Sidecar-Container + PROXY_TARGET_PORT)  
+1. `k8s/base/deployment.yaml` anpassen (Sidecar-Container + OIDC-Konfiguration)  
 2. `k8s/overlays/development/kustomization.yaml` patchen  
 3. Policies in `k8s/base/config.yaml` (ConfigMap `k8s-auth-sidecar-policies`)  
 4. `kubectl apply -k k8s/overlays/development`  
 
 **Wichtige Env-Variablen (immer setzen)**
-- `PROXY_TARGET_HOST=localhost`  
-- `PROXY_TARGET_PORT=8081`  
+- `OIDC_AUTH_SERVER_URL=https://keycloak.example.com/realms/myrealm`  
+- `OIDC_CLIENT_ID=k8s-auth-sidecar`  
 - `RATE_LIMIT_TRUSTED_PROXIES=10.244.0.1,...` (Ingress-IPs!)  
 
 **Pitfalls**

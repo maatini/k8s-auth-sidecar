@@ -17,8 +17,7 @@ import space.maatini.sidecar.infrastructure.util.RequestUtils;
 import java.util.Map;
 
 /**
- * Reactive route handler for Envoy ext_authz (PDP).
- * Replaces the streaming proxy logic with a pure authorization endpoint.
+ * Reactive route handler for Envoy ext_authz (PDP) authorization decisions.
  */
 @ApplicationScoped
 public class SidecarRouteHandler {

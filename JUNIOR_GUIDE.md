@@ -44,11 +44,11 @@ Der Sidecar ist wie ein **Sicherheits-Checkpoint** auf einem Flughafen:
    - Die Regeln stehen in Dateien mit der Endung `.rego` (eine eigene, einfache Sprache namens Rego).  
    - Beispiel: „Wenn der User `admin` ist UND der Pfad mit `/api/admin` beginnt → erlauben“.
 
-4. **Weiterleitung oder Blockieren (Proxy)**  
-   - Erlaubt? → Request wird an `localhost:8085` (deine App) weitergeleitet. Zusätzlich werden nützliche Header mitgeschickt:
+4. **Antwort an das Gateway**  
+   - Erlaubt? → Der Sidecar sendet `200 OK` zurück an das Gateway, zusammen mit nützlichen Headern:
      - `X-Auth-User-Id`: Die User-ID (Subject).
      - `X-Enriched-Roles`: Komma-separierte Liste der angereicherten Rollen.
-   - Verboten? → sofort `403 Forbidden` an den Client. Deine App wird **nie** aufgerufen → super performant und sicher!
+   - Verboten? → sofort `403 Forbidden`. Deine App wird **nie** aufgerufen → super performant und sicher!
 
 ---
 
@@ -60,7 +60,7 @@ Der Sidecar ist wie ein **Sicherheits-Checkpoint** auf einem Flughafen:
 - **Hot-Reload**: Du änderst eine `.wasm` Datei in einer ConfigMap → der Sidecar merkt es und lädt sie neu, ohne Neustart!
 - **OPA Workflow**: Schreibe Rego, kompiliere lokal zu WASM (`opa build -t wasm ...`) und mounte die `.wasm` Datei.
 - **Quarkus**: Ein super-schnelles Java-Framework, das auch als winziges **Native-Image** (keine JVM nötig) laufen kann.
-- **Reaktives Streaming**: Der Sidecar streamt selbst riesige Payloads (z. B. 500 MB Dateiuploads) ohne RAM-Probleme. Die Connection-Pools für solche Weiterleitungen (Proxy) sind dynamisch konfigurierbar.
+- **Reaktive Verarbeitung**: Der Sidecar verarbeitet Autorisierungsentscheidungen non-blocking mit Mutiny `Uni`. Die Connection-Pools sind dynamisch konfigurierbar.
 - **Micro-Caching**: Um bei jedem Nutzer nicht ständig aufwendig Kryptografie prüfen zu müssen, behält der Sidecar verifizierte Ausweise kurz im Gedächtnis (JWT Caffeine Cache).
 
 ---
@@ -70,7 +70,7 @@ Der Sidecar ist wie ein **Sicherheits-Checkpoint** auf einem Flughafen:
 - Unterstützt **Keycloak** und **Entra ID** (auch Multi-Tenant)
 - **Embedded OPA WASM** (In-Memory) – Lädt vorkompilierte `.wasm` Policies für maximale Speed.
 - Rollen-Enrichment aus eigenem Service
-- **Reaktive Pipeline** (Mutiny `Uni`) und **Streaming-Proxy** (Vert.x) – minimale Speicherbelegung!
+- **Reaktive Pipeline** (Mutiny `Uni`) und **Vert.x Route Handler** – minimale Speicherbelegung!
 - Ant-Style Path-Matching (`/**`, `/api/*/users`)
 - Prometheus-Metriken + OpenTelemetry + JSON-Logging
 - Health-Checks (liveness/readiness)
@@ -141,7 +141,7 @@ Bevor wir etwas nach Kubernetes schieben, verpacken wir es in einen Container.
 Bevor du `kubectl apply` tippst, schau dir an, was passieren würde.
 - **Befehl:** `kubectl kustomize k8s/overlays/development`
 - **Was passiert jetzt?** Kustomize baut alle deine "Puzzleteile" (YAML-Dateien) zu einer großen Datei zusammen.
-- **Junior-Tipp:** Prüf hier besonders, ob die `PROXY_TARGET_PORT` auf deine App zeigt!
+- **Junior-Tipp:** Prüf hier besonders, ob die Umgebungsvariablen (`OIDC_AUTH_SERVER_URL`, `AUTHZ_ENABLED`) richtig gesetzt sind!
 
 #### 7. Mutation Testing (PIT) – Qualitäts-Check
 Das ist das "Nächste Level". PIT verändert deinen Code absichtlich ("Mutanten"), um zu sehen, ob deine Tests das merken.
@@ -183,21 +183,12 @@ Auch wenn der Sidecar super schnell ist, gibt es zwei Dinge, auf die du achten m
 
 ## 📊 Projekt-Reife & Setup
 
-- **Sehr stabil**: Komplettes Refactoring (reaktiv + streaming + Memory-Optimierung) extrem performant.
-- **Aktiv in Entwicklung**: Core-Funktionen (Auth-Filter, Proxy, OPA, Path-Matcher) inkl. serverseitigen Caffeine-Caches (Session & Profiling) sind produktionsreif.
-- **Testing & Mutation Score**: **147 automatisierte Tests** (POJO+ExtTests + QuarkusTests). Die Kernservices in `auth-core` erreichen **79% PIT Test Strength** und **71% PIT Line Coverage**. Proxy-QuarkusIntegrationstests benötigen den lokalen WireMock-Stack (`docker-compose.dev.yml`).
+- **Sehr stabil**: Komplettes Refactoring (reaktiv + Memory-Optimierung) extrem performant.
 - **Dokumentation**: Sehr stark! README + `docs/ARCHITECTURE.md` + dieser Junior Guide.
-## 🛡️ Die zwei Gesichter des Sidecars
+## 🛡️ Der Sidecar als externer Autorisierungs-Service
 
-Du kannst den Sidecar auf zwei Arten nutzen, je nachdem, was du brauchst:
-
-### 1. Der "Leibwächter" (Proxy Mode)
-Das ist der Standard. Der Sidecar steht direkt vor deiner App. Alles, was zu deiner App will, muss erst am Sidecar vorbei. Er prüft den Ausweis (JWT) und lässt den Request nur durch, wenn alles okay ist.
-- **Wann nutzen?** Wenn deine App selbst gar nichts von Auth wissen soll.
-
-### 2. Der "Ausweis-Prüfer" (Gateway Mode / ext_authz)
-Hier steht der Sidecar nicht direkt vor deiner App, sondern daneben. Ein großes Gateway (z.B. Envoy oder Nginx) fragt den Sidecar über den `/authorize` Endpunkt: "Hey, dieser Typ hier will rein, ist sein Ausweis okay?". Der Sidecar sagt "Ja" oder "Nein", und das Gateway lässt den Typen dann durch oder blockt ihn ab.
-- **Wann nutzen?** Wenn du ein zentrales Gateway (Ingress) hast, das die Arbeit macht, aber die Logik vom Sidecar nutzen soll.
+Der Sidecar steht neben deiner App im selben Pod. Ein großes Gateway (z.B. Envoy oder Nginx) fragt den Sidecar über den `/authorize` Endpunkt: "Hey, dieser Typ hier will rein, ist sein Ausweis okay?". Der Sidecar sagt "Ja" (mit Enrichment-Headern) oder "Nein", und das Gateway lässt den Request dann durch oder blockt ihn ab.
+- **Wann nutzen?** Immer! Der Sidecar ist ausschließlich für den Betrieb mit einem Ingress-Gateway (Envoy, Nginx) konzipiert.
 
 ---
 

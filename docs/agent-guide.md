@@ -11,7 +11,7 @@ Dieses Dokument ist dein offizieller Leitfaden, wie du im **k8s-auth-sidecar** R
 root/
 ├── .agent/              ← deine Regeln & Skills
 ├── auth-core/           ← alle UseCases + Domain + POJO-Tests
-├── proxy/               ← REST-Resources + Proxy-Pipeline
+├── proxy/               ← REST-Resources + Route Handler
 ├── docs/
 │   ├── agent-guide.md   ← du bist hier
 │   ├── ARCHITECTURE.md
