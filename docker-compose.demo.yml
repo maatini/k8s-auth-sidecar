@@ -1,4 +1,4 @@
-version: '3.8'
+# Docker Compose demo stack for k8s-auth-sidecar
 
 services:
   # 1. Dummy Backend Application (Was geschützt werden soll)
@@ -49,10 +49,6 @@ services:
       # Optional: Lokale Policies mounten (Hot-Reload funktioniert auch hier!)
       - ./opa-wasm/src/main/resources/policies:/policies
     environment:
-      # Ziel: Unsere Dummy-App im selben Docker-Netzwerk
-      PROXY_TARGET_HOST: "backend-app"
-      PROXY_TARGET_PORT: "80"
-
       # OIDC Settings
       OIDC_AUTH_SERVER_URL: "http://wiremock-oidc:8080/realms/master"
       OIDC_CLIENT_ID: "k8s-auth-sidecar"
@@ -63,10 +59,6 @@ services:
       # The mock JWT signature is invalid. For the demo, disable Auth temporarily or fix token signing.
       AUTH_ENABLED: "false"
       ROLES_SERVICE_URL: "http://wiremock-roles:8080"
-
-      # OPA Einstellungen
-      OPA_MODE: "embedded"
-      OPA_POLICY_DIR: "/policies"
 
       # Logging
       QUARKUS_LOG_LEVEL: "DEBUG"

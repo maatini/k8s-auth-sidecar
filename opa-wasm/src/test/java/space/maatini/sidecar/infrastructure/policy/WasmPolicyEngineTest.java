@@ -109,6 +109,11 @@ public class WasmPolicyEngineTest {
 
                     @Override
                     public String interval() {
+                        return "10s";
+                    }
+
+                    @Override
+                    public String delayed() {
                         return "5s";
                     }
                 };

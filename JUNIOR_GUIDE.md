@@ -104,7 +104,7 @@ Danach nur noch:
 
 ## 🧪 So testest du das Projekt – Schritt für Schritt (super einfach erklärt)
 
-Keine Angst vor den 118 Tests! Wir zeigen dir jetzt, wie du sie alle ausführst und vor allem: **Was sie bedeuten.**
+Keine Angst vor den 147 Tests! Wir zeigen dir jetzt, wie du sie alle ausführst und vor allem: **Was sie bedeuten.**
 
 #### 1. Lokale Entwicklung (am schnellsten)
 Wenn du gerade am Code bastelst, willst du sofort sehen, ob es noch klappt.
@@ -185,7 +185,7 @@ Auch wenn der Sidecar super schnell ist, gibt es zwei Dinge, auf die du achten m
 
 - **Sehr stabil**: Komplettes Refactoring (reaktiv + streaming + Memory-Optimierung) extrem performant.
 - **Aktiv in Entwicklung**: Core-Funktionen (Auth-Filter, Proxy, OPA, Path-Matcher) inkl. serverseitigen Caffeine-Caches (Session & Profiling) sind produktionsreif.
-- **Testing & Mutation Score**: **118 automatisierte Tests** (POJO+ExtTests + QuarkusTests). Die Kernservices in `auth-core` erreichen **82% PIT Test Strength** und **91% PIT Line Coverage**. Proxy-QuarkusIntegrationstests benötigen den lokalen WireMock-Stack (`docker-compose.dev.yml`).
+- **Testing & Mutation Score**: **147 automatisierte Tests** (POJO+ExtTests + QuarkusTests). Die Kernservices in `auth-core` erreichen **79% PIT Test Strength** und **71% PIT Line Coverage**. Proxy-QuarkusIntegrationstests benötigen den lokalen WireMock-Stack (`docker-compose.dev.yml`).
 - **Dokumentation**: Sehr stark! README + `docs/ARCHITECTURE.md` + dieser Junior Guide.
 ## 🛡️ Die zwei Gesichter des Sidecars
 

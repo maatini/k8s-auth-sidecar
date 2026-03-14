@@ -54,9 +54,11 @@ class WasmPolicyEngineExtTest {
         mapperField.set(engine, objectMapper);
 
         // Initialize pool manually since @PostConstruct is not called
-        Field poolField = WasmPolicyEngine.class.getDeclaredField("policyPool");
+        Field poolField = WasmPolicyEngine.class.getDeclaredField("policyPoolRef");
         poolField.setAccessible(true);
-        poolField.set(engine, new java.util.concurrent.ArrayBlockingQueue<OpaPolicy>(10));
+        AtomicReference<java.util.concurrent.ArrayBlockingQueue<OpaPolicy>> poolRef =
+                (AtomicReference<java.util.concurrent.ArrayBlockingQueue<OpaPolicy>>) poolField.get(engine);
+        poolRef.set(new java.util.concurrent.ArrayBlockingQueue<>(10));
 
         mockPolicy = mock(OpaPolicy.class);
     }
@@ -262,9 +264,11 @@ class WasmPolicyEngineExtTest {
     }
 
     private void injectMockPolicy(WasmPolicyEngine engine, OpaPolicy policy, long version) throws Exception {
-        Field policyPoolField = WasmPolicyEngine.class.getDeclaredField("policyPool");
+        Field policyPoolField = WasmPolicyEngine.class.getDeclaredField("policyPoolRef");
         policyPoolField.setAccessible(true);
-        java.util.concurrent.ArrayBlockingQueue<OpaPolicy> pool = (java.util.concurrent.ArrayBlockingQueue<OpaPolicy>) policyPoolField.get(engine);
+        AtomicReference<java.util.concurrent.ArrayBlockingQueue<OpaPolicy>> poolRef =
+                (AtomicReference<java.util.concurrent.ArrayBlockingQueue<OpaPolicy>>) policyPoolField.get(engine);
+        java.util.concurrent.ArrayBlockingQueue<OpaPolicy> pool = poolRef.get();
         pool.clear();
         pool.offer(policy);
     }

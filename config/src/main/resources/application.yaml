@@ -4,7 +4,7 @@
 quarkus:
   application:
     name: k8s-auth-sidecar
-    version: 1.0.0
+    version: 0.3.0
 
   # HTTP Server Configuration
   http:
@@ -12,7 +12,7 @@ quarkus:
     cors:
       enabled: true
       origins: ${QUARKUS_HTTP_CORS_ORIGINS:*}
-      methods: GET,POST,PUT,DELETE,PATCH,OPTIONS
+      methods: ${QUARKUS_HTTP_CORS_METHODS:GET,POST,PUT,DELETE,PATCH,OPTIONS}
       headers: "*"
       access-control-max-age: 24H
 
@@ -37,24 +37,24 @@ quarkus:
   cache:
     caffeine:
       "policy-decision-cache":
-        initial-capacity: 500
-        maximum-size: 5000
-        expire-after-write: 1m
+        initial-capacity: ${POLICY_CACHE_INITIAL:500}
+        maximum-size: ${POLICY_CACHE_MAX:5000}
+        expire-after-write: ${POLICY_CACHE_TTL:1m}
       "jwt-cache":
-        initial-capacity: 500
-        maximum-size: 10000
-        expire-after-write: 10m
+        initial-capacity: ${JWT_CACHE_INITIAL:500}
+        maximum-size: ${JWT_CACHE_MAX:10000}
+        expire-after-write: ${JWT_CACHE_TTL:10m}
       "roles-cache":
-        initial-capacity: 100
-        maximum-size: 1000
-        expire-after-write: 10m
+        initial-capacity: ${ROLES_CACHE_INITIAL:100}
+        maximum-size: ${ROLES_CACHE_MAX:1000}
+        expire-after-write: ${ROLES_CACHE_TTL:10m}
 
   # REST Client Configuration for Roles Enrichment
   rest-client:
     "roles-api":
       url: ${sidecar.roles.url}
-      connect-timeout: 2000
-      read-timeout: 500
+      connect-timeout: ${ROLES_CONNECT_TIMEOUT:2000}
+      read-timeout: ${ROLES_READ_TIMEOUT:500}
 
   # Health and Metrics
   smallrye-health:
@@ -129,7 +129,10 @@ sidecar:
   # OPA (Embedded WASM via Chicory)
   opa:
     enabled: ${OPA_ENABLED:true}
-    hot-reload-interval: ${OPA_HOT_RELOAD_INTERVAL:10s}
+    hot-reload:
+      enabled: ${OPA_HOT_RELOAD_ENABLED:true}
+      interval: ${OPA_HOT_RELOAD_INTERVAL:10s}
+      delayed: ${OPA_HOT_RELOAD_DELAYED:5s}
     embedded:
       wasm-path: ${OPA_WASM_PATH:classpath:policies/authz.wasm}
       pool-size: ${OPA_POOL_SIZE:50}

@@ -11,6 +11,7 @@ import org.eclipse.microprofile.jwt.JsonWebToken;
 import space.maatini.sidecar.application.service.SidecarRequestProcessor;
 import space.maatini.sidecar.domain.model.ProcessingResult;
 import space.maatini.sidecar.domain.model.SidecarRequest;
+import space.maatini.sidecar.infrastructure.security.HeaderSanitizer;
 import space.maatini.sidecar.infrastructure.util.RequestUtils;
 
 import java.util.Map;
@@ -22,13 +23,23 @@ import java.util.Map;
 @ApplicationScoped
 public class SidecarRouteHandler {
 
+    /** Header name for the authenticated user ID enrichment. */
+    public static final String HEADER_AUTH_USER_ID = "X-Auth-User-Id";
+
+    /** Header name for the enriched roles list. */
+    public static final String HEADER_ENRICHED_ROLES = "X-Enriched-Roles";
+
     private final SidecarRequestProcessor processor;
     private final JsonWebToken jwt;
+    private final HeaderSanitizer headerSanitizer;
 
     @Inject
-    public SidecarRouteHandler(SidecarRequestProcessor processor, JsonWebToken jwt) {
+    public SidecarRouteHandler(SidecarRequestProcessor processor,
+                               JsonWebToken jwt,
+                               HeaderSanitizer headerSanitizer) {
         this.processor = processor;
         this.jwt = jwt;
+        this.headerSanitizer = headerSanitizer;
     }
 
     /**
@@ -38,19 +49,15 @@ public class SidecarRouteHandler {
     @Route(path = "/authorize", methods = Route.HttpMethod.GET)
     public Uni<Void> authorize(RoutingContext ctx) {
         HttpServerRequest vertxRequest = ctx.request();
-        
-        // Extract original request info from Envoy headers or fallback to current request
-        String path = vertxRequest.getHeader("X-Envoy-Original-Path");
-        if (path == null) {
-            path = vertxRequest.path();
-        }
-        
-        String method = vertxRequest.getHeader("X-Forwarded-Method");
-        if (method == null) {
-            method = vertxRequest.method().name();
-        }
 
+        // Extract and sanitize original request info (defense-in-depth against header spoofing)
+        String path = headerSanitizer.extractPath(vertxRequest);
+        String method = headerSanitizer.extractMethod(vertxRequest);
+
+        // Strip Envoy-internal headers before passing to policy engine
         Map<String, String> headers = RequestUtils.extractHeaders(vertxRequest);
+        headers.entrySet().removeIf(e -> headerSanitizer.isEnvoyInternalHeader(e.getKey()));
+
         Map<String, String> queryParams = RequestUtils.extractQueryParams(ctx);
 
         SidecarRequest request = new SidecarRequest(method, path, headers, queryParams, jwt);
@@ -62,9 +69,9 @@ public class SidecarRouteHandler {
                     if (result instanceof ProcessingResult.Proceed proceed) {
                         response.setStatusCode(200);
                         // Supplement Envoy request with enriched data
-                        response.putHeader("X-Auth-User-Id", proceed.authContext().userId());
+                        response.putHeader(HEADER_AUTH_USER_ID, proceed.authContext().userId());
                         if (proceed.authContext().roles() != null && !proceed.authContext().roles().isEmpty()) {
-                            response.putHeader("X-Enriched-Roles", String.join(",", proceed.authContext().roles()));
+                            response.putHeader(HEADER_ENRICHED_ROLES, String.join(",", proceed.authContext().roles()));
                         }
                         return Uni.createFrom().completionStage(response.end().toCompletionStage()).replaceWithVoid();
                     } else if (result instanceof ProcessingResult.Skip) {

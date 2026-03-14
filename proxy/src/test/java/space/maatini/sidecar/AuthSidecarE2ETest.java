@@ -133,6 +133,20 @@ public class AuthSidecarE2ETest {
                                 .statusCode(200); // Authorize says OK even if backend is failing (since it only checks authz)
         }
 
+        @Test
+        void testSpoofedHeader_TraversalShouldBeNormalized() {
+                // An attacker tries to spoof the path using traversal to bypass auth
+                // X-Envoy-Original-Path: /api/public/../../api/admin → normalized to /api/admin
+                // Without a valid JWT, this must return 401 (not 200)
+                given()
+                                .header("X-Envoy-Original-Path", "/api/public/../../api/admin")
+                                .header("X-Forwarded-Method", "GET")
+                                // Intentionally NO Authorization header → must be rejected
+                                .when().get("/authorize")
+                                .then()
+                                .statusCode(401);
+        }
+
         // Helper for removing leading zero byte in BigInteger if present for RSA
         // encoding
         private static byte[] toIntegerBytes(java.math.BigInteger bigInt) {

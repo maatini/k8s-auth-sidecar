@@ -216,7 +216,7 @@ public class WasmPolicyEngine {
         return Paths.get(path);
     }
 
-    @Scheduled(every = "{sidecar.opa.hot-reload.interval}", delayed = "5s", identity = "policy-hot-reload")
+    @Scheduled(every = "{sidecar.opa.hot-reload.interval}", delayed = "{sidecar.opa.hot-reload.delayed}", identity = "policy-hot-reload")
     void checkPolicyChanges() {
         if (!config.opa().enabled() || !config.opa().hotReload().enabled()) {
             return;

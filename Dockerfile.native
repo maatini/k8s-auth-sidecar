@@ -11,20 +11,24 @@ WORKDIR /app
 # Install Maven
 RUN microdnf install -y maven && microdnf clean all
 
-# Copy pom.xml first for better layer caching
+# Copy pom.xml files first for better layer caching (multi-module)
 COPY pom.xml .
+COPY auth-core/pom.xml auth-core/
+COPY proxy/pom.xml proxy/
+COPY opa-wasm/pom.xml opa-wasm/
+COPY config/pom.xml config/
 
 # Download dependencies
 RUN --mount=type=cache,target=/root/.m2 mvn dependency:go-offline -B
 
-# Copy source code
-COPY src ./src
+# Copy source code for all modules
+COPY auth-core/src auth-core/src
+COPY proxy/src proxy/src
+COPY opa-wasm/src opa-wasm/src
+COPY config/src config/src
 
-# Note: To drastically improve build times on CI, the CI workflow 
-# should build the native binary *before* the docker build and provide it in target/*-runner.
-# This Dockerfile still performs the build independently if no binary is provided,
-# ensuring the build is self-contained when run purely with `docker build`.
-RUN --mount=type=cache,target=/root/.m2 mvn package -Pnative -DskipTests \
+# Build the proxy application (which includes other modules) as native image
+RUN --mount=type=cache,target=/root/.m2 mvn package -Pnative -DskipTests -pl proxy -am \
     -Dquarkus.native.additional-build-args="-H:+ReportExceptionStackTraces"
 
 # =====================================================
@@ -47,11 +51,11 @@ WORKDIR /app
 # Switch to root to change ownership
 USER root
 
-# Copy policies
-COPY --chown=1001:1001 src/main/resources/policies /policies
+# Copy policies from opa-wasm module
+COPY --chown=1001:1001 opa-wasm/src/main/resources/policies /policies
 
 # Copy the native executable from the build stage with proper ownership
-COPY --chown=1001:1001 --from=build /app/target/*-runner /app/k8s-auth-sidecar
+COPY --chown=1001:1001 --from=build /app/proxy/target/*-runner /app/k8s-auth-sidecar
 
 # Switch back to non-root user (1001 is the default quarkus user in micro-image)
 USER 1001

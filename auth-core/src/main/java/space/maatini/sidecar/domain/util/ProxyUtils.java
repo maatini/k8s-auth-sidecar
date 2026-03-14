@@ -1,9 +1,19 @@
 package space.maatini.sidecar.domain.util;
 
+import java.util.List;
+
 /**
  * Utility class for sidecar proxy operations.
  */
 public final class ProxyUtils {
+
+    /** Well-known management paths that should never be proxied or auth-checked. */
+    public static final List<String> MANAGEMENT_PATHS = List.of(
+            "/health", "/metrics", "/ready", "/live"
+    );
+
+    /** Default Quarkus non-application root path. */
+    public static final String DEFAULT_NON_APP_ROOT = "/q";
 
     private ProxyUtils() {
         // Private constructor to prevent instantiation
@@ -21,15 +31,15 @@ public final class ProxyUtils {
             return false;
         }
 
-        String root = (nonAppRoot != null) ? nonAppRoot : "/q";
+        String root = (nonAppRoot != null) ? nonAppRoot : DEFAULT_NON_APP_ROOT;
         if (!root.endsWith("/")) {
             root = root + "/";
         }
 
-        return path.startsWith(root) ||
-                path.equals("/health") ||
-                path.equals("/metrics") ||
-                path.equals("/ready") ||
-                path.equals("/live");
+        if (path.startsWith(root)) {
+            return true;
+        }
+
+        return MANAGEMENT_PATHS.contains(path);
     }
 }

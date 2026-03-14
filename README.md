@@ -6,8 +6,8 @@
   [![Quarkus](https://img.shields.io/badge/Quarkus-3.32.3-blue.svg?logo=quarkus)](https://quarkus.io)
   [![Java](https://img.shields.io/badge/Java-21-orange.svg?logo=openjdk)](https://openjdk.org)
   [![License](https://img.shields.io/badge/License-Apache%202.0-green.svg)](LICENSE)
-  [![Tests](https://img.shields.io/badge/Tests-118%20%E2%9C%85%200%20Failures-brightgreen.svg)](#-so-testest-du-das-projekt--schritt-f%C3%BCr-schritt-super-einfach-erkl%C3%A4rt)
-  [![PIT Strength](https://img.shields.io/badge/PIT%20Strength-84%25-brightgreen.svg)](#7-mutation-testing-pit--qualit%C3%A4ts-check)
+  [![Tests](https://img.shields.io/badge/Tests-147%20%E2%9C%85%200%20Failures-brightgreen.svg)](#-so-testest-du-das-projekt--schritt-f%C3%BCr-schritt-super-einfach-erkl%C3%A4rt)
+  [![PIT Strength](https://img.shields.io/badge/PIT%20Strength-78%25-brightgreen.svg)](#7-mutation-testing-pit--qualit%C3%A4ts-check)
   [![Docker](https://img.shields.io/badge/Docker-Ready-blue.svg?logo=docker)](https://www.docker.com/)
   [![Kubernetes](https://img.shields.io/badge/Kubernetes-Ready-blue.svg?logo=kubernetes)](https://kubernetes.io/)
 </div>
@@ -193,22 +193,20 @@ Das Projekt besitzt eine extrem schnelle, überwiegend Framework-unabhängige Te
 
 | Modul | `@Test`-Methoden | Failures | Typ |
 |-------|------:|:--------:|-----|
-| `auth-core` | 46 | 0 ✅ | POJO + Ext + Quarkus |
-| `opa-wasm` | 59 | 0 ✅ | POJO + Ext + Quarkus |
 | `config` | 4 | 0 ✅ | POJO + Quarkus |
-| `proxy` | 9 | 0 ✅ | POJO + E2E |
-| **Gesamt** | **118** | **0 ✅** | |
-
-> [!NOTE]
-> Einige Quarkus-Integrationstests (`LivenessCheckTest`, `WasmPolicyEngineTest` etc.) haben aktuell einen Config-Mapping-Fehler (`sidecar.opa.hot-reload-interval`). POJO- und Ext-Tests sind davon nicht betroffen und laufen fehlerfrei.
+| `auth-core` | 48 | 0 ✅ | POJO + Ext + Quarkus |
+| `opa-wasm` | 57 | 0 ✅ | POJO + Ext + Quarkus |
+| `proxy` | 38 | 0 ✅ | POJO + E2E + Quarkus |
+| **Gesamt** | **147** | **0 ✅** | |
 
 **PIT Scores per Module:**
 
 | Module    | Killed % | Strength % | Line Cov % |
 |-----------|----------|------------|------------|
-| auth-core | 82      | 82        | 91        |
-| opa-wasm  | 72      | 78        | 78        |
-| proxy     | 84      | 84        | 52        |
+| config    | 29       | 100        | 53         |
+| auth-core | 48       | 79         | 71         |
+| opa-wasm  | 67       | 70         | 88         |
+| proxy     | 46       | 84         | 41         |
 
 - Bericht: `<modul>/target/pit-reports/`
 
