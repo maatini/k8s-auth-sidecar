@@ -6,9 +6,11 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import space.maatini.sidecar.infrastructure.config.SidecarConfig;
 import space.maatini.sidecar.domain.model.AuthContext;
-import space.maatini.sidecar.domain.model.PolicyDecision;
+import space.maatini.sidecar.domain.model.AuthContext;
 import space.maatini.sidecar.domain.model.ProcessingResult;
 import space.maatini.sidecar.domain.model.SidecarRequest;
+import space.maatini.sidecar.usecase.authorization.AuthorizationResult;
+import space.maatini.sidecar.usecase.authorization.AuthorizationUseCase;
  
 import java.util.Collections;
 import java.util.List;
@@ -23,17 +25,15 @@ class SidecarRequestProcessorPojoTest {
     private SidecarRequestProcessor processor;
     private SidecarConfig config;
     private AuthenticationService authService;
-    private PolicyEngine policyEngine;
-    private RolesService rolesService;
+    private AuthorizationUseCase authorizationUseCase;
  
     @BeforeEach
     void setup() {
         config = mock(SidecarConfig.class);
         authService = mock(AuthenticationService.class);
-        policyEngine = mock(PolicyEngine.class);
-        rolesService = mock(RolesService.class);
-
-        processor = new SidecarRequestProcessor(authService, rolesService, policyEngine, config);
+        authorizationUseCase = mock(AuthorizationUseCase.class);
+ 
+        processor = new SidecarRequestProcessor(authService, authorizationUseCase, config, "/q");
  
         // Common config
         SidecarConfig.AuthConfig authConfig = mock(SidecarConfig.AuthConfig.class);
@@ -97,9 +97,8 @@ class SidecarRequestProcessorPojoTest {
  
         AuthContext authCtx = AuthContext.builder().userId("u123").email("u@u").build();
         when(authService.extractAuthContext(eq(jwt))).thenReturn(Uni.createFrom().item(authCtx));
-        when(rolesService.enrich(any())).thenReturn(Uni.createFrom().item(authCtx));
-        when(policyEngine.evaluate(any(), any(), any(), any(), any()))
-                .thenReturn(Uni.createFrom().item(PolicyDecision.allow()));
+        when(authorizationUseCase.execute(any()))
+                .thenReturn(Uni.createFrom().item(new AuthorizationResult(true, null, Collections.emptyList())));
  
         ProcessingResult result = processor.process(request).await().indefinitely();
         assertTrue(result instanceof ProcessingResult.Proceed);
@@ -113,12 +112,11 @@ class SidecarRequestProcessorPojoTest {
  
         AuthContext authCtx = AuthContext.builder().userId("u123").email("u@u").build();
         when(authService.extractAuthContext(eq(jwt))).thenReturn(Uni.createFrom().item(authCtx));
-        when(rolesService.enrich(any())).thenReturn(Uni.createFrom().item(authCtx));
-        when(policyEngine.evaluate(any(), any(), any(), any(), any()))
-                .thenReturn(Uni.createFrom().item(PolicyDecision.deny("Denied by test")));
+        when(authorizationUseCase.execute(any()))
+                .thenReturn(Uni.createFrom().item(new AuthorizationResult(false, "Denied by test", Collections.emptyList())));
  
         ProcessingResult result = processor.process(request).await().indefinitely();
         assertTrue(result instanceof ProcessingResult.Forbidden);
-        assertEquals("Denied by test", ((ProcessingResult.Forbidden) result).decision().reason());
+        assertEquals("Denied by test", ((ProcessingResult.Forbidden) result).result().reason());
     }
 }

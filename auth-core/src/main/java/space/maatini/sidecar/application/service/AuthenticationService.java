@@ -36,12 +36,12 @@ public class AuthenticationService {
         }
 
         try {
-            // Use Raw Token as stable cache key to avoid memory leak with proxy objects
-            String cacheKey = jwt.getRawToken();
-            if (cacheKey == null) {
+            String rawToken = jwt.getRawToken();
+            if (rawToken == null) {
                 LOG.warn("JWT has no raw token, falling back to non-cached extraction");
                 return Uni.createFrom().item(() -> extractFromJwt(jwt));
             }
+            String cacheKey = hashToken(rawToken);
             return getCachedAuthContext(cacheKey, jwt);
         } catch (Exception e) {
             LOG.errorf(e, "Failed to extract auth context from JWT");
@@ -62,5 +62,24 @@ public class AuthenticationService {
 
         Set<String> tokenRoles = roleExtractor.extractRoles(jwt);
         return authContextMapper.mapToAuthContext(jwt, tokenRoles);
+    }
+
+    private String hashToken(String token) {
+        try {
+            java.security.MessageDigest digest = java.security.MessageDigest.getInstance("SHA-256");
+            byte[] encodedhash = digest.digest(token.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            StringBuilder hexString = new StringBuilder(2 * encodedhash.length);
+            for (byte b : encodedhash) {
+                String hex = Integer.toHexString(0xff & b);
+                if (hex.length() == 1) {
+                    hexString.append('0');
+                }
+                hexString.append(hex);
+            }
+            return hexString.toString();
+        } catch (java.security.NoSuchAlgorithmException e) {
+            // Fail-closed: never expose raw JWT as plaintext cache key
+            throw new IllegalStateException("SHA-256 algorithm missing - cannot hash token securely", e);
+        }
     }
 }

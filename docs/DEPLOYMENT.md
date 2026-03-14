@@ -230,7 +230,7 @@ kubectl apply -k k8s/overlays/production
 
 Bei `OPA_MODE=embedded` werden Policies automatisch neu geladen, wenn sich die ConfigMap ändert. 
 
-In Kubernetes passiert dies durch einen **Symlink-Swap auf ein neues `..data`-Verzeichnis**. Der Sidecar-Filewatcher ist darauf optimiert, diese Kubernetes-spezifischen Events zuverlässig zu erkennen. Die vorinstallierte OPA-CLI im Container kümmert sich um die On-the-Fly Rekompilierung nach `.wasm`.
+In Kubernetes passiert dies durch einen **Symlink-Swap auf ein neues `..data`-Verzeichnis**. Der Sidecar-Filewatcher ist darauf optimiert, diese Kubernetes-spezifischen Events zuverlässig zu erkennen.
 
 ```bash
 kubectl patch configmap k8s-auth-sidecar-policies -n k8s-auth-sidecar-demo \

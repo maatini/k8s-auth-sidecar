@@ -11,27 +11,29 @@ import space.maatini.sidecar.infrastructure.config.SidecarConfig;
 import space.maatini.sidecar.domain.model.AuthContext;
 import space.maatini.sidecar.domain.model.ProcessingResult;
 import space.maatini.sidecar.domain.model.SidecarRequest;
+import space.maatini.sidecar.usecase.authorization.AuthorizationCommand;
+import space.maatini.sidecar.usecase.authorization.AuthorizationUseCase;
 
 @ApplicationScoped
 public class SidecarRequestProcessor {
     private static final Logger LOG = Logger.getLogger(SidecarRequestProcessor.class);
 
     private final AuthenticationService authenticationService;
-    private final RolesService rolesService;
-    private final PolicyEngine policyEngine;
+    private final AuthorizationUseCase authorizationUseCase;
     private final SidecarConfig config;
+    private final String nonAppRoot;
 
     private ImmutablePathMatcher<Boolean> publicPathMatcher;
 
     @Inject
     public SidecarRequestProcessor(AuthenticationService authenticationService,
-                                   RolesService rolesService,
-                                   PolicyEngine policyEngine,
-                                   SidecarConfig config) {
+                                   AuthorizationUseCase authorizationUseCase,
+                                   SidecarConfig config,
+                                   @org.eclipse.microprofile.config.inject.ConfigProperty(name = "quarkus.http.non-application-root-path", defaultValue = "/q") String nonAppRoot) {
         this.authenticationService = authenticationService;
-        this.rolesService = rolesService;
-        this.policyEngine = policyEngine;
+        this.authorizationUseCase = authorizationUseCase;
         this.config = config;
+        this.nonAppRoot = nonAppRoot;
     }
 
     @PostConstruct
@@ -52,7 +54,7 @@ public class SidecarRequestProcessor {
         String path = request.path();
         String method = request.method();
 
-        if (isPublicPath(path) || ProxyUtils.isInternalPath(path)) {
+        if (isPublicPath(path) || ProxyUtils.isInternalPath(path, nonAppRoot)) {
             LOG.debugf("Skipping processing for path: %s", path);
             return Uni.createFrom().item(ProcessingResult.skip());
         }
@@ -70,22 +72,28 @@ public class SidecarRequestProcessor {
                     }
                     LOG.debugf("Authenticated user: %s", authContext.userId());
 
-                    return rolesService.enrich(authContext)
-                            .flatMap(enrichedContext -> {
-                                if (!config.authz().enabled()) {
-                                    return Uni.createFrom().item(ProcessingResult.proceed(enrichedContext));
+                    if (!config.authz().enabled()) {
+                        return Uni.createFrom().item(ProcessingResult.proceed(authContext));
+                    }
+
+                    AuthorizationCommand command = new AuthorizationCommand(
+                            authContext,
+                            method,
+                            path,
+                            request.headers(),
+                            request.queryParams()
+                    );
+
+                    return authorizationUseCase.execute(command)
+                            .map(result -> {
+                                if (!result.allowed()) {
+                                    LOG.warnf("Authorization denied for user on %s %s: %s", method, path,
+                                            result.reason());
+                                    return (ProcessingResult) ProcessingResult.forbidden(result);
                                 }
-                                return policyEngine.evaluate(enrichedContext, method, path, request.headers(), request.queryParams())
-                                        .map(decision -> {
-                                            if (!decision.allowed()) {
-                                                LOG.warnf("Authorization denied for user on %s %s: %s", method, path,
-                                                        decision.reason());
-                                                return (ProcessingResult) ProcessingResult.forbidden(decision);
-                                            }
-                                            LOG.debugf("Authorization allowed for user %s on %s %s",
-                                                    enrichedContext.userId(), method, path);
-                                            return (ProcessingResult) ProcessingResult.proceed(enrichedContext);
-                                        });
+                                LOG.debugf("Authorization allowed for user %s on %s %s",
+                                        authContext.userId(), method, path);
+                                return (ProcessingResult) ProcessingResult.proceed(authContext);
                             });
                 })
                 .onFailure().recoverWithItem(error -> {

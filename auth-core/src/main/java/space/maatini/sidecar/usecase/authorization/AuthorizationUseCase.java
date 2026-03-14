@@ -4,6 +4,7 @@ import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import space.maatini.sidecar.application.service.PolicyEngine;
+import space.maatini.sidecar.application.service.RolesService;
 import space.maatini.sidecar.domain.model.PolicyDecision;
 
 /**
@@ -13,10 +14,12 @@ import space.maatini.sidecar.domain.model.PolicyDecision;
 public class AuthorizationUseCase {
 
     private final PolicyEngine policyEngine;
+    private final RolesService rolesService;
 
     @Inject
-    public AuthorizationUseCase(PolicyEngine policyEngine) {
+    public AuthorizationUseCase(PolicyEngine policyEngine, RolesService rolesService) {
         this.policyEngine = policyEngine;
+        this.rolesService = rolesService;
     }
 
     /**
@@ -25,16 +28,17 @@ public class AuthorizationUseCase {
      * @param commandUni the command containing the context and request info
      * @return an AuthorizationResult indicating whether access is allowed or not
      */
-    public Uni<AuthorizationResult> execute(Uni<AuthorizationCommand> commandUni) {
-        return commandUni.flatMap(command ->
-                policyEngine.evaluate(
-                        command.context(),
-                        command.method(),
-                        command.path(),
-                        command.headers(),
-                        command.queryParams()
-                ).map(this::mapToResult)
-        );
+    public Uni<AuthorizationResult> execute(AuthorizationCommand command) {
+        return rolesService.enrich(command.context())
+                .flatMap(enrichedContext ->
+                        policyEngine.evaluate(
+                                enrichedContext,
+                                command.method(),
+                                command.path(),
+                                command.headers(),
+                                command.queryParams()
+                        ).map(this::mapToResult)
+                );
     }
 
     private AuthorizationResult mapToResult(PolicyDecision decision) {

@@ -14,27 +14,20 @@ Der **k8s-auth-sidecar** (Request Router Sidecar) ist ein Quarkus-basierter Micr
 
 ## Module & Komponenten (Maven Multi-Module)
 
-### 1. Modul: `proxy`
-- **Request Router (`ProxyResource`)**: Catch-all JAX-RS Resource.
-- **Streaming Proxy (`HttpProxyService`)**: Leitet Anfragen **via Streaming** an den Main-Container weiter.
-- **Entry Filter (`AuthProxyFilter`)**: Erster Kontaktpunkt, delegiert an den Processor.
-
-### 2. Modul: `auth-core`
-- **Request Processor (`SidecarRequestProcessor`)**: Orchestriert AuthN, Enrichment und AuthZ.
-- **Authentication Service (`AuthenticationService`)**: Validiert JWTs und extrahiert den `AuthContext`.
-- **Authorization UseCase (`AuthorizationUseCase`)**: Evaluiert OPA-WASM Policies über `AuthorizationCommand`.
-- **Roles Service (`RolesService`)**: Enriched den Context über den `RolesClient`.
-
-### 3. Modul: `opa-wasm`
-- **Policy Engine (`WasmPolicyEngine`)**: Eingebettete OPA-Engine (WASM) für In-Memory Evaluation.
-- **Policy Service (`PolicyService`)**: Abstraktionsschicht für die Autorisierungs-Logik.
-- **Rego Policies**: Lokale `.rego` Dateien und vorkompilierte `.wasm` Bundles.
-
-### 4. Modul: `config`
-- **Zentrale Konfiguration**: `SidecarConfig` (Quarkus Config).
-- **Observability**: Health-Checks (`Liveness`, `Readiness`) und Micrometer Metriken.
-
 Die gesamte HTTP-Pipeline ist reaktiv implementiert (`Mutiny Uni`), was höchste Parallelität bei minimalem Ressourcenverbrauch garantiert.
+
+## Betriebsmodi
+
+### 1. Gateway Mode (ext_authz) - EMPFOHLEN
+In diesem Modus wird der Sidecar von einem externen Gateway (Envoy/Nginx) zur Autorisierung kontaktiert.
+- **Endpoint**: `GET /authorize`.
+- **Logic**: Der Sidecar wertet die Header `X-Forwarded-Uri` und `X-Forwarded-Method` aus.
+- **Response**: `200 OK` delegiert die Anfrage an das eigentliche Ziel weiter. Rollen-Enrichment erfolgt über Antwort-Header (`X-Auth-User-Id`, `X-Enriched-Roles`).
+
+### 2. Sidecar Proxy Mode (Legacy)
+In diesem Modus ist der Sidecar der direkte Einstiegspunkt und leitet Traffic per Streaming weiter.
+- **Entry**: `AuthProxyFilter` fängt alle Requests an `/**` ab.
+- **Proxy**: `HttpProxyService` streamt den Request an `localhost:$PROXY_TARGET_PORT`.
 
 ## Architektur für lokale Entwicklung (Dev-Profil & Mocking)
 
@@ -47,11 +40,11 @@ Für eine erstklassige Developer Experience ohne externe Abhängigkeiten nutzt d
 
 | Komponente | Technologie |
 |------------|-------------|
-| Runtime | Quarkus 3.x (Native Image Support) |
+| Runtime | Quarkus 3.32.x (Native Image Support) |
 | Language | Java 21 |
 | OIDC | quarkus-oidc |
 | HTTP Client | quarkus-rest-client-reactive |
-| Policy Engine | OPA WASM (Chicory) oder REST (external) |
+| Policy Engine | OPA WASM (Chicory Embedded) |
 | Metrics | Micrometer + Prometheus |
 | Logging | quarkus-logging-json |
 | Container | GraalVM Native Image |
@@ -146,9 +139,9 @@ spec:
 > **Qualität zuerst:** Für uns ist Testing kein lästiges Extra, sondern der Kern unserer Stabilität. Wir nutzen modernste Java-Techniken wie **PIT Mutation Testing**, um sicherzustellen, dass unsere Tests wirklich jeden Fehler finden.
 
 ### Unsere Metriken (Stand März 2026)
-- **142 automatisierte Tests** (JVM + Native)
-- **PIT Test Strength > 70%** (unser Gold-Standard für Qualität)
-- **PIT Line Coverage > 75%**
+- **118 automatisierte Tests** (POJO + Ext + Quarkus)
+- **PIT Test Strength > 78%** (unser Gold-Standard für Qualität)
+- **PIT Line Coverage > 52%** (modulabhängig, auth-core: 91%)
 
 Weitere Details zum Testen findest du in unserem **legendären Testing-Abschnitt** im [README.md](../README.md#🧪-so-testest-du-das-projekt-–-schritt-für-schritt-super-einfach-erklärt).
 
@@ -159,7 +152,8 @@ Weitere Details zum Testen findest du in unserem **legendären Testing-Abschnitt
 - **Zero-Trust**: Jede Anfrage wird strikt validiert. Vertrauen ist gut, Kontrolle ist besser!
 - **Streaming Proxy**: Schützt vor Out-of-Memory-Attacken bei riesigen Uploads.
 - **Secure Defaults**: Alles ist standardmäßig verboten (`Deny by default`).
-- **WASM Hot-Reload**: Policies können im laufenden Betrieb ohne Neustart aktualisiert werden.
+- **WASM Hot-Reload**: Policies können im laufenden Betrieb ohne Neustart aktualisiert werden. Pool-Größe konfigurierbar via `OPA_POOL_SIZE` (Default: 50), gesichert durch `AtomicReference<ArrayBlockingQueue>`.
+- **Fail-Open Strategy (Roles)**: Bei Ausfall oder Timeout des `RolesService` greift ein `@Fallback` – der `AuthContext` behält seine JWT-basierten Rollen. Abgesichert durch `@Timeout(200ms)` und `@CircuitBreaker`.
 
 ---
 
@@ -176,17 +170,17 @@ Dieses Dokument wird stetig erweitert. Bei Fragen wende dich an die Architektur-
 
 | # | Bottleneck | Ursache | Geplante Lösung |
 |---|-----------|---------|-----------------|
-| 1 | **Event-Loop CPU-Blockade** | `WasmPolicyEngine` ruft `Jackson ObjectMapper` & Styra WASM-Engine synchron auf dem Vert.x Event Loop auf. Blockiert alle parallelen Requests auf demselben Thread. | Offloading auf den Quarkus Worker-Pool via `@Blocking` oder `Uni.emitOn(Infrastructure.getDefaultWorkerPool())`. |
-| 2 | **Connection Pool Limit** | `HttpProxyService` nutzt einen HTTP-Connection-Pool mit Default-`pool-size` = 100. Bei > 100 gleichzeitigen In-Flight Requests staut sich die Queue (Little's Law). | Für Prod: `quarkus.rest-client.pool-size` und `io.vertx.core.http.poolSize` auf Last prüfen und dynamisch erhöhen. |
-| 3 | **Synchrones JSON-Logging** | `quarkus-logging-json` schreibt Logs synchron auf dem Event-Loop – bei hohem Log-Volume addiert sich die I/O-Latenz. | Asynchrones Logging aktivieren: `quarkus.log.handler.console.async=true` in `application.properties`. |
-| 4 | **GC-Druck durch Header-Parsing** | Header-Propagierung im Proxy nutzt `Map`-Iterationen und `Stream`-Operationen, die kurzlebige Objekte erzeugen und den GC belasten. | Umstellung auf Vert.x `MultiMap` (case-insensitive, allocation-optimiert, kein Boxing). |
+| 1 | **Event-Loop CPU-Blockade** [FIXED] | JWT-Parsing & OPA-Evaluierung beanspruchen CPU. Synchrones Blocken verhindert hohe RPS. | Offloaded on the Quarkus Worker-Pool. **Achtung**: Virtual Threads (Loom) sind für Quarkus 3.15+ die Ziel-Architektur. |
+| 2 | **WASM Pool Exhaustion** | Pro Request ist eine WASM-Instanz gelockt. Bei hoher Concurrency (Burst) leert sich der Pool. | Pool ist per `OPA_POOL_SIZE` konfigurierbar (Default: 50). Nutzt `AtomicReference<ArrayBlockingQueue<OpaPolicy>>` für thread-sichere Hot-Reload-Swaps. Monitoring via `sidecar_wasm_pool_active`. |
+| 3 | **Synchrones JSON-Logging** | `quarkus-logging-json` schreibt Logs synchron auf dem Event-Loop. | Asynchrones Logging aktivieren: `quarkus.log.handler.console.async=true`. |
+| 4 | **GC-Druck durch Header-Parsing** | Header-Propagierung im Proxy nutzt `Map`-Iterationen. | Umstellung auf Vert.x `MultiMap` in `HttpProxyService`. |
 
 ### POC vs. Production
 
 | Dimension | POC (aktuell) | Production (Ziel) |
 |-----------|--------------|-------------------|
-| Durchsatz | < 100 RPS (Showcase) | > 1000 RPS |
-| Event-Loop-Safety | Sync WASM-Eval | Worker-Pool Offloading |
+| Durchsatz | ~1000 RPS | > 2000 RPS |
+| Event-Loop-Safety | **Offloaded (Worker-Pool)** | Optimized / Virtual Threads |
 | Connection Pool | Default 100 | Lastabhängig konfiguriert |
 | Logging | Synchron | Asynchron |
 | Header-Handling | Stream/Map | Vert.x MultiMap |

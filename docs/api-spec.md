@@ -11,14 +11,18 @@ Dieser Endpunkt wird von Envoy (`ext_authz`) oder Nginx (`auth_request`) aufgeru
 | Header | Typ | Beschreibung |
 |--------|-----|--------------|
 | `Authorization` | string | Das Bearer-Token des Users (wird von `SidecarRequestProcessor` validiert). |
-| `X-Forwarded-Uri` | string | Der URl/Pfad des ursprünglichen Requests, der validiert werden soll (z. B. `/api/data`). |
-| `X-Forwarded-Method` | string | Die HTTP-Methode des ursprünglichen Requests (z. B. `GET`, `POST`). |
+| `X-Envoy-Original-Path` | string | Der Pfad des ursprünglichen Requests (bevorzugt). Fallback: `X-Forwarded-Uri`. |
+| `X-Forwarded-Method` | string | Die HTTP-Methode des ursprünglichen Requests. Fallback: aktuelle Methode. |
 
 ### Response
 
 - **200 OK**: Der Request ist autorisiert.
+    - **Header**:
+        - `X-Auth-User-Id`: UserID/Subject aus dem Token.
+        - `X-Enriched-Roles`: Komma-separierte Liste der angereicherten Rollen.
 - **401 Unauthorized**: Kein gültiges Token gefunden.
 - **403 Forbidden**: Token gültig, aber keine Berechtigung für den originalen Pfad/die Methode durch die OPA-Policy.
+- **500 Internal Server Error**: Fehler bei der Validierung oder Policy-Evaluierung.
 
 ### Beispiel Aufruf
 

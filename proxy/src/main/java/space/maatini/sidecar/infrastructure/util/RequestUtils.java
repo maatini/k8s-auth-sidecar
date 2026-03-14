@@ -11,6 +11,9 @@ import java.util.Map;
  
 /**
  * Utility class for common request processing tasks.
+ * Uses HashMap instead of TreeMap for reduced allocation cost.
+ * Case-insensitivity is handled at the source level (Vert.x MultiMap)
+ * or by lowercasing keys for JAX-RS sources.
  */
 public final class RequestUtils {
  
@@ -20,13 +23,13 @@ public final class RequestUtils {
  
     /**
      * Extracts all request headers as a single-valued map from
-     * ContainerRequestContext.
+     * ContainerRequestContext. Keys are lowercased for case-insensitive lookup.
      */
     public static Map<String, String> extractHeaders(ContainerRequestContext requestContext) {
         Map<String, String> headers = new HashMap<>();
         if (requestContext.getHeaders() != null) {
             for (String headerName : requestContext.getHeaders().keySet()) {
-                headers.put(headerName, requestContext.getHeaderString(headerName));
+                headers.put(headerName.toLowerCase(), requestContext.getHeaderString(headerName));
             }
         }
         return headers;
@@ -34,12 +37,13 @@ public final class RequestUtils {
  
     /**
      * Extracts all request headers from JAX-RS HttpHeaders.
+     * Keys are lowercased for case-insensitive lookup.
      */
     public static Map<String, String> extractHeaders(HttpHeaders httpHeaders) {
         Map<String, String> headers = new HashMap<>();
         if (httpHeaders != null && httpHeaders.getRequestHeaders() != null) {
             for (String headerName : httpHeaders.getRequestHeaders().keySet()) {
-                headers.put(headerName, httpHeaders.getHeaderString(headerName));
+                headers.put(headerName.toLowerCase(), httpHeaders.getHeaderString(headerName));
             }
         }
         return headers;
@@ -54,10 +58,12 @@ public final class RequestUtils {
 
     /**
      * Extracts all request headers from Vert.x HttpServerRequest.
+     * Vert.x MultiMap is already case-insensitive, so we iterate directly
+     * into a HashMap without TreeMap overhead.
      */
     public static Map<String, String> extractHeaders(HttpServerRequest request) {
         Map<String, String> headers = new HashMap<>();
-        request.headers().forEach(entry -> headers.put(entry.getKey(), entry.getValue()));
+        request.headers().forEach(entry -> headers.put(entry.getKey().toLowerCase(), entry.getValue()));
         return headers;
     }
 
@@ -66,7 +72,7 @@ public final class RequestUtils {
      */
     public static Map<String, String> extractQueryParams(RoutingContext ctx) {
         Map<String, String> params = new HashMap<>();
-        ctx.queryParams().forEach(entry -> params.put(entry.getKey(), entry.getValue()));
+        ctx.queryParams().forEach(entry -> params.put(entry.getKey().toLowerCase(), entry.getValue()));
         return params;
     }
 

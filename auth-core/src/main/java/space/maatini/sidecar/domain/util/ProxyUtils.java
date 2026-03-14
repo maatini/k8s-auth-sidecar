@@ -12,14 +12,21 @@ public final class ProxyUtils {
     /**
      * Checks if the given path is an internal Quarkus or sidecar management path.
      *
-     * @param path The path to check.
+     * @param path       The path to check.
+     * @param nonAppRoot The non-application root path (e.g., /q).
      * @return true if the path is internal, false otherwise.
      */
-    public static boolean isInternalPath(String path) {
+    public static boolean isInternalPath(String path, String nonAppRoot) {
         if (path == null) {
             return false;
         }
-        return path.startsWith("/q/") ||
+
+        String root = (nonAppRoot != null) ? nonAppRoot : "/q";
+        if (!root.endsWith("/")) {
+            root = root + "/";
+        }
+
+        return path.startsWith(root) ||
                 path.equals("/health") ||
                 path.equals("/metrics") ||
                 path.equals("/ready") ||

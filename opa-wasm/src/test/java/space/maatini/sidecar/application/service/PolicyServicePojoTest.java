@@ -160,4 +160,9 @@ class PolicyServicePojoTest {
 
         assertTrue(decision.allowed());
     }
+
+    @Test
+    void testInvalidatePolicyCache_DoesNotThrow() {
+        assertDoesNotThrow(() -> policyService.invalidatePolicyCache());
+    }
 }

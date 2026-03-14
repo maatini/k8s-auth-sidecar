@@ -41,6 +41,7 @@ class WasmPolicyEngineExtTest {
         when(opaConfig.embedded()).thenReturn(embeddedConfig);
         when(opaConfig.enabled()).thenReturn(true);
         when(embeddedConfig.wasmPath()).thenReturn("classpath:policies/authz.wasm");
+        when(embeddedConfig.poolSize()).thenReturn(10);
 
         objectMapper = new ObjectMapper();
 
@@ -51,6 +52,11 @@ class WasmPolicyEngineExtTest {
         Field mapperField = WasmPolicyEngine.class.getDeclaredField("objectMapper");
         mapperField.setAccessible(true);
         mapperField.set(engine, objectMapper);
+
+        // Initialize pool manually since @PostConstruct is not called
+        Field poolField = WasmPolicyEngine.class.getDeclaredField("policyPool");
+        poolField.setAccessible(true);
+        poolField.set(engine, new java.util.concurrent.ArrayBlockingQueue<OpaPolicy>(10));
 
         mockPolicy = mock(OpaPolicy.class);
     }
@@ -114,12 +120,7 @@ class WasmPolicyEngineExtTest {
         assertTrue(Files.isDirectory(p));
     }
 
-    @Test
-    void testRecompileWasm_FailsGracefully() throws Exception {
-        Method m = WasmPolicyEngine.class.getDeclaredMethod("recompileWasm", java.nio.file.Path.class);
-        m.setAccessible(true);
-        m.invoke(engine, java.nio.file.Paths.get("/non/existent/dir/123991"));
-    }
+
 
     @Test
     void testLoadWasmModule_FileNotFound() throws Exception {
@@ -210,10 +211,7 @@ class WasmPolicyEngineExtTest {
     }
 
 
-    @Test
-    void testRecompileWasm_OpaMissing() {
-        engine.recompileWasm(Paths.get("src/main/resources/policies"));
-    }
+
 
     @Test
     void testIsModuleLoaded() {
@@ -249,10 +247,7 @@ class WasmPolicyEngineExtTest {
         assertEquals(tempFile.toAbsolutePath(), p.toAbsolutePath());
     }
 
-    @Test
-    void testRecompileWasm_Direct() {
-        engine.recompileWasm(Paths.get("src/main/resources/policies"));
-    }
+
 
     private void setWasmBundle(WasmPolicyEngine engine, byte[] bytes, long version) throws Exception {
         Class<?> bundleClass = Class.forName("space.maatini.sidecar.infrastructure.policy.WasmPolicyEngine$PolicyBundle");
@@ -267,15 +262,10 @@ class WasmPolicyEngineExtTest {
     }
 
     private void injectMockPolicy(WasmPolicyEngine engine, OpaPolicy policy, long version) throws Exception {
-        Field threadPolicyField = WasmPolicyEngine.class.getDeclaredField("threadPolicy");
-        threadPolicyField.setAccessible(true);
-        ThreadLocal<Object> threadLocal = (ThreadLocal<Object>) threadPolicyField.get(engine);
-
-        Class<?> instanceClass = Class.forName("space.maatini.sidecar.infrastructure.policy.WasmPolicyEngine$PolicyInstance");
-        Constructor<?> constructor = instanceClass.getDeclaredConstructor(OpaPolicy.class, long.class);
-        constructor.setAccessible(true);
-        Object instance = constructor.newInstance(policy, version);
-
-        threadLocal.set(instance);
+        Field policyPoolField = WasmPolicyEngine.class.getDeclaredField("policyPool");
+        policyPoolField.setAccessible(true);
+        java.util.concurrent.ArrayBlockingQueue<OpaPolicy> pool = (java.util.concurrent.ArrayBlockingQueue<OpaPolicy>) policyPoolField.get(engine);
+        pool.clear();
+        pool.offer(policy);
     }
 }

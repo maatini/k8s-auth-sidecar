@@ -5,7 +5,6 @@ import io.smallrye.config.WithDefault;
 import io.smallrye.config.WithName;
  
 import java.util.List;
-import java.util.Map;
  
 /**
  * Configuration mapping for the K8s-Auth-Sidecar.
@@ -14,7 +13,6 @@ import java.util.Map;
 @ConfigMapping(prefix = "sidecar")
 public interface SidecarConfig {
  
-    ProxyConfig proxy();
  
     AuthConfig auth();
  
@@ -33,15 +31,12 @@ public interface SidecarConfig {
         @WithDefault("false")
         boolean enabled();
  
-        @WithDefault("http://localhost:8081")
+        @WithDefault("http://localhost:8085")
         String url();
  
         @WithDefault("/api/v1/users/{userId}/roles")
         String path();
- 
-        @WithDefault("30s")
-        java.time.Duration timeout();
- 
+
         @WithDefault("1000")
         int cacheSize();
  
@@ -49,42 +44,6 @@ public interface SidecarConfig {
         java.time.Duration cacheTtl();
     }
  
-    /**
-     * Proxy configuration for the backend service.
-     */
-    interface ProxyConfig {
-        TargetConfig target();
- 
-        TimeoutConfig timeout();
- 
-        @WithDefault("100")
-        @WithName("pool-size")
-        int poolSize();
- 
-        @WithDefault("X-Request-ID,X-Correlation-ID,X-Forwarded-For,X-Forwarded-Proto")
-        List<String> propagateHeaders();
- 
-        Map<String, String> addHeaders();
- 
-        interface TargetConfig {
-            @WithDefault("localhost")
-            String host();
- 
-            @WithDefault("8081")
-            int port();
- 
-            @WithDefault("http")
-            String scheme();
-        }
- 
-        interface TimeoutConfig {
-            @WithDefault("5000")
-            int connect();
- 
-            @WithDefault("30000")
-            int read();
-        }
-    }
  
     /**
      * Authentication configuration.
@@ -141,6 +100,10 @@ public interface SidecarConfig {
             @WithName("wasm-path")
             @WithDefault("classpath:policies/authz.wasm")
             String wasmPath();
+
+            @WithName("pool-size")
+            @WithDefault("50")
+            int poolSize();
         }
 
         @WithName("hot-reload")

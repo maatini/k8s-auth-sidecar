@@ -1,6 +1,7 @@
 package space.maatini.sidecar.domain.model;
  
 import io.quarkus.runtime.annotations.RegisterForReflection;
+import space.maatini.sidecar.usecase.authorization.AuthorizationResult;
  
  
  
@@ -16,7 +17,7 @@ public sealed interface ProcessingResult {
     record Proceed(AuthContext authContext) implements ProcessingResult {
     }
  
-    record Forbidden(PolicyDecision decision) implements ProcessingResult {
+    record Forbidden(AuthorizationResult result) implements ProcessingResult {
     }
  
     record Unauthorized(String message) implements ProcessingResult {
@@ -33,8 +34,8 @@ public sealed interface ProcessingResult {
         return new Proceed(ctx);
     }
  
-    static Forbidden forbidden(PolicyDecision d) {
-        return new Forbidden(d);
+    static Forbidden forbidden(AuthorizationResult r) {
+        return new Forbidden(r);
     }
  
     static Unauthorized unauthorized(String message) {

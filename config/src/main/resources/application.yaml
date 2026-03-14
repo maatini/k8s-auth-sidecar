@@ -54,7 +54,7 @@ quarkus:
     "roles-api":
       url: ${sidecar.roles.url}
       connect-timeout: 2000
-      read-timeout: 5000
+      read-timeout: 500
 
   # Health and Metrics
   smallrye-health:
@@ -100,24 +100,6 @@ quarkus:
 # ===================
 
 sidecar:
-  # Proxy Configuration
-  proxy:
-    target:
-      host: ${PROXY_TARGET_HOST:localhost}
-      port: ${PROXY_TARGET_PORT:8081}
-      scheme: ${PROXY_TARGET_SCHEME:http}
-    timeout:
-      connect: 5000
-      read: 30000
-    pool-size: 4096
-
-    propagate-headers:
-      - X-Request-ID
-      - X-Correlation-ID
-      - X-Forwarded-For
-      - X-Forwarded-Proto
-
-    add-headers: {}
 
   # Authentication Configuration
   auth:
@@ -147,8 +129,10 @@ sidecar:
   # OPA (Embedded WASM via Chicory)
   opa:
     enabled: ${OPA_ENABLED:true}
+    hot-reload-interval: ${OPA_HOT_RELOAD_INTERVAL:10s}
     embedded:
       wasm-path: ${OPA_WASM_PATH:classpath:policies/authz.wasm}
+      pool-size: ${OPA_POOL_SIZE:50}
     default-package: authz
     default-rule: allow
 
@@ -165,9 +149,9 @@ sidecar:
   # Roles Microservice (Enrichment)
   roles:
     enabled: ${ROLES_ENABLED:false}
-    url: ${ROLES_SERVICE_URL:http://localhost:8081}
+    url: ${ROLES_SERVICE_URL:http://localhost:8085}
     path: ${ROLES_SERVICE_PATH:/api/v1/users/{userId}/roles}
-    timeout: 30s
+
     cache-size: 1000
     cache-ttl: 10m
 

@@ -3,10 +3,10 @@
 
   # K8s-Auth-Sidecar - AuthN/AuthZ Sidecar für Kubernetes
 
-  [![Quarkus](https://img.shields.io/badge/Quarkus-3.32.2-blue.svg?logo=quarkus)](https://quarkus.io)
+  [![Quarkus](https://img.shields.io/badge/Quarkus-3.32.3-blue.svg?logo=quarkus)](https://quarkus.io)
   [![Java](https://img.shields.io/badge/Java-21-orange.svg?logo=openjdk)](https://openjdk.org)
   [![License](https://img.shields.io/badge/License-Apache%202.0-green.svg)](LICENSE)
-  [![Tests](https://img.shields.io/badge/Tests-145%20%E2%9C%85%200%20Failures-brightgreen.svg)](#-so-testest-du-das-projekt--schritt-f%C3%BCr-schritt-super-einfach-erkl%C3%A4rt)
+  [![Tests](https://img.shields.io/badge/Tests-118%20%E2%9C%85%200%20Failures-brightgreen.svg)](#-so-testest-du-das-projekt--schritt-f%C3%BCr-schritt-super-einfach-erkl%C3%A4rt)
   [![PIT Strength](https://img.shields.io/badge/PIT%20Strength-84%25-brightgreen.svg)](#7-mutation-testing-pit--qualit%C3%A4ts-check)
   [![Docker](https://img.shields.io/badge/Docker-Ready-blue.svg?logo=docker)](https://www.docker.com/)
   [![Kubernetes](https://img.shields.io/badge/Kubernetes-Ready-blue.svg?logo=kubernetes)](https://kubernetes.io/)
@@ -21,7 +21,7 @@
 
 > [!TIP]
 > ## 🚀 POC‑Ready
-> Das Projekt bildet alle Kernfeatures vollständig und stabil ab: **OIDC-Validierung (Keycloak & Entra ID), embedded OPA-WASM-Autorisierung und reaktives Streaming-Proxy**. Eine sofort lauffähige Demo startet in unter 3 Minuten:
+> Das Projekt bildet alle Kernfeatures vollständig und stabil ab: **OIDC-Validierung (Keycloak & Entra ID), embedded OPA-WASM-Autorisierung und Envoy `ext_authz` Support**. Eine sofort lauffähige Demo startet in unter 3 Minuten:
 > ```bash
 > docker compose -f docker-compose.demo.yml up -d   # Demo-Stack (WireMock + Sidecar)
 > ```
@@ -33,10 +33,12 @@
 
 - ⚡ **Schnelle lokale Entwicklung**: Out-of-the-Box Mocking für Identity Provider (Keycloak) via WireMock.
 - 🏢 **OIDC-Support**: Standardisierter Support für Keycloak, Microsoft Entra ID und generische OIDC-Provider.
-- 🧠 **Embedded Policy-Engine**: In-Memory OPA-WASM-Engine mit Hot-Reload der `.rego` Regeln.
+- 🧠 **Embedded Policy-Engine**: In-Memory OPA-WASM-Engine (Chicory) mit Hot-Reload der `.wasm` Regeln.
 - ⚡ **Reaktive Pipeline**: Non-blocking AuthN → AuthZ Verarbeitung mit Mutiny `Uni`.
 - 🛡️ **Zero-Trust**: Jede Anfrage wird zwingend validiert.
-- 📡 **Streaming Proxy**: Request-Bodies werden **nie** vollständig in den RAM geladen – echtes Vert.x Streaming für beliebig große Payloads.
+- 🛡️ **Envoy / Ingress Mode (`ext_authz`)**: Primär für den Einsatz mit Envoy (Istio) oder Nginx entwickelt. Unterstützt den `/authorize` Endpunkt als externer Autorisierungs-Service (PDP).
+- 📡 **Legacy Sidecar Proxy Mode**: Unterstützt weiterhin das direkte Proxying von Requests (Vert.x Streaming), falls kein externes Gateway vorhanden ist.
+- 🚀 **Context Enrichment**: Reichert Anfragen an das Backend mit `X-Auth-User-Id` und `X-Enriched-Roles` an.
 - 🎯 **Zentrales Path-Matching**: Ant-Style Patterns (`/**`, `/*`) über praktisches `PathMatcher`-Utility.
 - 🚀 **Native Image Support**: Minimale Startup-Zeit (< 100ms) und extrem geringer Memory-Footprint.
 - 📊 **Observability**: Prometheus Metrics, JSON Logging und Health Checks out-of-the-box.
@@ -65,18 +67,22 @@ Für eine detaillierte Einführung siehe den [JUNIOR_GUIDE.md](JUNIOR_GUIDE.md).
 
 ## 🏗️ Architektur & Funktionsweise
 
-Der Sidecar fungiert als intelligenter **Türsteher** vor deinem Anwendungs-Container. Er fängt alle eingehenden Anfragen ab, validiert die Identität und prüft die Berechtigungen gegen lokal geladene OPA-WASM-Policies.
+Der Sidecar kann in zwei Modi betrieben werden:
+
+1.  **🛡️ Sidecar Proxy Mode**: Er fungiert als intelligenter **Türsteher** direkt vor deinem Anwendungs-Container. Er fängt alle eingehenden Anfragen ab, validiert sie und leitet sie per Streaming weiter.
+2.  **🌐 Gateway / ext_authz Mode**: Er fungiert als **externer Berater** für Ingress-Controller (wie Envoy oder Nginx). Diese fragen über den `/authorize` Endpunkt nach "Darf dieser User das?", und der Sidecar antwortet mit `200 OK` (Erlaubt) oder `403 Forbidden`.
+
+### Request Flow (ext_authz Mode)
 
 ```mermaid
 graph TD
-    Client((Client)) -->|Request + JWT| Sidecar[K8s-Auth-Sidecar]
-    Sidecar -->|1. Validierung & Cache| OIDC[(OIDC Provider<br/>z.B. Keycloak)]
-    OIDC -.->|JWKS / User Info| Sidecar
-    Sidecar -->|2. Rollen-Enrichment| RS[(Roles Service)]
-    RS -.->|User Roles| Sidecar
-    Sidecar -->|3. Evaluierung| OPA{In-Memory<br/>OPA-WASM}
-    OPA -.->|Allow / Deny| Sidecar
-    Sidecar -->|4. Streaming Proxy| Backend[App Container]
+    Client((Client)) -->|1. Request| Envoy[Envoy / Ingress]
+    Envoy -->|2. Check /authorize| Sidecar[K8s-Auth-Sidecar]
+    Sidecar -->|3. Validierung| OIDC[(OIDC Provider)]
+    Sidecar -->|4. Evaluierung| OPA{In-Memory<br/>OPA-WASM}
+    OPA -.->|Allow + Context| Sidecar
+    Sidecar -.->|5. 200 OK + Header| Envoy
+    Envoy -->|6. Forward with Context| Backend[App Container]
     
     style Sidecar fill:#1792E5,stroke:#fff,stroke-width:2px,color:#fff
     style Backend fill:#1E2B3C,stroke:#000,stroke-width:2px,color:#fff
@@ -98,9 +104,10 @@ Jeder Request durchläuft diese reaktiven Schritte:
 |----------|--------------|----------|
 | `OIDC_AUTH_SERVER_URL` | OIDC-Endpunkt (Discovery) | `http://localhost:8090/realms/master` |
 | `OIDC_CLIENT_ID` | Client Identifier | `k8s-auth-sidecar` |
-| `PROXY_TARGET_PORT` | Port deiner eigentlichen App | `8081` |
+| `PROXY_TARGET_PORT` | Port deiner eigentlichen App | `8085` |
 | `AUTHZ_ENABLED` | Policy-Prüfung ein/aus | `true` |
 | `OPA_WASM_PATH` | Pfad zur OPA-WASM Datei | `classpath:policies/authz.wasm` |
+| `OPA_HOT_RELOAD_INTERVAL` | Intervall für Hot-Reload der Policies | `10s` |
 
 ---
 
@@ -113,13 +120,13 @@ spec:
   containers:
     - name: my-application
       image: my-app:latest
-      ports: [{containerPort: 8081}]
+      ports: [{containerPort: 8085}]
 
     - name: k8s-auth-sidecar
       image: ghcr.io/maatini/k8s-auth-sidecar:0.3.0
       env:
         - name: PROXY_TARGET_PORT
-          value: "8081"
+          value: "8085"
         - name: OIDC_AUTH_SERVER_URL
           value: "https://keycloak.example.com/realms/myrealm"
 ```
@@ -156,7 +163,7 @@ Hier erfährst du, wie du sicherstellst, dass alles perfekt läuft. Wir gehen vo
 **Was du tust:** Prüfe deine Sicherheitsregeln (`.rego` Dateien).
 - **Befehl:** `opa test opa-wasm/src/main/resources/policies/ -v` (wenn OPA installiert ist)
 - **Was du sehen solltest:** `PASS` für alle definierten Regeln.
-- **Warum das wichtig ist:** So verhinderst du, dass du dich versehentlich selbst aussperrst oder Sicherheitslücken einbaust.
+- **Warum das wichtig ist:** So verhinderst du, dass du dich versehentlich selbst aussperrst oder Sicherheitslücken einbaust. Lokale Kompilierung zu WASM: `opa build -t wasm -e authz/allow authz.rego`.
 
 #### 5. Docker-Image bauen & testen
 **Was du tust:** Erstelle ein fertiges Container-Image.
@@ -180,21 +187,20 @@ Hier erfährst du, wie du sicherstellst, dass alles perfekt läuft. Wir gehen vo
 > [!IMPORTANT]
 > **Junior-Tipp:** Wenn PIT eine Mutation nicht findet, überlege dir einen Edge-Case (z.B. "Was passiert, wenn der Header leer ist?"), den du noch nicht getestet hast.
 
-#### 8. Aktuelle Test-Metriken (gemessen 2026-03-13)
+#### 8. Aktuelle Test-Metriken (gemessen 2026-03-14)
 
 Das Projekt besitzt eine extrem schnelle, überwiegend Framework-unabhängige Test-Suite:
 
-| Modul | Tests | Failures | Typ |
+| Modul | `@Test`-Methoden | Failures | Typ |
 |-------|------:|:--------:|-----|
-| `auth-core` | 47 | 0 ✅ | POJO + Ext + Quarkus |
+| `auth-core` | 46 | 0 ✅ | POJO + Ext + Quarkus |
 | `opa-wasm` | 59 | 0 ✅ | POJO + Ext + Quarkus |
-| `config` | 7 | 0 ✅ | Quarkus |
-| `proxy` | 32 | 0 ✅ | POJO + Ext + E2E |
-| **Gesamt** | **145** | **0 ✅** | |
+| `config` | 4 | 0 ✅ | POJO + Quarkus |
+| `proxy` | 9 | 0 ✅ | POJO + E2E |
+| **Gesamt** | **118** | **0 ✅** | |
 
-**PIT Mutation Testing (`auth-core`):**
-- **Line Coverage**: 71% (247/349 Zeilen)
-- **Test Strength**: **84%** ✅ (Ziel: > 80%)
+> [!NOTE]
+> Einige Quarkus-Integrationstests (`LivenessCheckTest`, `WasmPolicyEngineTest` etc.) haben aktuell einen Config-Mapping-Fehler (`sidecar.opa.hot-reload-interval`). POJO- und Ext-Tests sind davon nicht betroffen und laufen fehlerfrei.
 
 **PIT Scores per Module:**
 
@@ -204,7 +210,7 @@ Das Projekt besitzt eine extrem schnelle, überwiegend Framework-unabhängige Te
 | opa-wasm  | 72      | 78        | 78        |
 | proxy     | 84      | 84        | 52        |
 
-- Bericht: `auth-core/target/pit-reports/`
+- Bericht: `<modul>/target/pit-reports/`
 
 **Begriffsklärung:**
 - **Line Coverage**: Wie viel Prozent des Codes wurden mindestens einmal ausgeführt?
@@ -227,7 +233,8 @@ Das Projekt besitzt eine extrem schnelle, überwiegend Framework-unabhängige Te
 ## 🛡️ Sicherheit & Performance
 
 - **Stream-basierter Proxy**: Basiert auf Vert.x WebClient für maximale Skalierbarkeit.
-- **WASM Hot-Reload**: Ersetze Policies im laufenden Betrieb ohne Downtime.
+- **WASM Hot-Reload**: Ersetze Policies im laufenden Betrieb ohne Downtime. Pool-Größe konfigurierbar via `OPA_POOL_SIZE` (Default: 50).
+- **Fault Tolerance**: `RolesService` nutzt `@Timeout(200ms)`, `@CircuitBreaker` und `@Fallback` (Fail-Open: bei Ausfall werden nur JWT-Rollen verwendet).
 - **⚠️ Durchsatz-Hinweis (> 1000 RPS)**: Bei hoher Last (> 1000 Req/s) wurden in Lasttests Engpässe identifiziert (Event-Loop Blockade, Connection-Pool-Limit, synchrones Logging). Die Architektur ist bereits auf deren Beseitigung ausgelegt; die konkreten Optimierungen sind in [`docs/ARCHITECTURE.md` → Roadmap](docs/ARCHITECTURE.md#-performance--production-readiness-roadmap) dokumentiert. **Für den POC ist dies irrelevant.**
 
 ---

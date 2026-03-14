@@ -51,13 +51,6 @@ RUN addgroup -S sidecar && adduser -S sidecar -G sidecar
 # CVE FIX – Patch Alpine packages
 RUN apk upgrade --no-cache
 
-# HOT-RELOAD FIX – Install OPA CLI for in-container policy recompilation
-ARG OPA_VERSION=1.14.0
-ARG TARGETARCH
-RUN wget -q -O /usr/local/bin/opa \
-    "https://github.com/open-policy-agent/opa/releases/download/v${OPA_VERSION}/opa_linux_${TARGETARCH:-amd64}_static" && \
-    chmod +x /usr/local/bin/opa
-
 WORKDIR /app
 
 # Copy the uber-jar from build stage (located in proxy module target)
@@ -92,7 +85,7 @@ ENV QUARKUS_HTTP_PORT=8080 \
     QUARKUS_LOG_LEVEL=INFO \
     SIDECAR_LOG_LEVEL=DEBUG \
     PROXY_TARGET_HOST=localhost \
-    PROXY_TARGET_PORT=8081 \
+    PROXY_TARGET_PORT=8085 \
     AUTH_ENABLED=true \
     AUTHZ_ENABLED=true \
     OPA_ENABLED=true
