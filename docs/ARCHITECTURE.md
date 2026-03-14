@@ -55,31 +55,28 @@ Für eine erstklassige Developer Experience ohne externe Abhängigkeiten nutzt d
 ### Umgebungsvariablen
 
 ```bash
-# Identity Provider
+# Identity Provider (OIDC / Keycloak)
 OIDC_AUTH_SERVER_URL=https://keycloak.example.com/realms/myrealm
 OIDC_CLIENT_ID=my-client
-OIDC_TENANT_ENABLED=true
-
-# Microsoft Entra ID (optional, multi-tenant)
-ENTRA_AUTH_SERVER_URL=https://login.microsoftonline.com/{tenant}/v2.0
-ENTRA_CLIENT_ID=azure-client-id
 
 # Roles Microservice
 ROLES_SERVICE_URL=http://roles-service:8080
 ROLES_SERVICE_PATH=/api/v1/users/{userId}/roles
 
-# Proxy Target
-PROXY_TARGET_HOST=localhost
-PROXY_TARGET_PORT=8081
-
-# OPA
-OPA_MODE=embedded
+# OPA (Embedded WASM via Chicory)
 OPA_WASM_PATH=/policies/authz.wasm
-OPA_DECISION_ENDPOINT=/v1/data/authz/allow
+OPA_POOL_SIZE=50
+OPA_HOT_RELOAD_INTERVAL=10s
+
+# Feature Toggles
+AUTH_ENABLED=true
+AUTHZ_ENABLED=true
+OPA_ENABLED=true
+ROLES_ENABLED=true
 
 # Metrics & Logging
 QUARKUS_LOG_LEVEL=INFO
-QUARKUS_METRICS_ENABLED=true
+OTEL_ENABLED=false
 ```
 
 ## Policy-Beispiel (Rego)
@@ -119,18 +116,15 @@ spec:
     - name: application
       image: my-app:latest
       ports:
-        - containerPort: 8081
+        - containerPort: 8085
     
     # Sidecar Container (AuthN/AuthZ)
     - name: k8s-auth-sidecar
-      image: space.maatini/k8s-auth-sidecar:latest
+      image: ghcr.io/maatini/k8s-auth-sidecar:0.3.0
       ports:
         - containerPort: 8080
-      env:
-        - name: PROXY_TARGET_HOST
-          value: "localhost"
-        - name: PROXY_TARGET_PORT
-          value: "8081"
+      # Note: The sidecar operates as an ext_authz endpoint.
+      # Configure your ingress/envoy to call /authorize on this container.
 ```
 
 ## 🧪 Implementierungsplan & Testing-Strategie
@@ -139,9 +133,9 @@ spec:
 > **Qualität zuerst:** Für uns ist Testing kein lästiges Extra, sondern der Kern unserer Stabilität. Wir nutzen modernste Java-Techniken wie **PIT Mutation Testing**, um sicherzustellen, dass unsere Tests wirklich jeden Fehler finden.
 
 ### Unsere Metriken (Stand März 2026)
-- **118 automatisierte Tests** (POJO + Ext + Quarkus)
-- **PIT Test Strength > 78%** (unser Gold-Standard für Qualität)
-- **PIT Line Coverage > 52%** (modulabhängig, auth-core: 91%)
+- **147 automatisierte Tests** (POJO + Ext + Quarkus)
+- **PIT Test Strength > 70%** (unser Gold-Standard für Qualität)
+- **PIT Line Coverage > 41%** (modulabhängig, opa-wasm: 88%)
 
 Weitere Details zum Testen findest du in unserem **legendären Testing-Abschnitt** im [README.md](../README.md#🧪-so-testest-du-das-projekt-–-schritt-für-schritt-super-einfach-erklärt).
 
@@ -149,8 +143,32 @@ Weitere Details zum Testen findest du in unserem **legendären Testing-Abschnitt
 
 ## 🛡️ Sicherheitsaspekte
 
+### Header Trust Model (ext_authz)
+
+> [!CAUTION]
+> Im `ext_authz`-Modus liest der Sidecar den Zielpfad und die HTTP-Methode aus Envoy-internen Headern (`X-Envoy-Original-Path`, `X-Forwarded-Method`). Ohne Absicherung am Ingress-Gateway kann ein externer Angreifer diese Header fälschen und so die Autorisierung umgehen (**Privilege Escalation**).
+
+**Defense-in-Depth (zwei Schutzschichten):**
+
+| Schicht | Schutzmaßnahme | Verantwortung |
+|---------|---------------|---------------|
+| **1. Ingress-Gateway** (primär) | Header `X-Envoy-Original-Path`, `X-Forwarded-Method` müssen für externe Clients **überschrieben oder gelöscht** werden. | Cluster-/Plattform-Team |
+| **2. Sidecar** (sekundär) | `HeaderSanitizer` normalisiert Pfade (blockt `..`, `//`, URL-Encoding-Tricks) und validiert HTTP-Methoden gegen eine Whitelist. Envoy-interne Header werden vor der OPA-Evaluierung gestripped. | Sidecar-Code |
+
+**Envoy-Konfiguration (Pflicht!):**
+```yaml
+# envoy.yaml – externe Clients: interne Header löschen
+http_filters:
+  - name: envoy.filters.http.header_to_metadata
+    typed_config:
+      request_rules:
+        - header: x-envoy-original-path
+          on_present:
+            # Envoy setzt diese automatisch – externe Werte müssen entfernt werden
+            remove: true
+```
+
 - **Zero-Trust**: Jede Anfrage wird strikt validiert. Vertrauen ist gut, Kontrolle ist besser!
-- **Streaming Proxy**: Schützt vor Out-of-Memory-Attacken bei riesigen Uploads.
 - **Secure Defaults**: Alles ist standardmäßig verboten (`Deny by default`).
 - **WASM Hot-Reload**: Policies können im laufenden Betrieb ohne Neustart aktualisiert werden. Pool-Größe konfigurierbar via `OPA_POOL_SIZE` (Default: 50), gesichert durch `AtomicReference<ArrayBlockingQueue>`.
 - **Fail-Open Strategy (Roles)**: Bei Ausfall oder Timeout des `RolesService` greift ein `@Fallback` – der `AuthContext` behält seine JWT-basierten Rollen. Abgesichert durch `@Timeout(200ms)` und `@CircuitBreaker`.

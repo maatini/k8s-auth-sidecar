@@ -113,9 +113,13 @@ public interface SidecarConfig {
             @WithDefault("true")
             boolean enabled();
 
-            @WithDefault("5s")
+            @WithDefault("10s")
             @WithName("interval")
             String interval();
+
+            @WithDefault("5s")
+            @WithName("delayed")
+            String delayed();
         }
     }
  
