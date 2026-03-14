@@ -134,7 +134,7 @@ sidecar:
       interval: ${OPA_HOT_RELOAD_INTERVAL:10s}
       delayed: ${OPA_HOT_RELOAD_DELAYED:5s}
     embedded:
-      wasm-path: ${OPA_WASM_PATH:classpath:policies/authz.wasm}
+      wasm-path: ${OPA_WASM_PATH:classpath:policies/policy.wasm}
       pool-size: ${OPA_POOL_SIZE:50}
       pool-acquire-timeout-ms: ${OPA_POOL_ACQUIRE_TIMEOUT_MS:50}
     default-package: authz

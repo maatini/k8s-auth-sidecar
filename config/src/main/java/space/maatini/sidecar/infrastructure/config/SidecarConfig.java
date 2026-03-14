@@ -98,7 +98,7 @@ public interface SidecarConfig {
  
         interface EmbeddedOpaConfig {
             @WithName("wasm-path")
-            @WithDefault("classpath:policies/authz.wasm")
+            @WithDefault("classpath:policies/policy.wasm")
             String wasmPath();
 
             @WithName("pool-size")

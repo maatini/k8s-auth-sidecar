@@ -36,8 +36,7 @@
 - 🧠 **Embedded Policy-Engine**: In-Memory OPA-WASM-Engine (Chicory) mit Hot-Reload der `.wasm` Regeln.
 - ⚡ **Reaktive Pipeline**: Non-blocking AuthN → AuthZ Verarbeitung mit Mutiny `Uni`.
 - 🛡️ **Zero-Trust**: Jede Anfrage wird zwingend validiert.
-- 🛡️ **Envoy / Ingress Mode (`ext_authz`)**: Primär für den Einsatz mit Envoy (Istio) oder Nginx entwickelt. Unterstützt den `/authorize` Endpunkt als externer Autorisierungs-Service (PDP).
-- 📡 **Legacy Sidecar Proxy Mode**: Unterstützt weiterhin das direkte Proxying von Requests (Vert.x Streaming), falls kein externes Gateway vorhanden ist.
+- 🛡️ **Envoy / Ingress Mode (`ext_authz`)**: Entwickelt für den Einsatz mit Envoy (Istio) oder Nginx. Stellt den `/authorize` Endpunkt als externer Autorisierungs-Service (PDP) bereit.
 - 🚀 **Context Enrichment**: Reichert Anfragen an das Backend mit `X-Auth-User-Id` und `X-Enriched-Roles` an.
 - 🎯 **Zentrales Path-Matching**: Ant-Style Patterns (`/**`, `/*`) über praktisches `PathMatcher`-Utility.
 - 🚀 **Native Image Support**: Minimale Startup-Zeit (< 100ms) und extrem geringer Memory-Footprint.
@@ -67,10 +66,7 @@ Für eine detaillierte Einführung siehe den [JUNIOR_GUIDE.md](JUNIOR_GUIDE.md).
 
 ## 🏗️ Architektur & Funktionsweise
 
-Der Sidecar kann in zwei Modi betrieben werden:
-
-1.  **🛡️ Sidecar Proxy Mode**: Er fungiert als intelligenter **Türsteher** direkt vor deinem Anwendungs-Container. Er fängt alle eingehenden Anfragen ab, validiert sie und leitet sie per Streaming weiter.
-2.  **🌐 Gateway / ext_authz Mode**: Er fungiert als **externer Berater** für Ingress-Controller (wie Envoy oder Nginx). Diese fragen über den `/authorize` Endpunkt nach "Darf dieser User das?", und der Sidecar antwortet mit `200 OK` (Erlaubt) oder `403 Forbidden`.
+Der Sidecar wird ausschließlich als **externer Autorisierungs-Service (PDP)** betrieben. Ingress-Controller (Envoy, Nginx) fragen den Sidecar über den `/authorize` Endpunkt: „Darf dieser User das?“. Der Sidecar antwortet mit `200 OK` (Erlaubt, inkl. Enrichment-Header) oder `403 Forbidden`.
 
 ### Request Flow (ext_authz Mode)
 
@@ -89,10 +85,10 @@ graph TD
 ```
 
 ### 🧠 Die Pipeline im Detail
-Jeder Request durchläuft diese reaktiven Schritte:
-1.  **🔍 Token Extraktion & Authentifizierung (`AuthProxyFilter`)**: Ein JAX-RS Filter extrahiert den Bearer-Token, validiert Signatur/Issuer via Caffeine-Cache und injiziert einen sicheren `AuthContext`. Schlägt dies fehl, blockt der Filter sofort ab (`HTTP 401`).
+Jeder Request an `/authorize` durchläuft diese reaktiven Schritte:
+1.  **🔍 Token Extraktion & Authentifizierung**: Der Route-Handler extrahiert den Bearer-Token, validiert Signatur/Issuer via Caffeine-Cache und erzeugt einen sicheren `AuthContext`. Schlägt dies fehl, wird sofort `HTTP 401` zurückgegeben.
 2.  **⚖️ Policy Check & Autorisierung (`AuthorizationUseCase`)**: In-Memory Evaluierung via WASM anhand des `AuthContext` (inkl. extrahierter Rollen) gegen vorkompilierte `.rego` Regeln.
-3.  **🚀 Proxying**: Effizientes Streaming an das Backend über Mutiny `Uni`. Request-Bodies werden **nie** vollständig in den RAM geladen!
+3.  **✅ Response**: Bei Erfolg antwortet der Sidecar mit `200 OK` und den Enrichment-Headern (`X-Auth-User-Id`, `X-Enriched-Roles`). Das Ingress-Gateway leitet den originalen Request dann an das Backend weiter.
 
 ---
 
@@ -104,16 +100,15 @@ Jeder Request durchläuft diese reaktiven Schritte:
 |----------|--------------|----------|
 | `OIDC_AUTH_SERVER_URL` | OIDC-Endpunkt (Discovery) | `http://localhost:8090/realms/master` |
 | `OIDC_CLIENT_ID` | Client Identifier | `k8s-auth-sidecar` |
-| `PROXY_TARGET_PORT` | Port deiner eigentlichen App | `8085` |
 | `AUTHZ_ENABLED` | Policy-Prüfung ein/aus | `true` |
-| `OPA_WASM_PATH` | Pfad zur OPA-WASM Datei | `classpath:policies/authz.wasm` |
+| `OPA_WASM_PATH` | Pfad zur OPA-WASM Datei | `classpath:policies/policy.wasm` |
 | `OPA_HOT_RELOAD_INTERVAL` | Intervall für Hot-Reload der Policies | `10s` |
 
 ---
 
 ## 🚢 Kubernetes Deployment
 
-Integriere den Sidecar einfach als zweiten Container in dein Pod-Spec:
+Der Sidecar wird als `ext_authz`-Endpunkt neben deiner App deployt. Das Ingress-Gateway ruft `/authorize` auf dem Sidecar auf:
 
 ```yaml
 spec:
@@ -125,10 +120,9 @@ spec:
     - name: k8s-auth-sidecar
       image: ghcr.io/maatini/k8s-auth-sidecar:0.3.0
       env:
-        - name: PROXY_TARGET_PORT
-          value: "8085"
         - name: OIDC_AUTH_SERVER_URL
           value: "https://keycloak.example.com/realms/myrealm"
+      # Configure your ingress/envoy to call /authorize on this container.
 ```
 
 ---
@@ -221,7 +215,7 @@ Das Projekt besitzt eine extrem schnelle, überwiegend Framework-unabhängige Te
 ## 📂 Projektstruktur (Maven Multi-Module)
 
 - `auth-core/`: Domain-Modelle, Request-Processor und Auth-Logik.
-- `proxy/`: Vert.x Streaming Proxy und JAX-RS Filter.
+- `proxy/`: Vert.x Route Handler (`/authorize`) und JAX-RS Filter.
 - `opa-wasm/`: OPA WASM Engine und Rego-Policies (`.rego`).
 - `config/`: Quarkus-Config, Metriken und Health-Checks.
 - `k8s/`: Kustomize Manifeste für das Deployment.
@@ -230,7 +224,7 @@ Das Projekt besitzt eine extrem schnelle, überwiegend Framework-unabhängige Te
 
 ## 🛡️ Sicherheit & Performance
 
-- **Stream-basierter Proxy**: Basiert auf Vert.x WebClient für maximale Skalierbarkeit.
+- **Reaktive Pipeline**: Non-blocking Autorisierungsentscheidungen via Mutiny `Uni` und Vert.x Route Handler.
 - **WASM Hot-Reload**: Ersetze Policies im laufenden Betrieb ohne Downtime. Pool-Größe konfigurierbar via `OPA_POOL_SIZE` (Default: 50).
 - **Fault Tolerance**: `RolesService` nutzt `@Timeout(200ms)`, `@CircuitBreaker` und `@Fallback` (Fail-Open: bei Ausfall werden nur JWT-Rollen verwendet).
 - **⚠️ Durchsatz-Hinweis (> 1000 RPS)**: Bei hoher Last (> 1000 Req/s) wurden in Lasttests Engpässe identifiziert (Event-Loop Blockade, Connection-Pool-Limit, synchrones Logging). Die Architektur ist bereits auf deren Beseitigung ausgelegt; die konkreten Optimierungen sind in [`docs/ARCHITECTURE.md` → Roadmap](docs/ARCHITECTURE.md#-performance--production-readiness-roadmap) dokumentiert. **Für den POC ist dies irrelevant.**

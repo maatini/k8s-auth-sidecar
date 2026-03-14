@@ -56,8 +56,8 @@ WORKDIR /app
 # Copy the uber-jar from build stage (located in proxy module target)
 COPY --from=build /app/proxy/target/*-runner.jar /app/k8s-auth-sidecar.jar
 
-# Copy policies
-COPY --from=build /app/opa-wasm/src/main/resources/policies /policies
+# Copy policies (generated at build time from authz.rego)
+COPY --from=build /app/opa-wasm/target/classes/policies /policies
 
 # Set ownership
 RUN chown -R sidecar:sidecar /app /policies
@@ -84,8 +84,6 @@ ENV JAVA_OPTS="-Xms128m -Xmx512m \
 ENV QUARKUS_HTTP_PORT=8080 \
     QUARKUS_LOG_LEVEL=INFO \
     SIDECAR_LOG_LEVEL=DEBUG \
-    PROXY_TARGET_HOST=localhost \
-    PROXY_TARGET_PORT=8085 \
     AUTH_ENABLED=true \
     AUTHZ_ENABLED=true \
     OPA_ENABLED=true

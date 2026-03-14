@@ -26,7 +26,7 @@ public class PolicyServiceRegoTest {
                 public Map<String, String> getConfigOverrides() {
                         return Map.of(
                                         "sidecar.opa.enabled", "true",
-                                        "sidecar.opa.embedded.wasm-path", "classpath:policies/authz.wasm");
+                                        "sidecar.opa.embedded.wasm-path", "classpath:policies/policy.wasm");
                 }
         }
 

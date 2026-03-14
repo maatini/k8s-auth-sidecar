@@ -33,7 +33,7 @@ sidecar:
   opa:
     enabled: true
     embedded:
-      wasm-path: classpath:policies/authz.wasm
+      wasm-path: classpath:policies/policy.wasm
   
   
   audit:

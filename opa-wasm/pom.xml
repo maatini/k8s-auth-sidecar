@@ -57,4 +57,59 @@
             <scope>test</scope>
         </dependency>
     </dependencies>
+
+    <build>
+        <plugins>
+            <!-- OPA WASM Build: Compiles authz.rego to policy.wasm at build time -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.5.0</version>
+                <executions>
+                    <execution>
+                        <id>create-target-dir</id>
+                        <phase>generate-resources</phase>
+                        <goals><goal>exec</goal></goals>
+                        <configuration>
+                            <executable>mkdir</executable>
+                            <arguments>
+                                <argument>-p</argument>
+                                <argument>${project.build.directory}/generated-resources/policies</argument>
+                            </arguments>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>compile-opa-policy</id>
+                        <phase>generate-resources</phase>
+                        <goals><goal>exec</goal></goals>
+                        <configuration>
+                            <executable>opa</executable>
+                            <arguments>
+                                <argument>build</argument>
+                                <argument>-t</argument><argument>wasm</argument>
+                                <argument>-e</argument><argument>authz/allow</argument>
+                                <argument>-o</argument><argument>${project.build.directory}/generated-resources/policies/bundle.tar.gz</argument>
+                                <argument>${project.basedir}/src/main/resources/policies/authz.rego</argument>
+                            </arguments>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>extract-wasm</id>
+                        <phase>process-resources</phase>
+                        <goals><goal>exec</goal></goals>
+                        <configuration>
+                            <executable>tar</executable>
+                            <arguments>
+                                <argument>-xzf</argument>
+                                <argument>${project.build.directory}/generated-resources/policies/bundle.tar.gz</argument>
+                                <argument>-C</argument>
+                                <argument>${project.build.outputDirectory}/policies/</argument>
+                                <argument>/policy.wasm</argument>
+                            </arguments>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
 </project>

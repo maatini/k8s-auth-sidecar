@@ -46,6 +46,7 @@ coverage/
 # Generated
 generated/
 .gradle/
+*.wasm
 
 .devbox/
 .agent/skills/.agent

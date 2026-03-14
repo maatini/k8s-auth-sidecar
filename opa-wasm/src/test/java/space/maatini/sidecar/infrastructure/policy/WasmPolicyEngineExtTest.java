@@ -40,7 +40,7 @@ class WasmPolicyEngineExtTest {
         when(config.opa()).thenReturn(opaConfig);
         when(opaConfig.embedded()).thenReturn(embeddedConfig);
         when(opaConfig.enabled()).thenReturn(true);
-        when(embeddedConfig.wasmPath()).thenReturn("classpath:policies/authz.wasm");
+        when(embeddedConfig.wasmPath()).thenReturn("classpath:policies/policy.wasm");
         when(embeddedConfig.poolSize()).thenReturn(10);
         when(embeddedConfig.poolAcquireTimeoutMs()).thenReturn(50);
 
@@ -208,7 +208,7 @@ class WasmPolicyEngineExtTest {
 
     @Test
     void testResolvePath_Local() {
-        Path p = engine.resolvePath("src/main/resources/policies/authz.wasm");
+        Path p = engine.resolvePath("src/main/resources/policies/authz.rego");
         assertNotNull(p);
         assertTrue(Files.exists(p));
     }
@@ -233,9 +233,9 @@ class WasmPolicyEngineExtTest {
     void testResolvePath_Classpath_Survivor() throws Exception {
         Method m = WasmPolicyEngine.class.getDeclaredMethod("resolvePath", String.class);
         m.setAccessible(true);
-        Path p = (Path) m.invoke(engine, "classpath:policies/authz.wasm");
+        Path p = (Path) m.invoke(engine, "classpath:policies/policy.wasm");
         assertNotNull(p);
-        assertTrue(p.toString().endsWith("authz.wasm"));
+        assertTrue(p.toString().endsWith("policy.wasm"));
     }
 
     @Test
