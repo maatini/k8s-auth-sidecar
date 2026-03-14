@@ -104,7 +104,6 @@
                                 <argument>${project.build.directory}/generated-resources/policies/bundle.tar.gz</argument>
                                 <argument>-C</argument>
                                 <argument>${project.build.outputDirectory}/policies/</argument>
-                                <argument>/policy.wasm</argument>
                             </arguments>
                         </configuration>
                     </execution>
