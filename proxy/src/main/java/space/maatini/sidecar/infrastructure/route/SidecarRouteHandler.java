@@ -11,10 +11,9 @@ import org.eclipse.microprofile.jwt.JsonWebToken;
 import space.maatini.sidecar.application.service.SidecarRequestProcessor;
 import space.maatini.sidecar.domain.model.ProcessingResult;
 import space.maatini.sidecar.domain.model.SidecarRequest;
+import space.maatini.sidecar.infrastructure.util.RequestUtils;
 
 import java.util.Map;
-import java.util.TreeMap;
-import java.util.stream.Collectors;
 
 /**
  * Reactive route handler for Envoy ext_authz (PDP).
@@ -51,11 +50,8 @@ public class SidecarRouteHandler {
             method = vertxRequest.method().name();
         }
 
-        Map<String, String> headers = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
-        vertxRequest.headers().forEach(entry -> headers.put(entry.getKey(), entry.getValue()));
-
-        Map<String, String> queryParams = vertxRequest.params().entries().stream()
-                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, (a, b) -> a, () -> new TreeMap<>(String.CASE_INSENSITIVE_ORDER)));
+        Map<String, String> headers = RequestUtils.extractHeaders(vertxRequest);
+        Map<String, String> queryParams = RequestUtils.extractQueryParams(ctx);
 
         SidecarRequest request = new SidecarRequest(method, path, headers, queryParams, jwt);
 

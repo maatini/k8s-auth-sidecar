@@ -11,6 +11,7 @@ import java.util.Set;
 public record PolicyCacheKey(
         String userId,
         Set<String> roles,
+        Set<String> permissions,
         String method,
         String path) {
 }

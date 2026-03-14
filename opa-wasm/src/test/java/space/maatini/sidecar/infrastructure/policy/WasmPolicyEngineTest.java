@@ -91,6 +91,11 @@ public class WasmPolicyEngineTest {
                     public String wasmPath() {
                         return "classpath:policies/dummy.wasm";
                     }
+
+                    @Override
+                    public int poolSize() {
+                        return 10;
+                    }
                 };
             }
 

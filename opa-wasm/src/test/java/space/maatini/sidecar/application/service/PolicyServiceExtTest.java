@@ -100,6 +100,7 @@ class PolicyServiceExtTest {
         PolicyCacheKey key = new PolicyCacheKey(
                 input.user().id(),
                 input.user().roles(),
+                input.user().permissions(),
                 input.request().method(),
                 input.request().path()
         );

@@ -35,6 +35,9 @@ public class WasmPolicyEngine {
     @Inject
     ObjectMapper objectMapper;
 
+    @Inject
+    PolicyService policyService;
+
     /**
      * Internal bundle of the WASM module and its version.
      */
@@ -46,12 +49,15 @@ public class WasmPolicyEngine {
     public record PolicyInstance(OpaPolicy policy, long version) {}
 
     private final AtomicReference<PolicyBundle> wasmBundleRef = new AtomicReference<>();
-    private final ArrayBlockingQueue<OpaPolicy> policyPool = new ArrayBlockingQueue<>(10);
+    private final AtomicReference<ArrayBlockingQueue<OpaPolicy>> policyPoolRef = new AtomicReference<>();
     private long lastModifiedTime = 0;
 
     @PostConstruct
     void init() {
         if (config.opa().enabled()) {
+            int poolSize = config.opa().embedded().poolSize();
+            this.policyPoolRef.set(new ArrayBlockingQueue<>(poolSize));
+            LOG.infof("OPA WASM pool initialized with capacity %d", poolSize);
             loadWasmModule();
             // Initial modified time setup
             try {
@@ -83,12 +89,19 @@ public class WasmPolicyEngine {
             return Uni.createFrom().item(PolicyDecision.deny("WASM module not initialized"));
         }
 
+        ArrayBlockingQueue<OpaPolicy> pool = policyPoolRef.get();
+        if (pool == null) {
+            LOG.warn("WASM policy pool is not initialized. Defaulting to deny.");
+            return Uni.createFrom().item(PolicyDecision.deny("WASM policy pool not initialized"));
+        }
+
         return Uni.createFrom().emitter(emitter -> {
             OpaPolicy policy = null;
             try {
-                policy = policyPool.poll(5, java.util.concurrent.TimeUnit.SECONDS);
+                // Non-blocking poll: fail-fast if all instances are in use
+                policy = pool.poll();
                 if (policy == null) {
-                    emitter.complete(PolicyDecision.deny("WASM policy pool exhausted"));
+                    emitter.complete(PolicyDecision.deny("429: Too Many Requests - WASM Pool exhausted"));
                     return;
                 }
 
@@ -115,7 +128,7 @@ public class WasmPolicyEngine {
                 emitter.complete(PolicyDecision.deny("WASM evaluation failed: " + e.getMessage()));
             } finally {
                 if (policy != null) {
-                    policyPool.offer(policy);
+                    pool.offer(policy);
                 }
             }
         }).runSubscriptionOn(Infrastructure.getDefaultWorkerPool())
@@ -129,12 +142,15 @@ public class WasmPolicyEngine {
      * Clears and refills the policy pool with new instances for the given bundle.
      */
     protected void refreshPolicyPool(PolicyBundle bundle) {
-        policyPool.clear();
-        for (int i = 0; i < 10; i++) {
+        int poolSize = config.opa().embedded().poolSize();
+        ArrayBlockingQueue<OpaPolicy> newPool = new ArrayBlockingQueue<>(poolSize);
+        for (int i = 0; i < poolSize; i++) {
             LOG.debugf("Creating OpaPolicy instance %d for pool (version %d)", i, bundle.version());
             OpaPolicy newPolicy = OpaPolicy.builder().withPolicy(bundle.bytes()).build();
-            policyPool.offer(newPolicy);
+            newPool.offer(newPolicy);
         }
+        // Atomic swap: old pool remains available to in-flight requests until GC
+        policyPoolRef.set(newPool);
     }
 
     /**
@@ -217,6 +233,7 @@ public class WasmPolicyEngine {
                 LOG.info("Detected changes in policies directory. Reloading WASM module...");
                 lastModifiedTime = currentMaxModified;
                 loadWasmModule();
+                policyService.invalidatePolicyCache();
             }
         } catch (IOException e) {
             LOG.errorf(e, "Error checking policy changes in %s", watchDir);

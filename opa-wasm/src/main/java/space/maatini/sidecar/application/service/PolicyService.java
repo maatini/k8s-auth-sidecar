@@ -2,6 +2,7 @@ package space.maatini.sidecar.application.service;
  
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.quarkus.cache.CacheInvalidateAll;
 import io.quarkus.cache.CacheResult;
 import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -19,6 +20,18 @@ import java.util.*;
 /**
  * Service for evaluating authorization policies using embedded OPA WASM.
  * Implements the PolicyEngine interface from auth-core.
+ *
+ * <p><b>Thundering Herd Risk (Cache Stampede):</b>
+ * After a WASM policy hot-reload, {@link #invalidatePolicyCache()} calls
+ * {@code @CacheInvalidateAll} which evicts all cached decisions at once.
+ * This causes every concurrent request to re-evaluate WASM simultaneously,
+ * potentially exhausting the WASM instance pool. Mitigations to consider:
+ * <ul>
+ *   <li>Probabilistic early expiration (staggered TTL per cache entry)</li>
+ *   <li>A cache lock / single-flight pattern to coalesce duplicate evaluations</li>
+ *   <li>Increasing the WASM pool size proportionally to expected concurrent requests</li>
+ * </ul>
+ * </p>
  */
 @ApplicationScoped
 public class PolicyService implements PolicyEngine {
@@ -51,6 +64,7 @@ public class PolicyService implements PolicyEngine {
         PolicyCacheKey key = new PolicyCacheKey(
                 authContext.userId(),
                 authContext.roles(),
+                authContext.permissions(),
                 method,
                 path
         );
@@ -66,6 +80,15 @@ public class PolicyService implements PolicyEngine {
                     return PolicyDecision.deny(
                             "Policy evaluation failed. Access denied for security.");
                 });
+    }
+ 
+    /**
+     * Invalidates all entries in the policy decision cache.
+     * Called after a successful WASM module hot-reload to prevent stale authorization decisions.
+     */
+    @CacheInvalidateAll(cacheName = "policy-decision-cache")
+    public void invalidatePolicyCache() {
+        LOG.info("Policy decision cache invalidated after WASM reload");
     }
  
     public static PolicyDecision parsePolicyResult(JsonNode result) {

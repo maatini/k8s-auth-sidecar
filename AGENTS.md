@@ -31,7 +31,7 @@ Jeder Agent liest diese Datei **automatisch** beim Workspace-Scan und folgt den 
 - **Dokumentation**: Jede neue Klasse bekommt einzeiligen Header + JavaDoc + `@Description`
 - **OpenAPI**: Nach jedem neuen Endpoint `docs/api-spec.md` + smallrye-openapi aktualisieren
 - **Tests**: PIT-Mutation-Testing muss > 80 % bleiben (Plugin ist bereits im Root-POM)
-- **Quarkus-Version**: Bleibe bei 3.15+ (aktuell 3.15.1)
+- **Quarkus-Version**: Bleibe bei 3.32+ (aktuell 3.32.3)
 - **Event-Loop-Schutz**: CPU-intensive Tasks (WASM-Evaluierung, JSON-Parsing) **niemals** auf dem Vert.x Event Loop ausführen. Immer `@Blocking` oder `Uni.emitOn(Infrastructure.getDefaultWorkerPool())` verwenden. Blockierende Calls auf dem Event Loop sind ein kritisches Anti-Pattern und limitieren den Throughput hart auf < 1000 RPS.
 
 ## 🔥 Schnellstart-Prompt für Agents

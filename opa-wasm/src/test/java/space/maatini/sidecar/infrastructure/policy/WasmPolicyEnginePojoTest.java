@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 import space.maatini.sidecar.infrastructure.config.SidecarConfig;
 import space.maatini.sidecar.domain.model.PolicyDecision;
 import space.maatini.sidecar.domain.model.PolicyInput;
+import space.maatini.sidecar.application.service.PolicyService;
 
 import java.lang.reflect.Field;
 import java.nio.file.Path;
@@ -23,12 +24,24 @@ class WasmPolicyEnginePojoTest {
 
     private WasmPolicyEngine engine;
     private SidecarConfig config;
+    private PolicyService policyService;
+    private SidecarConfig.OpaConfig.EmbeddedOpaConfig embeddedConfig;
 
     @BeforeEach
     void setup() throws Exception {
         engine = new WasmPolicyEngine();
         config = mock(SidecarConfig.class);
+        policyService = mock(PolicyService.class);
+        SidecarConfig.OpaConfig opaConfig = mock(SidecarConfig.OpaConfig.class);
+        embeddedConfig = mock(SidecarConfig.OpaConfig.EmbeddedOpaConfig.class);
+        when(config.opa()).thenReturn(opaConfig);
+        when(opaConfig.embedded()).thenReturn(embeddedConfig);
+        when(embeddedConfig.poolSize()).thenReturn(10);
         setField(engine, "config", config);
+        setField(engine, "policyService", policyService);
+        // Initialize pool manually since @PostConstruct is not called
+        java.util.concurrent.atomic.AtomicReference<java.util.concurrent.ArrayBlockingQueue<com.styra.opa.wasm.OpaPolicy>> poolRef = new java.util.concurrent.atomic.AtomicReference<>(new java.util.concurrent.ArrayBlockingQueue<>(10));
+        setField(engine, "policyPoolRef", poolRef);
     }
 
     private void setField(Object target, String name, Object value) throws Exception {
@@ -119,6 +132,7 @@ class WasmPolicyEnginePojoTest {
         when(opa.enabled()).thenReturn(true);
         when(opa.embedded()).thenReturn(embedded);
         when(embedded.wasmPath()).thenReturn("classpath:policies/dummy.wasm");
+        when(embedded.poolSize()).thenReturn(10);
 
         Object bundle = createDummyBundle(1L);
         java.util.concurrent.atomic.AtomicReference<Object> ref = new java.util.concurrent.atomic.AtomicReference<>(bundle);
@@ -139,13 +153,19 @@ class WasmPolicyEnginePojoTest {
         WasmPolicyEngine.PolicyBundle pb2 = (WasmPolicyEngine.PolicyBundle) bundle2;
 
         engine.refreshPolicyPool(pb1);
-        Field poolField = WasmPolicyEngine.class.getDeclaredField("policyPool");
-        poolField.setAccessible(true);
-        java.util.concurrent.ArrayBlockingQueue<OpaPolicy> pool = (java.util.concurrent.ArrayBlockingQueue<OpaPolicy>) poolField.get(engine);
-        assertEquals(10, pool.size());
+        Field poolRefField = WasmPolicyEngine.class.getDeclaredField("policyPoolRef");
+        poolRefField.setAccessible(true);
+        @SuppressWarnings("unchecked")
+        java.util.concurrent.atomic.AtomicReference<java.util.concurrent.ArrayBlockingQueue<OpaPolicy>> poolRef =
+                (java.util.concurrent.atomic.AtomicReference<java.util.concurrent.ArrayBlockingQueue<OpaPolicy>>) poolRefField.get(engine);
+        assertEquals(10, poolRef.get().size());
 
         engine.refreshPolicyPool(pb2);
-        assertEquals(10, pool.size());
+        // After refresh, poolRef points to a new pool instance
+        @SuppressWarnings("unchecked")
+        java.util.concurrent.atomic.AtomicReference<java.util.concurrent.ArrayBlockingQueue<OpaPolicy>> poolRef2 =
+                (java.util.concurrent.atomic.AtomicReference<java.util.concurrent.ArrayBlockingQueue<OpaPolicy>>) poolRefField.get(engine);
+        assertEquals(10, poolRef2.get().size());
     }
 
     @Test
@@ -212,5 +232,62 @@ class WasmPolicyEnginePojoTest {
             // Cleanup
             Files.walk(tempDir).map(Path::toFile).forEach(java.io.File::delete);
         }
+    }
+
+    @Test
+    void testCheckPolicyChanges_InvalidatesCache() throws Exception {
+        // Setup: enable OPA + hot-reload
+        SidecarConfig.OpaConfig opa = mock(SidecarConfig.OpaConfig.class);
+        SidecarConfig.OpaConfig.HotReloadConfig hotReload = mock(SidecarConfig.OpaConfig.HotReloadConfig.class);
+        SidecarConfig.OpaConfig.EmbeddedOpaConfig embedded = mock(SidecarConfig.OpaConfig.EmbeddedOpaConfig.class);
+        when(config.opa()).thenReturn(opa);
+        when(opa.enabled()).thenReturn(true);
+        when(opa.hotReload()).thenReturn(hotReload);
+        when(hotReload.enabled()).thenReturn(true);
+        when(opa.embedded()).thenReturn(embedded);
+        when(embedded.wasmPath()).thenReturn("classpath:policies/dummy.wasm");
+
+        // Create a temp dir with a .wasm file that has a future timestamp
+        Path tempDir = Files.createTempDirectory("hotreload-cache-test");
+        try {
+            Path wasmFile = tempDir.resolve("authz.wasm");
+            Files.writeString(wasmFile, "dummy wasm");
+            // Set modification time far in the future to trigger reload
+            Files.setLastModifiedTime(wasmFile,
+                    java.nio.file.attribute.FileTime.fromMillis(System.currentTimeMillis() + 100000));
+
+            // Override resolveWatchDir to return our temp dir
+            WasmPolicyEngine spyEngine = spy(engine);
+            setField(spyEngine, "config", config);
+            setField(spyEngine, "policyService", policyService);
+            doReturn(tempDir).when(spyEngine).resolveWatchDir();
+            doNothing().when(spyEngine).loadWasmModule();
+
+            spyEngine.checkPolicyChanges();
+
+            verify(policyService).invalidatePolicyCache();
+        } finally {
+            Files.walk(tempDir).map(Path::toFile).forEach(java.io.File::delete);
+        }
+    }
+
+    @Test
+    void testCheckPolicyChanges_NoChange_DoesNotInvalidateCache() throws Exception {
+        SidecarConfig.OpaConfig opa = mock(SidecarConfig.OpaConfig.class);
+        SidecarConfig.OpaConfig.HotReloadConfig hotReload = mock(SidecarConfig.OpaConfig.HotReloadConfig.class);
+        when(config.opa()).thenReturn(opa);
+        when(opa.enabled()).thenReturn(true);
+        when(opa.hotReload()).thenReturn(hotReload);
+        when(hotReload.enabled()).thenReturn(true);
+
+        // Override resolveWatchDir to return null (no watch dir)
+        WasmPolicyEngine spyEngine = spy(engine);
+        setField(spyEngine, "config", config);
+        setField(spyEngine, "policyService", policyService);
+        doReturn(null).when(spyEngine).resolveWatchDir();
+
+        spyEngine.checkPolicyChanges();
+
+        verify(policyService, never()).invalidatePolicyCache();
     }
 }

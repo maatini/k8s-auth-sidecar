@@ -31,15 +31,12 @@ public interface SidecarConfig {
         @WithDefault("false")
         boolean enabled();
  
-        @WithDefault("http://localhost:8081")
+        @WithDefault("http://localhost:8085")
         String url();
  
         @WithDefault("/api/v1/users/{userId}/roles")
         String path();
- 
-        @WithDefault("30s")
-        java.time.Duration timeout();
- 
+
         @WithDefault("1000")
         int cacheSize();
  
@@ -103,6 +100,10 @@ public interface SidecarConfig {
             @WithName("wasm-path")
             @WithDefault("classpath:policies/authz.wasm")
             String wasmPath();
+
+            @WithName("pool-size")
+            @WithDefault("50")
+            int poolSize();
         }
 
         @WithName("hot-reload")

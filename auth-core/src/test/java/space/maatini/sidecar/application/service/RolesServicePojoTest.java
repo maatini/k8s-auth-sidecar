@@ -70,18 +70,6 @@ public class RolesServicePojoTest {
     }
 
     @Test
-    void testEnrich_Failure_FailClosed() {
-        when(rolesConfig.enabled()).thenReturn(true);
-        AuthContext context = AuthContext.builder().userId("u1").roles(Set.of("user")).build();
-
-        when(mockClient.getUserRoles("u1")).thenReturn(Uni.createFrom().failure(new RuntimeException("API Down")));
-
-        assertThrows(SecurityException.class, () -> 
-            rolesService.enrich(context).await().indefinitely()
-        );
-    }
-
-    @Test
     void testEnrich_EmptyResponse() {
         when(rolesConfig.enabled()).thenReturn(true);
         AuthContext context = AuthContext.builder().userId("u1").roles(Set.of("user")).build();
@@ -92,5 +80,39 @@ public class RolesServicePojoTest {
 
         assertEquals(Set.of("user"), result.roles());
         assertTrue(result.permissions().isEmpty());
+    }
+
+    @Test
+    void testFallbackRoles_ReturnsEmpty() {
+        RolesResponse result = rolesService.fallbackRoles("u1").await().indefinitely();
+
+        assertEquals("u1", result.userId());
+        assertTrue(result.roles().isEmpty());
+        assertTrue(result.permissions().isEmpty());
+    }
+
+    @Test
+    void testEnrich_WithFallbackResponse_RetainsOriginalRoles() {
+        // Simulates the Fail-Open scenario: when getEnrichedRoles returns
+        // the fallback (empty response), original JWT roles must be preserved.
+        when(rolesConfig.enabled()).thenReturn(true);
+        AuthContext context = AuthContext.builder()
+                .userId("u1")
+                .roles(Set.of("user", "editor"))
+                .permissions(Set.of("read"))
+                .build();
+
+        // Simulate fallback returning empty roles (like the Fail-Open strategy)
+        when(mockClient.getUserRoles("u1"))
+                .thenReturn(Uni.createFrom().item(new RolesResponse("u1", Set.of(), Set.of())));
+
+        AuthContext result = rolesService.enrich(context).await().indefinitely();
+
+        // Original JWT roles must be fully preserved
+        assertTrue(result.roles().contains("user"));
+        assertTrue(result.roles().contains("editor"));
+        assertEquals(2, result.roles().size());
+        assertTrue(result.permissions().contains("read"));
+        assertEquals(1, result.permissions().size());
     }
 }

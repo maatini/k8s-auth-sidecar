@@ -54,7 +54,7 @@ spec:
             - name: PROXY_TARGET_HOST
               value: "localhost"
             - name: PROXY_TARGET_PORT
-              value: "8081"
+              value: "8085"
             - name: PROXY_TARGET_SCHEME
               value: "http"
           
@@ -109,12 +109,12 @@ spec:
           # Note: Only exposed internally, not to the service
           ports:
             - name: http-internal
-              containerPort: 8081
+              containerPort: 8085
               protocol: TCP
           
           env:
             - name: SERVER_PORT
-              value: "8081"
+              value: "8085"
             # The app doesn't need auth - sidecar handles it
             - name: SECURITY_ENABLED
               value: "false"
@@ -130,14 +130,14 @@ spec:
           livenessProbe:
             httpGet:
               path: /health
-              port: 8081
+              port: 8085
             initialDelaySeconds: 30
             periodSeconds: 30
           
           readinessProbe:
             httpGet:
               path: /health
-              port: 8081
+              port: 8085
             initialDelaySeconds: 10
             periodSeconds: 10
           

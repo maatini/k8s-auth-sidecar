@@ -11,11 +11,10 @@ Genau dafür gibt es den **k8s-auth-sidecar**!
 
 Der Sidecar ist ein **kleiner Helfer-Container**, der **neben** deiner eigentlichen Anwendung im selben Kubernetes-Pod läuft (Sidecar-Pattern).
 
-- Dein Service im Cluster zeigt **nicht** mehr direkt auf deine App (Port 8081), sondern auf den **Sidecar** (Port 8080).  
-- Jeder HTTP-Request von außen landet zuerst beim Sidecar.  
-- Der Sidecar prüft: „Darf dieser User das überhaupt?“  
-- Wenn ja → leitet er den Request weiter an deine App (lokal über `localhost:8081`).  
-- Wenn nein → schickt er sofort `401` oder `403` zurück. Deine App merkt davon **gar nichts**!
+- Jeder HTTP-Request von außen landet zuerst bei einem Ingress-Gateway (z. B. Envoy).
+- Das Gateway fragt den Sidecar: „Darf dieser User das überhaupt?“ (Port 8080 `/authorize`).
+- Wenn ja → leitet das Gateway den Request mit neuen Sicherheits-Headern weiter an deine App.
+- Wenn nein → schickt das Gateway sofort `401` oder `403` zurück. Deine App merkt davon **gar nichts**!
 
 **Vorteile für dich als Junior:**
 - Deine Haupt-App bleibt **sauber** und kümmert sich nur um Business-Logik.  
@@ -46,10 +45,9 @@ Der Sidecar ist wie ein **Sicherheits-Checkpoint** auf einem Flughafen:
    - Beispiel: „Wenn der User `admin` ist UND der Pfad mit `/api/admin` beginnt → erlauben“.
 
 4. **Weiterleitung oder Blockieren (Proxy)**  
-   - Erlaubt? → Request wird an `localhost:8081` (deine App) weitergeleitet. Zusätzlich werden nützliche Header mitgeschickt:
-     - `X-Auth-User`: Die User-ID.
-     - `X-Auth-Roles`: Die Rollen.
-     - `X-Auth-Context`: **Base64-kodierter JSON-String** mit allen Infos (`AuthContext`). Diesen kannst du in Java einfach deserialisieren!
+   - Erlaubt? → Request wird an `localhost:8085` (deine App) weitergeleitet. Zusätzlich werden nützliche Header mitgeschickt:
+     - `X-Auth-User-Id`: Die User-ID (Subject).
+     - `X-Enriched-Roles`: Komma-separierte Liste der angereicherten Rollen.
    - Verboten? → sofort `403 Forbidden` an den Client. Deine App wird **nie** aufgerufen → super performant und sicher!
 
 ---
@@ -106,7 +104,7 @@ Danach nur noch:
 
 ## 🧪 So testest du das Projekt – Schritt für Schritt (super einfach erklärt)
 
-Keine Angst vor den 142 Tests! Wir zeigen dir jetzt, wie du sie alle ausführst und vor allem: **Was sie bedeuten.**
+Keine Angst vor den 118 Tests! Wir zeigen dir jetzt, wie du sie alle ausführst und vor allem: **Was sie bedeuten.**
 
 #### 1. Lokale Entwicklung (am schnellsten)
 Wenn du gerade am Code bastelst, willst du sofort sehen, ob es noch klappt.
@@ -163,7 +161,22 @@ Sicherheit klingt langweilig? Nicht hier! Mit dem Sidecar bist du von Anfang an 
 - **Don't hardcode**: Nutze niemals Passwörter im Code. Dafür gibt es `application.properties` und Kubernetes Secrets.
 - **Watch the Logs**: Schau dir mit `kubectl logs` an, was dein Sidecar macht. Er sagt dir genau, warum ein Request abgelehnt wurde.
 
+---
+
+## ⚠️ Bekannte Fallstricke & Performance-Warnungen
+
+Auch wenn der Sidecar super schnell ist, gibt es zwei Dinge, auf die du achten musst:
+
+1. **The Event Loop Blockade (CPU-Last)**: 
+   Die Verarbeitung von JWTs (Kryptografie) und das Parsen von JSON sind CPU-intensiv. Wenn wir das direkt auf dem "Event Loop" (dem Haupt-Förderband von Vert.x) machen, bleibt der Sidecar stehen. **Lösung**: Wir nutzen `@Blocking` oder `Uni.emitOn(Infrastructure.getDefaultWorkerPool())`, um diese Arbeit auf andere Threads auszulagern.
+
+2. **The WASM Pool Race Condition**: 
+   Die OPA-Logik läuft in einer WASM-Engine. Da eine WASM-Instanz immer nur einen Request gleichzeitig verarbeiten kann, nutzen wir einen **Pool**. Wenn dein Pool zu klein ist (z. B. nur 10 Instanzen), aber 100 Leute gleichzeitig kommen, müssen 90 warten. Achte darauf, den Pool in der `application.properties` passend zu deiner Last zu konfigurieren.
+
 > [!IMPORTANT]
+> **POJO-First Rule**: Um eine Mutation-Strength von > 80% zu halten, muss die Kernlogik in `auth-core` immer in reinen Java-Klassen (POJOs) ohne Framework-Schnickschnack bleiben. Nur so findet PIT wirklich alle Logikfehler!
+
+> [!TIP]
 > **Einfachheit ist Trumpf:** Wenn du merkst, dass deine Rego-Regeln zu kompliziert werden, sprich sie nochmal mit einem Senior durch. Meistens gibt es einen einfacheren Weg!
 
 ---
@@ -172,8 +185,7 @@ Sicherheit klingt langweilig? Nicht hier! Mit dem Sidecar bist du von Anfang an 
 
 - **Sehr stabil**: Komplettes Refactoring (reaktiv + streaming + Memory-Optimierung) extrem performant.
 - **Aktiv in Entwicklung**: Core-Funktionen (Auth-Filter, Proxy, OPA, Path-Matcher) inkl. serverseitigen Caffeine-Caches (Session & Profiling) sind produktionsreif.
-- **Testing & Mutation Score**: **121 stabile automatisierte Tests** (108 POJO+ExtTests + 13 QuarkusTests). Die Kernservices in `auth-core` erreichen **80% PIT Test Strength** und **91% PIT Line Coverage**. Proxy-QuarkusIntegrationstests benötigen den lokalen WireMock-Stack (`docker-compose.dev.yml`).
-  - *Junior-Tipp:* Teste Kernlogik immer ohne Framework (`@QuarkusTest`), also als reines Java-Objekt (POJO). Das ist extrem schnell und deckt kleinste Mutanten auf (z.B. Mockito Spy Maps für Edge-Cases)!
+- **Testing & Mutation Score**: **118 automatisierte Tests** (POJO+ExtTests + QuarkusTests). Die Kernservices in `auth-core` erreichen **82% PIT Test Strength** und **91% PIT Line Coverage**. Proxy-QuarkusIntegrationstests benötigen den lokalen WireMock-Stack (`docker-compose.dev.yml`).
 - **Dokumentation**: Sehr stark! README + `docs/ARCHITECTURE.md` + dieser Junior Guide.
 ## 🛡️ Die zwei Gesichter des Sidecars
 
@@ -189,7 +201,9 @@ Hier steht der Sidecar nicht direkt vor deiner App, sondern daneben. Ein großes
 
 ---
 
-## 🏗️ Wie der Sidecar im Inneren tickt (für Neugierige)nsthafte Einsätze und skaliert logisch und fehlerfrei im Kubernetes Cluster.
+## 🏗️ Wie der Sidecar im Inneren tickt (für Neugierige)
+
+Der Sidecar ist für ernsthafte Einsätze konzipiert und skaliert logisch und fehlerfrei im Kubernetes Cluster.
 
 ---
 

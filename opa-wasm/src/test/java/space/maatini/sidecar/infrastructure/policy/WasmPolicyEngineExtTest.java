@@ -41,6 +41,7 @@ class WasmPolicyEngineExtTest {
         when(opaConfig.embedded()).thenReturn(embeddedConfig);
         when(opaConfig.enabled()).thenReturn(true);
         when(embeddedConfig.wasmPath()).thenReturn("classpath:policies/authz.wasm");
+        when(embeddedConfig.poolSize()).thenReturn(10);
 
         objectMapper = new ObjectMapper();
 
@@ -51,6 +52,11 @@ class WasmPolicyEngineExtTest {
         Field mapperField = WasmPolicyEngine.class.getDeclaredField("objectMapper");
         mapperField.setAccessible(true);
         mapperField.set(engine, objectMapper);
+
+        // Initialize pool manually since @PostConstruct is not called
+        Field poolField = WasmPolicyEngine.class.getDeclaredField("policyPool");
+        poolField.setAccessible(true);
+        poolField.set(engine, new java.util.concurrent.ArrayBlockingQueue<OpaPolicy>(10));
 
         mockPolicy = mock(OpaPolicy.class);
     }
