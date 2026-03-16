@@ -55,7 +55,7 @@ Bearbeite `k8s/overlays/production/kustomization.yaml`:
 
 ```yaml
 images:
-  - name: space.maatini/k8s-auth-sidecar
+  - name: de.edeka.eit/k8s-auth-sidecar
     newName: your-registry.io/k8s-auth-sidecar
     newTag: "1.0.0"
 ```

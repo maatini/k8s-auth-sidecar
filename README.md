@@ -235,4 +235,4 @@ Das Projekt besitzt eine extrem schnelle, überwiegend Framework-unabhängige Te
 
 Apache License 2.0 - siehe [LICENSE](LICENSE).
 
-Entwickelt von **[space.maatini](https://github.com/maatini)**
+Entwickelt von **[de.edeka.eit](https://github.com/maatini)**

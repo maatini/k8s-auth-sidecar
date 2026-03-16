@@ -31,5 +31,5 @@ configMapGenerator:
       - OIDC_TLS_VERIFICATION=none
 
 images:
-  - name: space.maatini/k8s-auth-sidecar
+  - name: de.edeka.eit/k8s-auth-sidecar
     newTag: "latest"

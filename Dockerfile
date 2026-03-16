@@ -3,7 +3,7 @@
 # =====================================================
 FROM eclipse-temurin:25-jdk-alpine AS build
 
-LABEL maintainer="space.maatini"
+LABEL maintainer="de.edeka.eit"
 LABEL description="K8s-Auth-Sidecar AuthN/AuthZ Microservice Build Stage"
 
 # Install Maven
@@ -44,7 +44,7 @@ ARG VERSION=0.3.0
 # OCI standard labels
 LABEL org.opencontainers.image.title="K8s-Auth-Sidecar"
 LABEL org.opencontainers.image.description="AuthN/AuthZ Microservice"
-LABEL org.opencontainers.image.authors="space.maatini"
+LABEL org.opencontainers.image.authors="de.edeka.eit"
 LABEL org.opencontainers.image.version="${VERSION}"
 LABEL org.opencontainers.image.source="https://github.com/maatini/k8s-auth-sidecar"
 

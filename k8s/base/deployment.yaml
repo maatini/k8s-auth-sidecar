@@ -35,7 +35,7 @@ spec:
         # Handles AuthN/AuthZ before forwarding to main app
         # ==========================================
         - name: k8s-auth-sidecar
-          image: space.maatini/k8s-auth-sidecar:0.3.1
+          image: de.edeka.eit/k8s-auth-sidecar:0.3.1
           imagePullPolicy: IfNotPresent
           
           ports:

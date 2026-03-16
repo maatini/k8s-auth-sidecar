@@ -4,7 +4,7 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
  
-    <groupId>space.maatini</groupId>
+    <groupId>de.edeka.eit</groupId>
     <artifactId>k8s-auth-sidecar</artifactId>
     <version>0.3.1</version>
     <packaging>pom</packaging>
@@ -155,15 +155,15 @@
                             <jvmArg>-Djava.util.logging.manager=org.jboss.logmanager.LogManager</jvmArg>
                         </jvmArgs>
                         <targetClasses>
-                            <param>space.maatini.sidecar.*</param>
+                            <param>de.edeka.eit.sidecar.*</param>
                         </targetClasses>
                         <targetTests>
-                            <param>space.maatini.sidecar.*PojoTest</param>
-                            <param>space.maatini.sidecar.*ExtTest</param>
+                            <param>de.edeka.eit.sidecar.*PojoTest</param>
+                            <param>de.edeka.eit.sidecar.*ExtTest</param>
                         </targetTests>
                         <excludedTestClasses>
-                            <param>space.maatini.sidecar.*IT</param>
-                            <param>space.maatini.sidecar.*E2ETest</param>
+                            <param>de.edeka.eit.sidecar.*IT</param>
+                            <param>de.edeka.eit.sidecar.*E2ETest</param>
                         </excludedTestClasses>
                         <mutators>
                             <mutator>STRONGER</mutator>

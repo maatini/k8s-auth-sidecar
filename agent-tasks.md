@@ -14,7 +14,7 @@ Hier findest du fertige Prompt-Templates, mit denen du **komplette Use-Cases** i
 ```
 Du bist Senior Quarkus-Architect. Implementiere einen neuen UseCase im Modul auth-core:
 
-- Package: de.maatini.k8sauth.usecase.jwt
+- Package: de.edeka.eit.k8sauth.usecase.jwt
 - Klasse: JwtValidationUseCase.java (POJO, @ApplicationScoped)
 - Methode: Uni<ValidationResult> execute(Uni<JwtValidationCommand> command)
 - Nutze bestehende Klassen: JwtParser, TokenValidator, CaffeineCache
@@ -30,7 +30,7 @@ Plane, implementiere, teste und committe alles in einem Durchgang.
 ```
 Du bist Senior Quarkus-Architect. Implementiere einen neuen UseCase im Modul auth-core:
 
-- Package: de.maatini.k8sauth.usecase.authorization
+- Package: de.edeka.eit.k8sauth.usecase.authorization
 - Klasse: AuthorizationUseCase.java (POJO)
 - Methode: Uni<AuthorizationResult> execute(Uni<AuthorizationCommand> command)
 - Verwende WasmPolicyEngine + PolicyService
@@ -46,7 +46,7 @@ Plane, implementiere, teste und committe alles in einem Durchgang.
 ```
 Du bist Senior Quarkus-Architect. Implementiere einen neuen UseCase im Modul auth-core:
 
-- Package: de.maatini.k8sauth.usecase.secrets
+- Package: de.edeka.eit.k8sauth.usecase.secrets
 - Klasse: VaultSecretsUseCase.java (POJO)
 - Methode: Uni<SecretResult> execute(Uni<VaultCommand> command)
 - Nutze quarkus-vault Extension (falls nötig hinzufügen)
@@ -61,7 +61,7 @@ Plane, implementiere, teste und committe alles in einem Durchgang.
 ```
 Du bist Senior Quarkus-Architect. Implementiere einen neuen UseCase im Modul auth-core:
 
-- Package: de.maatini.k8sauth.usecase.roles
+- Package: de.edeka.eit.k8sauth.usecase.roles
 - Klasse: RoleMappingUseCase.java (POJO)
 - Methode: Uni<RoleMappingResult> execute(Uni<RoleMappingCommand> command)
 - Unterstützt Entra ID + Keycloak Claims
@@ -75,7 +75,7 @@ Plane, implementiere, teste und committe alles in einem Durchgang.
 ```
 Du bist Senior Quarkus-Architect. Implementiere einen neuen UseCase im Modul auth-core:
 
-- Package: de.maatini.k8sauth.usecase.cache
+- Package: de.edeka.eit.k8sauth.usecase.cache
 - Klasse: CacheInvalidationUseCase.java (POJO)
 - Methode: Uni<Void> execute(Uni<InvalidationCommand> command)
 - Nutze Caffeine + EventBus (Mutiny)

@@ -44,5 +44,5 @@ configMapGenerator:
       - SIDECAR_OPA_EMBEDDED_POOL_ACQUIRE_TIMEOUT_MS=50
 
 images:
-  - name: space.maatini/k8s-auth-sidecar
+  - name: de.edeka.eit/k8s-auth-sidecar
     newTag: "0.3.1"

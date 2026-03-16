@@ -75,7 +75,7 @@ quarkus:
   log:
     level: ${QUARKUS_LOG_LEVEL:INFO}
     category:
-      "space.maatini.sidecar":
+      "de.edeka.eit.sidecar":
         level: ${SIDECAR_LOG_LEVEL:DEBUG}
     console:
       json:

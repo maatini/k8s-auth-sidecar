@@ -20,7 +20,7 @@
       "test": "mvn test",
       "test:coverage": "mvn test -Dquarkus.jacoco.report=true",
       "test:policies": "opa test src/main/resources/policies -v",
-      "image:build": "docker build -t space.maatini/k8s-auth-sidecar:1.0.0 .",
+      "image:build": "docker build -t de.edeka.eit/k8s-auth-sidecar:1.0.0 .",
       "deploy:dev": "kubectl apply -k k8s/overlays/development"
     }
   }
