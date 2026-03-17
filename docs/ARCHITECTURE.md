@@ -21,8 +21,14 @@ Die gesamte HTTP-Pipeline ist reaktiv implementiert (`Mutiny Uni`), was höchste
 ### Gateway Mode (ext_authz)
 Der Sidecar wird von einem externen Gateway (Envoy/Nginx) zur Autorisierung kontaktiert.
 - **Endpoint**: `GET /authorize`.
-- **Logic**: Der Sidecar wertet die Header `X-Forwarded-Uri` und `X-Forwarded-Method` aus.
+- **Logic**: Der Sidecar wertet die Header `X-Forwarded-Uri` und `X-Forwarded-Method` aus, führt das Rollen-Enrichment durch (`RolesService`) und evaluiert dann die OPA-Policies.
 - **Response**: `200 OK` delegiert die Anfrage an das eigentliche Ziel weiter. Rollen-Enrichment erfolgt über Antwort-Header (`X-Auth-User-Id`, `X-Enriched-Roles`).
+
+### UserInfo Endpoint
+Verarbeitet Anfragen nach strukturierten Benutzerinformationen des angemeldeten Benutzers.
+- **Endpoint**: `GET /userinfo`.
+- **Logic**: Durchläuft dieselbe AuthN/AuthZ Pipeline wie `/authorize`. Extrahiert nach erfolgreicher Autorisierung die Identität, (angereicherte) Rollen sowie gruppierte Berechtigungen (z.B. `{"orders": ["read", "write"]}`) aus dem `AuthContext`.
+- **Response**: Ein strukturiertes JSON-Dokument mit Benutzerinformationen, Rollen und Berechtigungen.
 
 ## Architektur für lokale Entwicklung (Dev-Profil & Mocking)
 

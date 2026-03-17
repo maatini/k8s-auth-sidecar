@@ -38,6 +38,7 @@
 - 🛡️ **Zero-Trust**: Jede Anfrage wird zwingend validiert.
 - 🛡️ **Envoy / Ingress Mode (`ext_authz`)**: Entwickelt für den Einsatz mit Envoy (Istio) oder Nginx. Stellt den `/authorize` Endpunkt als externer Autorisierungs-Service (PDP) bereit.
 - 🚀 **Context Enrichment**: Reichert Anfragen an das Backend mit `X-Auth-User-Id` und `X-Enriched-Roles` an.
+- 👤 **UserInfo Endpoint**: Bietet unter `/userinfo` strukturierte JSON-Antworten über Identität, Rollen und extrahierte Berechtigungen des Nutzers.
 - 🎯 **Zentrales Path-Matching**: Ant-Style Patterns (`/**`, `/*`) über praktisches `PathMatcher`-Utility.
 - 🚀 **Native Image Support**: Minimale Startup-Zeit (< 100ms) und extrem geringer Memory-Footprint.
 - 📊 **Observability**: Prometheus Metrics, JSON Logging und Health Checks out-of-the-box.
@@ -75,10 +76,11 @@ graph TD
     Client((Client)) -->|1. Request| Envoy[Envoy / Ingress]
     Envoy -->|2. Check /authorize| Sidecar[K8s-Auth-Sidecar]
     Sidecar -->|3. Validierung| OIDC[(OIDC Provider)]
-    Sidecar -->|4. Evaluierung| OPA{In-Memory<br/>OPA-WASM}
+    Sidecar -->|4. Enrichment| RolesService[Roles Service]
+    Sidecar -->|5. Evaluierung| OPA{In-Memory<br/>OPA-WASM}
     OPA -.->|Allow + Context| Sidecar
-    Sidecar -.->|5. 200 OK + Header| Envoy
-    Envoy -->|6. Forward with Context| Backend[App Container]
+    Sidecar -.->|6. 200 OK + Header| Envoy
+    Envoy -->|7. Forward with Context| Backend[App Container]
     
     style Sidecar fill:#1792E5,stroke:#fff,stroke-width:2px,color:#fff
     style Backend fill:#1E2B3C,stroke:#000,stroke-width:2px,color:#fff
@@ -87,8 +89,9 @@ graph TD
 ### 🧠 Die Pipeline im Detail
 Jeder Request an `/authorize` durchläuft diese reaktiven Schritte:
 1.  **🔍 Token Extraktion & Authentifizierung**: Der Route-Handler extrahiert den Bearer-Token, validiert Signatur/Issuer via Caffeine-Cache und erzeugt einen sicheren `AuthContext`. Schlägt dies fehl, wird sofort `HTTP 401` zurückgegeben.
-2.  **⚖️ Policy Check & Autorisierung (`AuthorizationUseCase`)**: In-Memory Evaluierung via WASM anhand des `AuthContext` (inkl. extrahierter Rollen) gegen vorkompilierte `.rego` Regeln.
-3.  **✅ Response**: Bei Erfolg antwortet der Sidecar mit `200 OK` und den Enrichment-Headern (`X-Auth-User-Id`, `X-Enriched-Roles`). Das Ingress-Gateway leitet den originalen Request dann an das Backend weiter.
+2.  **🔄 Rollen-Enrichment**: Der `RolesService` ruft asynchron zusätzliche Rollen für den Nutzer ab und fügt sie dem `AuthContext` hinzu. Bei Fehlern (Timeout etc.) greift ein Fallback auf die im JWT enthaltenen Rollen.
+3.  **⚖️ Policy Check & Autorisierung (`AuthorizationUseCase`)**: In-Memory Evaluierung via WASM anhand des `AuthContext` (inkl. extrahierter Rollen) gegen vorkompilierte `.rego` Regeln.
+4.  **✅ Response**: Bei Erfolg antwortet der Sidecar mit `200 OK` und den Enrichment-Headern (`X-Auth-User-Id`, `X-Enriched-Roles`). Das Ingress-Gateway leitet den originalen Request dann an das Backend weiter.
 
 ---
 

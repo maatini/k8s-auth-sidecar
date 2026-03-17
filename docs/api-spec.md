@@ -73,4 +73,78 @@ paths:
                 properties:
                   error:
                     type: string
+
+---
+
+## `GET /userinfo`
+
+Gibt strukturierte Benutzerinformationen, Rollen und Berechtigungen (Permissions) als JSON zurück. Dieser Endpunkt durchläuft dieselbe Pipeline (inklusive Policy Check) wie `/authorize`.
+
+### Parameter (via Header)
+
+| Header | Typ | Beschreibung |
+|--------|-----|--------------|
+| `Authorization` | string | Das Bearer-Token des Users. |
+
+### Response
+
+- **200 OK**: Ein JSON-Objekt mit Identität, Rollen, gruppierten Berechtigungen und Zeitstempeln.
+- **401 Unauthorized**: Token ungültig oder abgelaufen.
+- **403 Forbidden**: Token gültig, aber Zugriff durch OPA Policy verweigert.
+- **500 Internal Server Error**: Fehler bei der Generierung der Antwort.
+
+### Beispiel Aufruf
+
+```http
+GET /userinfo HTTP/1.1
+Host: localhost:8080
+Authorization: Bearer eyJhbGci...
+```
+
+### OpenAPI (YAML Snippet)
+
+```yaml
+  /userinfo:
+    get:
+      summary: Ruft Identitäts- und Berechtigungsinformationen des Nutzers ab
+      description: Returns structured user information extracted from the token, enriched roles, and grouped permissions.
+      responses:
+        '200':
+          description: User information successfully retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sub:
+                    type: string
+                  name:
+                    type: string
+                  preferred_username:
+                    type: string
+                  email:
+                    type: string
+                  roles:
+                    type: array
+                    items:
+                      type: string
+                  rights:
+                    type: array
+                    items:
+                      type: string
+                  permissions:
+                    type: object
+                    additionalProperties:
+                      type: array
+                      items:
+                        type: string
+                  exp:
+                    type: integer
+                  iat:
+                    type: integer
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden
+```
 ```

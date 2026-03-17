@@ -53,4 +53,12 @@ class AuthSidecarTest {
             .then()
             .statusCode(200);
     }
+
+    @Test
+    void testUnauthenticatedUserInfoReturns401() {
+        given()
+            .when().get("/userinfo")
+            .then()
+            .statusCode(401);
+    }
 }
