@@ -58,7 +58,12 @@ mvn quarkus:dev
 
 # 3. Test-Token abrufen & Request senden
 export TOKEN=$(curl -s -X POST http://localhost:8090/realms/master/protocol/openid-connect/token | jq -r .access_token)
+
+# API Request simulieren
 curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/v1/something
+
+# ODER: Eigene Identität, Rollen und Permissions abfragen
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/userinfo
 ```
 
 Für eine detaillierte Einführung siehe den [JUNIOR_GUIDE.md](JUNIOR_GUIDE.md).
@@ -92,6 +97,22 @@ Jeder Request an `/authorize` durchläuft diese reaktiven Schritte:
 2.  **🔄 Rollen-Enrichment**: Der `RolesService` ruft asynchron zusätzliche Rollen für den Nutzer ab und fügt sie dem `AuthContext` hinzu. Bei Fehlern (Timeout etc.) greift ein Fallback auf die im JWT enthaltenen Rollen.
 3.  **⚖️ Policy Check & Autorisierung (`AuthorizationUseCase`)**: In-Memory Evaluierung via WASM anhand des `AuthContext` (inkl. extrahierter Rollen) gegen vorkompilierte `.rego` Regeln.
 4.  **✅ Response**: Bei Erfolg antwortet der Sidecar mit `200 OK` und den Enrichment-Headern (`X-Auth-User-Id`, `X-Enriched-Roles`). Das Ingress-Gateway leitet den originalen Request dann an das Backend weiter.
+
+### 👤 UserInfo Endpoint (`/userinfo`)
+
+Ergänzend zur reinen Ingress-Autorisierung (via `/authorize`) stellt der Sidecar den `/userinfo` Endpunkt bereit.
+Dieser durchläuft **exakt dieselbe Pipeline** (Authentifizierung → Rollen-Enrichment → OPA-Policy Check), leitet den Request aber am Ende nicht weiter, sondern gibt die aggregierten Berechtigungsdaten als strukturiertes JSON an den Aufrufer (z.B. ein Frontend) zurück.
+
+```json
+{
+  "sub": "20d88f6b-3135-4dbb-887f-e2518e38d745",
+  "preferred_username": "alice",
+  "roles": ["view-profile", "shop-manager"],
+  "permissions": {
+    "store": ["read", "write"]
+  }
+}
+```
 
 ---
 
