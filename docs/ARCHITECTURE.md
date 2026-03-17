@@ -12,9 +12,176 @@ Der **k8s-auth-sidecar** (Request Router Sidecar) ist ein Quarkus-basierter Micr
 
 ![Request Flow](images/request_flow.png)
 
-## Module & Komponenten (Maven Multi-Module)
+## Module Architecture & Responsibilities (Maven Multi-Module)
 
-Die gesamte HTTP-Pipeline ist reaktiv implementiert (`Mutiny Uni`), was höchste Parallelität bei minimalem Ressourcenverbrauch garantiert.
+Die Architektur des k8s-auth-sidecar folgt strengen modularen Prinzipien. Jeder Bereich ist in ein eigenes Maven-Modul gekapselt, um Verantwortlichkeiten sauber zu trennen und Dependency Inversion zu erzwingen.
+
+### auth-core
+
+**Zweck / Verantwortlichkeit**  
+Das `auth-core`-Modul ist das Herzstück der Anwendung und enthält die reine Domain-Logik (POJO-First) ohne jegliche Infrastruktur-, Framework- oder REST-Abhängigkeiten.
+
+**Wichtige Packages**  
+- `de.edeka.eit.sidecar.domain.model`
+- `de.edeka.eit.sidecar.application.service`
+- `de.edeka.eit.sidecar.usecase.*`
+
+**Kern-Klassen / Komponenten**  
+- `AuthorizationUseCase`: Orchestriert den gesamten Autorisierungsprozess (Token validieren, Rollen laden, Policy anwenden).
+- `AuthContext`: Zentrales Domain-Model, das Benutzer-Identität, extrahierte Claims und angereicherte Rollen/Berechtigungen bündelt.
+- `PolicyEngine` (Interface): Abstraktion für die Policy-Evaluierung, die durch das WASM-Modul implementiert wird.
+- `UserInfoResponseBuilder`: Kapselt die Logik zur Transformation eines `AuthContext` in ein standardisiertes `UserInfoResponse`-Objekt.
+
+**Verantwortlichkeiten im Detail**  
+- Validierung von JWTs und Extraktion von Basis-Claims (via `JwtClaimExtractor`).
+- Bereitstellung von Interfaces (Ports) für externe Systeme wie Identity Provider, Roles-Services und Policy-Engines.
+- Evaluierung der Business-Zustände und Rückgabe detaillierter `ProcessingResult`-Objekte zur sauberen Fehlerbehandlung in der Präsentationsschicht.
+- Technologiefokus: Reines Java 21, Mutiny (`Uni`) für nicht-blockierende reaktive Pipelines, Verzicht auf `@Inject` oder Quarkus-spezifische Annotationen in der Core-Schicht.
+
+**Interaktion mit anderen Modulen**  
+Das Modul wird vom `ext-authz` (welches Requests entgegennimmt) aufgerufen und konsumiert Implementierungen der Infrastruktur (wie `opa-wasm` und Clients für den Roles-Service aus `ext-authz` bzw. config). Es hat keine Abhängigkeiten zu den anderen Modulen (Dependency Rule).
+
+**Wichtige Konzepte / Patterns**  
+- **POJO-First**: Keine Quarkus-Annotationen, 100% isolierbar und per Mutation-Testing (PIT) testbar.
+- **Port & Adapter (Hexagonal)**: Definiert Interfaces, die von außen implementiert werden.
+- **Mutiny Uni**: Alle Operationen sind durchgängig asynchron und non-blocking.
+
+---
+
+### ext-authz
+
+**Zweck / Verantwortlichkeit**  
+Dieses Modul übernimmt das Request-Routing (Präsentationsschicht), die Absicherung gegen Header-Spoofing und fungiert als primärer Einstiegspunkt (PDP) für das Envoy/Nginx-Gateway.
+
+**Wichtige Packages**  
+- `de.edeka.eit.sidecar.infrastructure.route`
+- `de.edeka.eit.sidecar.infrastructure.security`
+- `de.edeka.eit.sidecar.infrastructure.roles`
+
+**Kern-Klassen / Komponenten**  
+- `SidecarRouteHandler`: Vert.x HTTP-Route für `GET /authorize`, die den Input parst und an den `AuthorizationUseCase` weiterreicht.
+- `UserInfoRouteHandler`: Vert.x HTTP-Route für `GET /userinfo`, liefert das JSON des Benutzers zurück.
+- `HeaderSanitizer`: Validiert und bereinigt Envoy-Header (`X-Forwarded-Uri`, `X-Forwarded-Method`), um Path-Traversal und Privilege Escalation zu verhindern.
+- `RolesClient`: Ein reaktiver Quarkus REST-Client zur Anbindung des externen Rollen-Microservices.
+
+**Verantwortlichkeiten im Detail**  
+- Bereitstellung der HTTP-Endpunkte (Routes) auf Basis von Vert.x Reactive.
+- Transformation von rohen HTTP-Headern in strukturierte `PolicyInput`-Objekte für den Core.
+- Durchsetzung von Rate-Limiting und Schutzmaßnahmen gegen IP-Spoofing (`X-Forwarded-For`).
+- Primärer Technologiestack: Vert.x Web, Quarkus REST Client Reactive, Caffeine (für Caching).
+
+**Interaktion mit anderen Modulen**  
+Das Modul instanziiert bzw. registriert die Routen in Quarkus und ruft die UseCases aus `auth-core` auf. Es leitet die aus dem HTTP-Request gewonnenen Parameter an die Domain weiter und übersetzt `ProcessingResult` in HTTP-Statuscodes (200, 401, 403, 500).
+
+**Wichtige Konzepte / Patterns**  
+- **Reactive Route Handler**: Verzicht auf JAX-RS (Resteasy) zugunsten von leichtgewichtigen, hochperformanten Vert.x-Routen.
+- **Defense-in-Depth**: Strikte Validierung aller Eingangsdaten durch den `HeaderSanitizer`.
+- **Fail-Fast / Circuit Breaker**: Externe Aufrufe (z.B. Roles-Service) sind gegen Timeouts abgesichert.
+
+---
+
+### config
+
+**Zweck / Verantwortlichkeit**  
+Hier findet das Zusammenbinden der Applikation (Dependency Injection Configuration), das Monitoring und die Bereitstellung applikationsweiter Infrastruktur (Health-Checks) statt.
+
+**Wichtige Packages**  
+- `de.edeka.eit.sidecar.infrastructure.config`
+- `de.edeka.eit.sidecar.infrastructure.health`
+
+**Kern-Klassen / Komponenten**  
+- `SidecarConfig`: Definiert CDI (`@Produces`) Beans, die die reinen Java-POJOs aus dem `auth-core` instanziieren und mit den Quarkus-spezifischen Adaptern verknüpfen.
+- `LivenessCheck` / `ReadinessCheck`: Überwachen den Zustand der Anwendung und der integrierten OPA-Engine für Kubernetes.
+
+**Verantwortlichkeiten im Detail**  
+- Konfiguration der Quarkus-Anwendung (Auslesen properties).
+- Erstellung des OIDC-Clients und Einbindung der Quarkus-Security.
+- Bereitstellung von Micrometer-Metriken (Prometheus) zur Laufzeitüberwachung.
+- Bereitstellung der `/q/health`-Endpunkte für den Kubelet-Probes.
+
+**Interaktion mit anderen Modulen**  
+Das Modul aggregiert `auth-core`, `ext-authz` und `opa-wasm` als Maven-Abhängigkeiten. Es fungiert als Composition Root für das Dependency Injection und injiziert die konkrete `WasmPolicyEngine` in die Services des Cores.
+
+**Wichtige Konzepte / Patterns**  
+- **Composition Root**: Der einzige Ort, an dem Framework (Quarkus) und fachliche Implementierung (`auth-core`) verheiratet werden.
+- **Auto-Config (Dev-Mode)**: Umschalten auf In-Memory Mock-Clients während der lokalen Entwicklung.
+
+---
+
+### opa-wasm
+
+**Zweck / Verantwortlichkeit**  
+Implementiert einen extrem schnellen, In-Memory Policy Decision Point (PDP) durch das Kompilieren und Ausführen von OPA (Open Policy Agent) Rego-Policies als WebAssembly (WASM).
+
+**Wichtige Packages**  
+- `de.edeka.eit.sidecar.infrastructure.policy`
+
+**Kern-Klassen / Komponenten**  
+- `WasmPolicyEngine`: Implementiert das `PolicyEngine` Interface aus dem Core. Lädt WASM-Binaries, verwaltet den Hot-Reloading-Thread und evaluiert Anfragen.
+- `Chicory` (als Bibliothek im Hintergrund): Eine pure-Java WASM-Laufzeitumgebung.
+
+**Verantwortlichkeiten im Detail**  
+- Laden der vorkompilierten `authz.wasm` Policies aus dem Classpath (oder via Volume-Mount).
+- Verwaltung eines Threads-Pools / Queues (`AtomicReference<ArrayBlockingQueue>`) für WASM-Instanzen, da WASM State-Management nicht thread-safe ist.
+- Abstraktion des komplexen JSON-Marshalling (Eingabe des `AuthContext` in die WASM-Umgebung und Extrahierung des Ergebnisses).
+- Automatisches Hot-Reloading bei Änderungen an der WASM-Datei ohne Neustart der Anwendung.
+
+**Interaktion mit anderen Modulen**  
+Implementiert das Interface `PolicyEngine` aus dem `auth-core` und ist somit die Ausführungs-Maschine der Autorisierung. Wird vom `config`-Modul registriert.
+
+**Wichtige Konzepte / Patterns**  
+- **Zero-Dependency WASM**: Ausführung der compiled Rego-Policies direkt in der JVM via Chicory (keine nativen Bibliotheken oder externen OPA-Container nötig).
+- **Object Pool Pattern**: Wiederverwendung von vorkonfigurierten WASM-Instanzen zwecks Reduzierung des GC- und CPU-Overheads ("Pool Exhaustion" Vermeidung).
+- **Hot-Reload**: Hintergrund-Watcher, der die WASM-Datei auf dem Filesystem überwacht und bei Updates den Instanz-Pool non-blocking austauscht.
+
+---
+
+### Architectural Overview (C4 Container Diagram)
+
+```mermaid
+C4Container
+    title Modul-Architektur des k8s-auth-sidecar
+
+    Container_Boundary(sidecar, "Sidecar Application") {
+        Container(ext_authz, "ext-authz", "Vert.x Route Handlers", "Nimmt HTTP-Requests entgegen, sanitizes Header, steuert REST-Clients an")
+        Container(config, "config", "Quarkus CDI", "Composition Root, Health Checks, Micrometer Metrics")
+        Container(auth_core, "auth-core", "Java POJOs", "Enthält die pure Domain-Logik, UseCases und Interfaces (Hexagonale Architektur)")
+        Container(opa_wasm, "opa-wasm", "Chicory WASM", "Führt OPA Policies als kompilierte WASM Binaries in-memory aus")
+    }
+
+    Rel(ext_authz, auth_core, "Ruft UseCases auf", "Java (Uni)")
+    Rel(config, auth_core, "Injiziert Abhängigkeiten", "CDI")
+    Rel(config, opa_wasm, "Registriert PolicyEngine", "CDI")
+    Rel(config, ext_authz, "Konfiguriert Routen", "CDI")
+    Rel(auth_core, opa_wasm, "Evaluiert Policies (via Interface)", "Java")
+    
+    System_Ext(envoy, "Envoy/Gateway", "Sendet /authorize Requests")
+    System_Ext(roles_svc, "Roles Service", "Liefert angereicherte Rollen")
+    
+    Rel(envoy, ext_authz, "HTTP GET", "X-Forwarded Headers")
+    Rel(ext_authz, roles_svc, "HTTP GET", "REST Client")
+```
+
+### Request Flow (Sequence Überblick)
+
+1. **Gateway** (Envoy) fängt Request des Clients ab und sendet ein `GET /authorize` (mit Original-Tokens und Headern) an den Sidecar.
+2. **ext-authz** (`SidecarRouteHandler`) empfängt Request, parst Header via `HeaderSanitizer` und schickt einen asynchronen Aufruf (Mutiny) an den `AuthorizationUseCase`.
+3. **auth-core** (`AuthorizationUseCase`) steuert den Workflow:
+   - Extrahiert Claims aus dem Token.
+   - Ruft `RolesService` Interface (implementiert in `ext-authz`) auf, um Rollen vom externen System zu holen.
+   - Bündelt alles in einem `AuthContext`.
+4. **auth-core** fragt `PolicyEngine` (implementiert in `opa-wasm`) zur Evaluierung an.
+5. **opa-wasm** wandelt `AuthContext` in JSON, führt die WASM-Policy aus und liefert eine `PolicyDecision` (Allow/Deny) an den Core zurück.
+6. **ext-authz** wertet das `ProcessingResult` des Cores aus und sendet abschließend HTTP `200 OK` (mit neuen Headern für die Rollen) oder `401`/`403` an das Gateway zurück.
+
+### Developer Recommendations (Einstiegspunkte für Features)
+
+*   **Neue Auth-Logik oder UseCases ("Was" soll passieren):** Immer zuerst in `auth-core` als POJO entwickeln. Keine Framework-Imports verwenden! Nutze PIT Mutation-Testing für >80% Qualität.
+*   **Neue REST-Endpoints (z.B. `/userinfo`):** Im Modul `ext-authz` unter `infrastructure/route/` anlegen und als Vert.x-Route einklinken.
+*   **Andere Policy-Sprachen oder Evaluatoren:** Eine neue Implementierung des `PolicyEngine`-Interfaces schreiben (z.B. ein neues Modul `cedar-evaluator` schnüren und in `config` injizieren). 
+*   **Neue externe APIs anbinden (z.B. Fraud-Detection):** Interface im `auth-core` definieren, den REST-Client im `ext-authz` (analog zu `RolesClient`) implementieren.
+
+
 
 ## Betriebsmodus
 
