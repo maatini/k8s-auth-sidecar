@@ -6,8 +6,8 @@
   [![Quarkus](https://img.shields.io/badge/Quarkus-3.32.3-blue.svg?logo=quarkus)](https://quarkus.io)
   [![Java](https://img.shields.io/badge/Java-21-orange.svg?logo=openjdk)](https://openjdk.org)
   [![License](https://img.shields.io/badge/License-Apache%202.0-green.svg)](LICENSE)
-  [![Tests](https://img.shields.io/badge/Tests-147%20%E2%9C%85%200%20Failures-brightgreen.svg)](#-so-testest-du-das-projekt--schritt-f%C3%BCr-schritt-super-einfach-erkl%C3%A4rt)
-  [![PIT Strength](https://img.shields.io/badge/PIT%20Strength-78%25-brightgreen.svg)](#7-mutation-testing-pit--qualit%C3%A4ts-check)
+  [![Tests](https://img.shields.io/badge/Tests-56%20%E2%9C%85%200%20Failures-brightgreen.svg)](#-so-testest-du-das-projekt--schritt-f%C3%BCr-schritt-super-einfach-erkl%C3%A4rt)
+  [![PIT Strength](https://img.shields.io/badge/PIT%20Strength-79%25-brightgreen.svg)](#7-mutation-testing-pit--qualit%C3%A4ts-check)
   [![Docker](https://img.shields.io/badge/Docker-Ready-blue.svg?logo=docker)](https://www.docker.com/)
   [![Kubernetes](https://img.shields.io/badge/Kubernetes-Ready-blue.svg?logo=kubernetes)](https://kubernetes.io/)
 </div>
@@ -205,28 +205,28 @@ Hier erfährst du, wie du sicherstellst, dass alles perfekt läuft. Wir gehen vo
 > [!IMPORTANT]
 > **Junior-Tipp:** Wenn PIT eine Mutation nicht findet, überlege dir einen Edge-Case (z.B. "Was passiert, wenn der Header leer ist?"), den du noch nicht getestet hast.
 
-#### 8. Aktuelle Test-Metriken (gemessen 2026-03-14)
+#### 8. Aktuelle Test-Metriken (gemessen 2026-03-17)
 
-Das Projekt besitzt eine extrem schnelle, überwiegend Framework-unabhängige Test-Suite:
+Das Projekt besitzt eine extrem schnelle, überwiegend Framework-unabhängige Test-Suite.
 
-| Modul | `@Test`-Methoden | Failures | Typ |
-|-------|------:|:--------:|-----|
-| `config` | 4 | 0 ✅ | POJO + Quarkus |
-| `auth-core` | 48 | 0 ✅ | POJO + Ext + Quarkus |
-| `opa-wasm` | 57 | 0 ✅ | POJO + Ext + Quarkus |
-| `ext-authz` | 38 | 0 ✅ | POJO + E2E + Quarkus |
-| **Gesamt** | **147** | **0 ✅** | |
+| Modul       | `@Test`-Methoden | Failures | Typ                  |
+|-------------|-----------------:|:--------:|----------------------|
+| `config`    | 4                | 0 ✅     | POJO + Quarkus       |
+| `auth-core` | 13               | 0 ✅     | POJO                 |
+| `opa-wasm`  | 6                | 0 ✅     | POJO                 |
+| `ext-authz` | 33               | 0 ✅     | POJO + Quarkus       |
+| **Gesamt**  | **56**           | **0 ✅** |                      |
 
 **PIT Scores per Module:**
 
-| Module    | Killed % | Strength % | Line Cov % |
-|-----------|----------|------------|------------|
-| config    | 29       | 100        | 53         |
-| auth-core | 48       | 79         | 71         |
-| opa-wasm  | 67       | 70         | 88         |
-| ext-authz | 46       | 84         | 41         |
+| Module      | Killed % | Strength % | Line Cov % |
+|-------------|----------|------------|------------|
+| config      | 29       | 100        | 53         |
+| auth-core   | 51       | 80         | 74         |
+| opa-wasm    | 66       | 70         | 88         |
+| ext-authz   | 50       | 79         | 53         |
 
-- Bericht: `<modul>/target/pit-reports/`
+- Bericht: `<modul>/target/pit-reports/index.html`
 
 **Begriffsklärung:**
 - **Line Coverage**: Wie viel Prozent des Codes wurden mindestens einmal ausgeführt?
