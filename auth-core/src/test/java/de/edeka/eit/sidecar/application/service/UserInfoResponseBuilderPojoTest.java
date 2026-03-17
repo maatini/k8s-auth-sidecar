@@ -145,4 +145,51 @@ class UserInfoResponseBuilderPojoTest {
         assertTrue(response.permissions().get("invoices").containsAll(List.of("read", "approve")));
         assertEquals(List.of("manage"), response.permissions().get("users"));
     }
+
+    // --- New edge-case tests ---
+
+    @Test
+    void groupPermissions_ColonAtEnd_PlacedUnderGlobalKey() {
+        // "orders:" has colonIndex == 6 but colonIndex < length - 1 is false
+        Set<String> perms = Set.of("orders:");
+
+        Map<String, List<String>> grouped = builder.groupPermissions(perms);
+
+        assertTrue(grouped.containsKey("_global"), "Permission ending with colon should go to _global");
+        assertTrue(grouped.get("_global").contains("orders:"));
+    }
+
+    @Test
+    void groupPermissions_ColonAtStart_PlacedUnderGlobalKey() {
+        // ":read" has colonIndex == 0, which fails colonIndex > 0 check
+        Set<String> perms = Set.of(":read");
+
+        Map<String, List<String>> grouped = builder.groupPermissions(perms);
+
+        assertTrue(grouped.containsKey("_global"), "Permission starting with colon should go to _global");
+        assertTrue(grouped.get("_global").contains(":read"));
+    }
+
+    @Test
+    void groupPermissions_MultipleColons_SplitsOnFirstColon() {
+        Set<String> perms = Set.of("a:b:c");
+
+        Map<String, List<String>> grouped = builder.groupPermissions(perms);
+
+        assertEquals(List.of("b:c"), grouped.get("a"),
+                "Should split on first colon only, keeping remainder as action");
+    }
+
+    @Test
+    void build_WithEmptyRoles_ReturnsEmptyList() {
+        AuthContext ctx = AuthContext.builder()
+                .userId("user1")
+                .roles(Set.of())
+                .build();
+
+        UserInfoResponse response = builder.build(ctx);
+
+        assertNotNull(response.roles());
+        assertTrue(response.roles().isEmpty());
+    }
 }
