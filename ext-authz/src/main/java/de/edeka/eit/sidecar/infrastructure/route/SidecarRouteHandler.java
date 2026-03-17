@@ -8,6 +8,8 @@ import io.vertx.ext.web.RoutingContext;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.jwt.JsonWebToken;
+import org.eclipse.microprofile.openapi.annotations.Operation;
+import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
 import de.edeka.eit.sidecar.application.service.SidecarRequestProcessor;
 import de.edeka.eit.sidecar.domain.model.ProcessingResult;
 import de.edeka.eit.sidecar.domain.model.SidecarRequest;
@@ -46,6 +48,10 @@ public class SidecarRouteHandler {
      * Checks if the request is authorized and returns enriched headers.
      */
     @Route(path = "/authorize", methods = Route.HttpMethod.GET)
+    @Operation(summary = "Authorize request", description = "Envoy ext_authz endpoint that validates the token and queries OPA policies")
+    @APIResponse(responseCode = "200", description = "Authorized")
+    @APIResponse(responseCode = "401", description = "Unauthorized - invalid token")
+    @APIResponse(responseCode = "403", description = "Forbidden - denied by OPA")
     public Uni<Void> authorize(RoutingContext ctx) {
         HttpServerRequest vertxRequest = ctx.request();
 
