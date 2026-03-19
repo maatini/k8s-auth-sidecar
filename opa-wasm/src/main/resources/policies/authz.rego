@@ -9,11 +9,23 @@ import future.keywords.in
 # Default deny
 default allow := false
  
+# Erlaube jedem authentifizierten Nutzer den Zugriff auf sein eigenes /userinfo
+allow if {
+    input.request.path == "/userinfo"
+}
+
 # Allow if user has superadmin role
 allow if {
     "superadmin" in input.user.roles
 }
- 
+
+# Allow admin paths only for users
+# Test 
+allow if {
+    startswith(input.request.path, "/user/")
+    "user" in input.user.roles
+}
+
 # Allow admin paths for admin users
 allow if {
     startswith(input.request.path, "/api/admin")
@@ -100,4 +112,22 @@ metadata := {
     "version": "1.0.0",
     "description": "Default authorization policy for RR-Sidecar",
     "last_updated": "2024-01-01"
+}
+
+# -----------------
+# Permissions
+# -----------------
+
+# Optional definierte Rollen-Berechtigungen (Role-to-Permissions Mapping)
+role_permissions := {
+    "admin": ["admin_access", "user_read", "user_write"],
+    "user-manager": ["user_read", "user_write"],
+    "viewer": ["user_read"],
+    "developer": ["system_read"]
+}
+
+# Löst Berechtigungen dynamisch anhand der ermittelten Rollen auf
+permissions contains p if {
+    some role in input.user.roles
+    some p in role_permissions[role]
 }

@@ -1,0 +1,54 @@
+---
+# 1. Ingress (Routen werden über /authorize abgesichert)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-application
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/auth-url: "http://my-application.k8s-auth-sidecar-demo.svc.cluster.local:8080/authorize"
+    nginx.ingress.kubernetes.io/auth-response-headers: "X-Auth-User-Id, X-Enriched-Roles"    
+spec:
+  tls:
+    - hosts:
+        - my-application.example.com
+      secretName: my-application-tls
+  rules:
+    - host: my-application.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: my-application
+                port:
+                  number: 80
+
+---
+# 2. Ingress speziell für den Sidecar (OHNE Auth-Annotations)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-application-userinfo
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    # WICHTIG: Die auth-url und auth-response-headers fehlen hier absichtlich!
+spec:
+  tls:
+    - hosts:
+        - my-application.example.com
+      secretName: my-application-tls
+  rules:
+    - host: my-application.example.com
+      http:
+        paths:
+          - path: /userinfo
+            pathType: Exact
+            backend:
+              service:
+                name: my-application
+                port:
+                  number: 8080 # <-- Leitet direkt an den Sidecar-Port weiter

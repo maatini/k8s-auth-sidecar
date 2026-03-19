@@ -93,7 +93,18 @@ public class SidecarRequestProcessor {
                                 }
                                 LOG.debugf("Authorization allowed for user %s on %s %s",
                                         authContext.userId(), method, path);
-                                return (ProcessingResult) ProcessingResult.proceed(authContext);
+                                
+                                AuthContext updatedContext = authContext;
+                                if (result.permissions() != null && !result.permissions().isEmpty()) {
+                                    java.util.Set<String> allPerms = new java.util.HashSet<>();
+                                    if (authContext.permissions() != null) {
+                                        allPerms.addAll(authContext.permissions());
+                                    }
+                                    allPerms.addAll(result.permissions());
+                                    updatedContext = authContext.withRolesAndPermissions(authContext.roles(), allPerms);
+                                }
+                                
+                                return (ProcessingResult) ProcessingResult.proceed(updatedContext);
                             });
                 })
                 .onFailure().recoverWithItem(error -> {

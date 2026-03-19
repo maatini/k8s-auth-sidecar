@@ -50,7 +50,7 @@ services:
       - ./opa-wasm/src/main/resources/policies:/policies
     environment:
       # OIDC Settings
-      OIDC_AUTH_SERVER_URL: "http://wiremock-oidc:8080/realms/master"
+      OIDC_AUTH_SERVER_URL: "http://wiremock-oidc:8090/realms/master"
       OIDC_CLIENT_ID: "k8s-auth-sidecar"
       QUARKUS_OIDC_TOKEN_ISSUER: "any"
       QUARKUS_OIDC_JWKS_RESOLVE_EARLY: "false"
@@ -58,7 +58,7 @@ services:
       # By setting issuer: any and not validating early, Quarkus will skip validating the issuer claim
       # The mock JWT signature is invalid. For the demo, disable Auth temporarily or fix token signing.
       AUTH_ENABLED: "false"
-      ROLES_SERVICE_URL: "http://wiremock-roles:8080"
+      ROLES_SERVICE_URL: "http://wiremock-roles:8089"
 
       # Logging
       QUARKUS_LOG_LEVEL: "DEBUG"

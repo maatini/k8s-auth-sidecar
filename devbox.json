@@ -4,9 +4,14 @@
     "maven@latest",
     "kubectl@latest",
     "kustomize@latest",
-    "quarkus@latest"
+    "quarkus@latest",
+    "open-policy-agent@latest",
+    "python@latest",
+    "uv@latest"
   ],
-  "env": {},
+  "env": {
+    "no_proxy": "localhost,127.0.0.1"
+  },
   "shell": {
     "init_hook": [
       "echo '🚀 K8s-Auth-Sidecar Devbox Environment'",
@@ -15,13 +20,13 @@
       "echo '🛡️ OPA Version:' $(opa version | head -n 1)"
     ],
     "scripts": {
-      "build": "mvn package",
-      "dev": "mvn quarkus:dev",
-      "test": "mvn test",
+      "build":         "mvn package",
+      "dev":           "mvn quarkus:dev",
+      "test":          "mvn test",
       "test:coverage": "mvn test -Dquarkus.jacoco.report=true",
       "test:policies": "opa test src/main/resources/policies -v",
-      "image:build": "docker build -t de.edeka.eit/k8s-auth-sidecar:1.0.0 .",
-      "deploy:dev": "kubectl apply -k k8s/overlays/development"
+      "image:build":   "docker build -t de.edeka.eit/k8s-auth-sidecar:1.0.0 .",
+      "deploy:dev":    "kubectl apply -k k8s/overlays/development"
     }
   }
 }

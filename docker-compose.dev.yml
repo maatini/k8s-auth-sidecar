@@ -10,6 +10,9 @@ services:
       - ./wiremock/oidc:/home/wiremock
     command:
       - "--global-response-templating"
+    environment: 
+      WIREMOCK_OPTIONS: "--verbose"
+  
 
   wiremock-roles:
     image: wiremock/wiremock:3.13.2
@@ -20,3 +23,5 @@ services:
       - ./wiremock/roles:/home/wiremock
     command:
       - "--global-response-templating"
+    environment: 
+      WIREMOCK_OPTIONS: "--verbose"

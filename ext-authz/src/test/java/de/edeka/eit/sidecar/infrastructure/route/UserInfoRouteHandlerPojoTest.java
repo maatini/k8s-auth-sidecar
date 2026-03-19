@@ -123,7 +123,7 @@ class UserInfoRouteHandlerPojoTest {
     @Test
     void userinfo_WhenForbidden_Returns403() {
         var authResult = new de.edeka.eit.sidecar.usecase.authorization.AuthorizationResult(
-                false, "Not authorized", List.of());
+                false, "Not authorized", List.of(), Collections.emptySet());
         ProcessingResult.Forbidden forbidden = new ProcessingResult.Forbidden(authResult);
 
         when(processor.process(any())).thenReturn(Uni.createFrom().item(forbidden));

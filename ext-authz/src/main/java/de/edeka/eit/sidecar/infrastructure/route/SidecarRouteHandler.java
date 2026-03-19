@@ -10,6 +10,8 @@ import jakarta.inject.Inject;
 import org.eclipse.microprofile.jwt.JsonWebToken;
 import org.eclipse.microprofile.openapi.annotations.Operation;
 import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
+import org.eclipse.microprofile.openapi.annotations.security.SecurityRequirement;
+
 import de.edeka.eit.sidecar.application.service.SidecarRequestProcessor;
 import de.edeka.eit.sidecar.domain.model.ProcessingResult;
 import de.edeka.eit.sidecar.domain.model.SidecarRequest;
@@ -49,6 +51,7 @@ public class SidecarRouteHandler {
      */
     @Route(path = "/authorize", methods = Route.HttpMethod.GET)
     @Operation(summary = "Authorize request", description = "Envoy ext_authz endpoint that validates the token and queries OPA policies")
+    @SecurityRequirement(name = "jwt")
     @APIResponse(responseCode = "200", description = "Authorized")
     @APIResponse(responseCode = "401", description = "Unauthorized - invalid token")
     @APIResponse(responseCode = "403", description = "Forbidden - denied by OPA")

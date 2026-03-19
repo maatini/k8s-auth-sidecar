@@ -120,8 +120,17 @@ public class PolicyService implements PolicyEngine {
  
         if (result.isObject() && result.has("allow")) {
             boolean allowed = result.get("allow").asBoolean(false);
+            
+            Set<String> permissions = new HashSet<>();
+            if (result.has("permissions") && result.get("permissions").isArray()) {
+                result.get("permissions").forEach(p -> permissions.add(p.asText()));
+            }
+ 
             if (allowed) {
-                return PolicyDecision.allow();
+                return PolicyDecision.builder()
+                        .allowed(true)
+                        .permissions(permissions)
+                        .build();
             }
  
             String reason = result.has("reason") ? result.get("reason").asText() : "Access denied by policy";
@@ -129,7 +138,12 @@ public class PolicyService implements PolicyEngine {
             if (result.has("violations") && result.get("violations").isArray()) {
                 result.get("violations").forEach(v -> violations.add(v.asText()));
             }
-            return PolicyDecision.deny(reason, violations);
+            return PolicyDecision.builder()
+                    .allowed(false)
+                    .reason(reason)
+                    .violations(violations)
+                    .permissions(permissions)
+                    .build();
         }
  
         return PolicyDecision.deny("Unexpected OPA response format");

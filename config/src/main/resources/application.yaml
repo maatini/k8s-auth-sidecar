@@ -56,6 +56,18 @@ quarkus:
       connect-timeout: ${ROLES_CONNECT_TIMEOUT:2000}
       read-timeout: ${ROLES_READ_TIMEOUT:500}
 
+  # OpenAPI Configuration
+  smallrye-openapi:
+    enabled: true
+    info-title: "K8s-Auth-Sidecar API"
+    info-version: "0.3.0"
+    info-description: "OpenAPI Dokumentation und Test-UI für k8s-auth-sidecar v0.3.0"
+
+  # Swagger UI
+  swagger-ui:
+    always-include: true
+    path: /swagger-ui
+
   # Health and Metrics
   smallrye-health:
     ui:
@@ -160,6 +172,17 @@ sidecar:
     cache-ttl: 10m
 
 # ===================
+# MicroProfile OpenAPI – OASModelReader for reactive routes
+# ===================
+
+mp:
+  openapi:
+    model:
+      reader: de.edeka.eit.sidecar.infrastructure.openapi.OpenApiConfig
+    scan:
+      disable: true
+
+# ===================
 # Profile-specific Configuration
 # ===================
 
@@ -180,6 +203,7 @@ sidecar:
           level: WARN
     oidc:
       auth-server-url: http://localhost:8090/realms/master
+      application-type: service
       token:
         issuer: any
         verification:
@@ -190,7 +214,7 @@ sidecar:
 
   sidecar:
     auth:
-      enabled: false
+      enabled: true
     authz:
       enabled: true
     opa:

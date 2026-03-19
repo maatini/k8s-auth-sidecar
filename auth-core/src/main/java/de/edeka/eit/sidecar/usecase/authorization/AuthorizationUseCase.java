@@ -45,7 +45,8 @@ public class AuthorizationUseCase {
         return new AuthorizationResult(
                 decision.allowed(),
                 decision.reason(),
-                decision.violations()
+                decision.violations(),
+                decision.permissions()
         );
     }
 }

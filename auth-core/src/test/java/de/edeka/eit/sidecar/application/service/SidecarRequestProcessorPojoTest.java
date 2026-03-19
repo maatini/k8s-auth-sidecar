@@ -98,7 +98,7 @@ class SidecarRequestProcessorPojoTest {
         AuthContext authCtx = AuthContext.builder().userId("u123").email("u@u").build();
         when(authService.extractAuthContext(eq(jwt))).thenReturn(Uni.createFrom().item(authCtx));
         when(authorizationUseCase.execute(any()))
-                .thenReturn(Uni.createFrom().item(new AuthorizationResult(true, null, Collections.emptyList())));
+                .thenReturn(Uni.createFrom().item(new AuthorizationResult(true, null, Collections.emptyList(), Collections.emptySet())));
  
         ProcessingResult result = processor.process(request).await().indefinitely();
         assertTrue(result instanceof ProcessingResult.Proceed);
@@ -113,7 +113,7 @@ class SidecarRequestProcessorPojoTest {
         AuthContext authCtx = AuthContext.builder().userId("u123").email("u@u").build();
         when(authService.extractAuthContext(eq(jwt))).thenReturn(Uni.createFrom().item(authCtx));
         when(authorizationUseCase.execute(any()))
-                .thenReturn(Uni.createFrom().item(new AuthorizationResult(false, "Denied by test", Collections.emptyList())));
+                .thenReturn(Uni.createFrom().item(new AuthorizationResult(false, "Denied by test", Collections.emptyList(), Collections.emptySet())));
  
         ProcessingResult result = processor.process(request).await().indefinitely();
         assertTrue(result instanceof ProcessingResult.Forbidden);

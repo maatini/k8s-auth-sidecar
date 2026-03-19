@@ -38,7 +38,7 @@ public class AuthSidecarE2ETest {
                                         "sidecar.auth.enabled", "true",
                                         "sidecar.authz.enabled", "true",
                                         "sidecar.opa.enabled", "true",
-                                        "quarkus.oidc.auth-server-url", "http://localhost:8089/realms/test");
+                                        "quarkus.oidc.auth-server-url", "http://localhost:18089/realms/test");
                 }
         }
 
@@ -58,16 +58,16 @@ public class AuthSidecarE2ETest {
                 String jwks = "{\"keys\":[{\"kty\":\"RSA\",\"kid\":\"1\",\"alg\":\"RS256\",\"use\":\"sig\",\"n\":\"" + n
                                 + "\",\"e\":\"" + e + "\"}]}";
 
-                wireMockServer = new WireMockServer(8089);
+                wireMockServer = new WireMockServer(18089);
                 wireMockServer.start();
-                WireMock.configureFor(8089);
+                WireMock.configureFor(18089);
 
                 // OIDC config stubs
                 stubFor(get(urlEqualTo("/realms/test/.well-known/openid-configuration"))
                                 .willReturn(aResponse()
                                                 .withStatus(200)
                                                 .withHeader("Content-Type", "application/json")
-                                                .withBody("{\"issuer\":\"http://localhost:8089/realms/test\",\"jwks_uri\":\"http://localhost:8089/realms/test/protocol/openid-connect/certs\"}")));
+                                                .withBody("{\"issuer\":\"http://localhost:18089/realms/test\",\"jwks_uri\":\"http://localhost:18089/realms/test/protocol/openid-connect/certs\"}")));
 
                 stubFor(get(urlEqualTo("/realms/test/protocol/openid-connect/certs"))
                                 .willReturn(aResponse()
@@ -97,7 +97,7 @@ public class AuthSidecarE2ETest {
         @Test
         void testHappyPath_OwnProfile_ShouldReturn200() {
                 String token = Jwt.claims().subject("user123")
-                                .issuer("http://localhost:8089/realms/test")
+                                .issuer("http://localhost:18089/realms/test")
                                 .issuedAt(System.currentTimeMillis() / 1000)
                                 .expiresAt(System.currentTimeMillis() / 1000 + 3600)
                                 .upn("user123")
@@ -117,7 +117,7 @@ public class AuthSidecarE2ETest {
         @Test
         void testErrorPath_ShouldReturn500() {
                 String token = Jwt.claims().subject("admin1")
-                                .issuer("http://localhost:8089/realms/test")
+                                .issuer("http://localhost:18089/realms/test")
                                 .issuedAt(System.currentTimeMillis() / 1000)
                                 .expiresAt(System.currentTimeMillis() / 1000 + 3600)
                                 .upn("admin1")

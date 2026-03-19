@@ -87,7 +87,7 @@
                             <arguments>
                                 <argument>build</argument>
                                 <argument>-t</argument><argument>wasm</argument>
-                                <argument>-e</argument><argument>authz/allow</argument>
+                                <argument>-e</argument><argument>authz</argument>
                                 <argument>-o</argument><argument>${project.build.directory}/generated-resources/policies/bundle.tar.gz</argument>
                                 <argument>${project.basedir}/src/main/resources/policies/authz.rego</argument>
                             </arguments>

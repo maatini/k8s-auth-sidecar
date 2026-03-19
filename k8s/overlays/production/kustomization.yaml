@@ -10,27 +10,7 @@ namePrefix: prod-
 
 commonLabels:
   environment: production
-
-# Production-specific patches
-patches:
-  - patch: |-
-      - op: replace
-        path: /spec/replicas
-        value: 3
-    target:
-      kind: Deployment
-      name: my-application
-
-  - patch: |-
-      - op: replace
-        path: /spec/template/spec/containers/0/resources/requests/memory
-        value: "96Mi"
-      - op: replace
-        path: /spec/template/spec/containers/0/resources/limits/memory
-        value: "256Mi"
-    target:
-      kind: Deployment
-      name: my-application
+  app: my-application
 
 configMapGenerator:
   - name: k8s-auth-sidecar-config

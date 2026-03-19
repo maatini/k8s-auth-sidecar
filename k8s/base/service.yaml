@@ -1,0 +1,19 @@
+---
+# Service pointing to the SIDECAR port (8080)
+# All external traffic goes through the sidecar first
+apiVersion: v1
+kind: Service
+metadata:
+  name: my-application
+  labels:
+    app: my-application
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080  # Points to sidecar, NOT the main app
+      protocol: TCP
+  selector:
+    app: my-application
+

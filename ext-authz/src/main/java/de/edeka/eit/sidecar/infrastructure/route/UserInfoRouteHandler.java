@@ -11,6 +11,7 @@ import jakarta.inject.Inject;
 import org.eclipse.microprofile.jwt.JsonWebToken;
 import org.eclipse.microprofile.openapi.annotations.Operation;
 import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
+import org.eclipse.microprofile.openapi.annotations.security.SecurityRequirement;
 import org.jboss.logging.Logger;
 import de.edeka.eit.sidecar.application.service.SidecarRequestProcessor;
 import de.edeka.eit.sidecar.application.service.UserInfoResponseBuilder;
@@ -58,6 +59,7 @@ public class UserInfoRouteHandler {
      */
     @Route(path = "/userinfo", methods = Route.HttpMethod.GET)
     @Operation(summary = "Get user info", description = "Extracts user context, roles and permissions from token and an optional RolesService")
+    @SecurityRequirement(name = "jwt")
     @APIResponse(responseCode = "200", description = "User info retrieved successfully")
     @APIResponse(responseCode = "401", description = "Unauthorized - invalid token")
     @APIResponse(responseCode = "403", description = "Forbidden - denied by OPA")

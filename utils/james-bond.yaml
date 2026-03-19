@@ -1,0 +1,11 @@
+sub: "test-user-123"
+email: "test.user@example.com"
+name: "Test User"
+preferred_username: "tuser"
+groups:
+  - "developer"
+  - "admin"
+tenant: "tenant-A"
+
+
+
