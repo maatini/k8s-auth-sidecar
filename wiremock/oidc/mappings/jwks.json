@@ -12,10 +12,10 @@
       "keys": [
         {
           "kty": "RSA",
-          "kid": "wiremock-key",
+          "kid": "test-key-2026",
           "use": "sig",
           "alg": "RS256",
-          "n": "jskQJU7Af-Bjhi_553vHkaoyo85yIW5wZalbieqy5HalccMSDdeNVBp0Wirogtqbe7Pp9YuHJExQmIouZQqqJ7yzE-cJ4hr97HclXyCEASzYN2_WWnvkC1tYixZpPEcYlPzDt8Ft0AoFUJdt7gbuStMgnpjGdd75kwbZaMRKJ7qXhQ8ZmcfJlmDrLUT9pDKsd6iShLRJcoEMh5tgXdmmfjwdiwRmFmXkiZbzMPWzEB2jIMxvHwCS2G7XwLM7nwu1CCEdKvmrh0GU8CWnrcU1VhjC6aanOHxP2gZt4H7csU8xU-Cvn4NaaEMU4dqZeVinp-5p7XL4gIdbCKZF15xoTw",
+          "n": "35udKHkM3sRINGVNg82NsvLpo56qvdm1th2tvwB_bZKQ4FXR9QqWf9mIn6MW4VOr6j0bNcs7nlUeYtyYT1ZTRzRcmw5JpPrBQqFA0LiWA_22B8msCLN9qP-hxEYVXlPnTST6r9plEs1cJG71Gkwbc2RJ-xpLKj8Ot-sVdCj0h7BmcLCK7NS5KDrblv3AuYdZsSC-P2cyxwP5kyZALukCVBwYLqW0O1Y6I9UEptxt1_nf14lsApoVIVq7B24jj3UuQy5pmTW2i5jzzFc9x8jybvQil7EbS2UOd3usvkW8nPtY6WRo3SKYxOBuihxU0bMT48ol8cdpdSesmHa31BX5sQ",
           "e": "AQAB"
         }
       ]

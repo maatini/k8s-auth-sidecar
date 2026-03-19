@@ -99,14 +99,43 @@ def main():
 
     token = create_test_jwt(private_key_obj, claims, kid=args.kid)
 
-    print("Private Key (PEM) – speichere sicher!\n")
+    # Path to wiremock directory relative to this script
+    script_dir = Path(__file__).parent.resolve()
+    wiremock_dir = script_dir.parent / "wiremock" / "oidc" / "mappings"
+    
+    jwks_file = wiremock_dir / "jwks.json"
+    token_file = wiremock_dir / "token.json"
+    
+    # Update JWKS file
+    if jwks_file.exists():
+        with open(jwks_file, "r", encoding="utf-8") as f:
+            jwks_data = json.load(f)
+        
+        jwks_data["response"]["jsonBody"]["keys"] = [jwk]
+        
+        with open(jwks_file, "w", encoding="utf-8") as f:
+            json.dump(jwks_data, f, indent=2)
+        print(f"Updated: {jwks_file.relative_to(script_dir.parent)}")
+    else:
+        print(f"File not found: {jwks_file}")
+        
+    # Update token file
+    if token_file.exists():
+        with open(token_file, "r", encoding="utf-8") as f:
+            token_data = json.load(f)
+            
+        token_data["response"]["jsonBody"]["access_token"] = token
+        
+        with open(token_file, "w", encoding="utf-8") as f:
+            json.dump(token_data, f, indent=2)
+        print(f"Updated: {token_file.relative_to(script_dir.parent)}")
+    else:
+        print(f"File not found: {token_file}")
+
+    print("\nPrivate Key (PEM) – speichere sicher!\n")
     print(private_pem)
     print("\nPublic Key (PEM):\n")
     print(public_pem)
-    print("\nJWKS JSON (für WireMock /.well-known/jwks.json):\n")
-    print(json.dumps(jwks, indent=2))
-    print("\nBeispiel-JWT (kopiere direkt in Authorization: Bearer ...):\n")
-    print(token)
     print("\nFertig! Issuer:", args.iss)
 
 
