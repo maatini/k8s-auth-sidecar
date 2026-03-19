@@ -1,0 +1,37 @@
+sequenceDiagram
+    participant Gateway as Envoy/Gateway
+    participant ExtAuthz as ext-authz (SidecarRouteHandler)
+    participant AuthCore as auth-core (AuthorizationUseCase)
+    participant RolesSvc as Roles Service (via ext-authz Client)
+    participant OpaWasm as opa-wasm (PolicyEngine)
+
+    Note over Gateway,OpaWasm: Request Flow (Sequence)
+    
+    Gateway->>ExtAuthz: 1. GET /authorize (Tokens & Headers)
+    
+    rect rgb(240, 240, 240)
+    Note over ExtAuthz: 2. HeaderSanitizer prüft Inputs
+    ExtAuthz->>AuthCore: 2. Async Call (validate/authorize)
+    end
+    
+    rect rgb(230, 245, 230)
+    Note over AuthCore: 3. Extrahiert Claims aus Token
+    AuthCore->>RolesSvc: 3. Hole externe Rollen
+    RolesSvc-->>AuthCore: 3. Return User Roles
+    Note over AuthCore: 3. Bündelt Daten in AuthContext
+    end
+    
+    rect rgb(245, 230, 230)
+    AuthCore->>OpaWasm: 4. Evaluierung anfragen (AuthContext)
+    Note over OpaWasm: 5. AuthContext -> JSON
+    Note over OpaWasm: 5. Führt WASM-Policy aus
+    OpaWasm-->>AuthCore: 5. Return PolicyDecision (Allow/Deny)
+    end
+    
+    AuthCore-->>ExtAuthz: Return ProcessingResult
+    
+    alt Allowed
+        ExtAuthz-->>Gateway: 6. 200 OK (inkl. X-Auth-User-Id, X-Enriched-Roles)
+    else Denied
+        ExtAuthz-->>Gateway: 6. 401/403 (Unauthorized/Forbidden)
+    end

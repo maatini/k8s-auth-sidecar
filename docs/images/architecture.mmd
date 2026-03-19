@@ -1,0 +1,21 @@
+C4Container
+    title Modul-Architektur des k8s-auth-sidecar
+
+    Container_Boundary(sidecar, "Sidecar Application") {
+        Container(ext_authz, "ext-authz", "Vert.x Route Handlers", "Nimmt HTTP-Requests entgegen, sanitizes Header, steuert REST-Clients an")
+        Container(config, "config", "Quarkus CDI", "Composition Root, Health Checks, Micrometer Metrics")
+        Container(auth_core, "auth-core", "Java POJOs", "Enthält die pure Domain-Logik, UseCases und Interfaces (Hexagonale Architektur)")
+        Container(opa_wasm, "opa-wasm", "Chicory WASM", "Führt OPA Policies als kompilierte WASM Binaries in-memory aus")
+    }
+
+    Rel(ext_authz, auth_core, "Ruft UseCases auf", "Java (Uni)")
+    Rel(config, auth_core, "Injiziert Abhängigkeiten", "CDI")
+    Rel(config, opa_wasm, "Registriert PolicyEngine", "CDI")
+    Rel(config, ext_authz, "Konfiguriert Routen", "CDI")
+    Rel(auth_core, opa_wasm, "Evaluiert Policies (via Interface)", "Java")
+    
+    System_Ext(envoy, "Envoy/Gateway", "Sendet /authorize Requests")
+    System_Ext(roles_svc, "Roles Service", "Liefert angereicherte Rollen")
+    
+    Rel(envoy, ext_authz, "HTTP GET", "X-Forwarded Headers")
+    Rel(ext_authz, roles_svc, "HTTP GET", "REST Client")
