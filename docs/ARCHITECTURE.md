@@ -4,9 +4,10 @@
 
 Der **k8s-auth-sidecar** (Request Router Sidecar) ist ein Quarkus-basierter Microservice, der als Sidecar in einem Kubernetes-Pod läuft und Authentifizierung (AuthN) sowie Autorisierung (AuthZ) für den Haupt-Container übernimmt.
 
-## Architekturdiagramm (ASCII)
+## Architekturdiagramm 
 
-![System Architecture](images/architecture.png)
+<img src="./images/architektur-diagramm.jpg" alt="K8s-Auth-Sidecar Architektur" width="800">
+
 
 ## Request Flow
 
