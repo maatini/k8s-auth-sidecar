@@ -22,7 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       # Setup Java 21 distribution with Maven caching for faster builds
       - name: Set up JDK 21
@@ -61,7 +61,7 @@ jobs:
     needs: build
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       # Setup GraalVM for native compilation
       - name: Set up GraalVM
@@ -87,7 +87,7 @@ jobs:
     needs: build
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       # QEMU allows building for ARM64 on AMD64 runners
       - name: Set up QEMU
