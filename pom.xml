@@ -32,7 +32,7 @@
         <surefire-plugin.version>3.5.6</surefire-plugin.version>
         <failsafe-plugin.version>3.5.6</failsafe-plugin.version>
         <jandex-plugin.version>3.6.0</jandex-plugin.version>
-        <pitest-maven.version>1.25.4</pitest-maven.version>
+        <pitest-maven.version>1.25.5</pitest-maven.version>
         <cyclonedx-maven.version>2.9.1</cyclonedx-maven.version>
     </properties>
  
