@@ -89,6 +89,18 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v7
 
+      # JDK + Maven cache so Trivy can resolve Java deps from ~/.m2 (avoids Maven Central 429)
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      # Populate local Maven repository before Trivy FS scan (prevents remote POM 429s)
+      - name: Populate Maven local cache
+        run: ./mvnw -B --no-transfer-progress dependency:go-offline -DskipTests
+
       # QEMU allows building for ARM64 on AMD64 runners
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v4
@@ -98,8 +110,9 @@ jobs:
         uses: docker/setup-buildx-action@v4
 
       # Security: Scan the local Git repository for vulnerabilities
+      # Pinned (not @master) after trivy-action supply-chain incidents in 2026
       - name: Trivy FS Scan
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: 'fs'
           scan-ref: '.'
@@ -120,7 +133,7 @@ jobs:
 
       # Security: Scan the built Docker image for vulnerabilities in OS packages and dependencies
       - name: Trivy Image Scan (Syft/Trivy)
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: 'k8s-auth-sidecar:latest'
           format: 'table'
