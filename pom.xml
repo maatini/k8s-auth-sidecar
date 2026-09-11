@@ -35,7 +35,7 @@
         <pitest-maven.version>1.25.9</pitest-maven.version>
         <cyclonedx-maven.version>2.9.3</cyclonedx-maven.version>
         <!-- Override Quarkus-managed Jackson (GHSA-r7wm-3cxj-wff9 in jackson-core 2.22.0) -->
-        <jackson-bom.version>2.22.1</jackson-bom.version>
+        <jackson-bom.version>2.22.2</jackson-bom.version>
     </properties>
  
     <dependencyManagement>
